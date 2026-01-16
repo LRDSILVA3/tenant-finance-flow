@@ -1,8 +1,8 @@
 // Chart of Accounts Component
 
 import React, { useState } from 'react';
-import { useFinance } from '@/contexts/FinanceContext';
-import { Category, TransactionType } from '@/types/finance';
+import { useFinance, Category } from '@/contexts/FinanceContext';
+import { TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,8 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Plus, Pencil, Trash2, ChevronRight, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 
 export const ChartOfAccounts: React.FC = () => {
   const {
@@ -49,6 +48,7 @@ export const ChartOfAccounts: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -81,17 +81,18 @@ export const ChartOfAccounts: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.code.trim() || !currentClient) return;
 
+    setSaving(true);
+
     if (editingCategory) {
-      updateCategory(editingCategory.id, {
+      await updateCategory(editingCategory.id, {
         name: formData.name,
         code: formData.code,
       });
-      toast({ title: t.saved });
     } else {
-      addCategory({
+      await addCategory({
         clientId: currentClient.id,
         name: formData.name,
         code: formData.code,
@@ -99,16 +100,15 @@ export const ChartOfAccounts: React.FC = () => {
         parentId: formData.parentId || null,
         order: categories.length,
       });
-      toast({ title: t.saved });
     }
 
+    setSaving(false);
     setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingCategory) {
-      deleteCategory(deletingCategory.id);
-      toast({ title: t.deleted });
+      await deleteCategory(deletingCategory.id);
     }
     setIsDeleteDialogOpen(false);
     setDeletingCategory(null);
@@ -182,11 +182,11 @@ export const ChartOfAccounts: React.FC = () => {
   const renderCategorySection = (
     title: string,
     type: TransactionType,
-    categories: Category[],
+    categoriesList: Category[],
     icon: React.ReactNode,
     accentColor: string
   ) => {
-    const rootCategories = categories.filter((c) => c.parentId === null);
+    const rootCategories = categoriesList.filter((c) => c.parentId === null);
 
     return (
       <div className="finance-card overflow-hidden">
@@ -298,7 +298,16 @@ export const ChartOfAccounts: React.FC = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               {t.cancel}
             </Button>
-            <Button onClick={handleSave}>{t.save}</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                t.save
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

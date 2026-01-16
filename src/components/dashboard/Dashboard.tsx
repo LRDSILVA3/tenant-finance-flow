@@ -17,35 +17,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
   const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
   const getMonthLabel = (monthIndex: number) => t[monthKeys[monthIndex]];
 
-  const clientTransactions = useMemo(() => {
-    if (!currentClient) return [];
-    return transactions.filter((t) => t.clientId === currentClient.id);
-  }, [currentClient, transactions]);
-
   const summary: FinancialSummary = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const currentMonthTransactions = clientTransactions.filter((t) => {
-      const date = new Date(t.date);
+    const currentMonthTransactions = transactions.filter((txn) => {
+      const date = new Date(txn.date);
       return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
 
     const totalIncome = currentMonthTransactions
-      .filter((t) => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((txn) => txn.type === 'income')
+      .reduce((sum, txn) => sum + txn.amount, 0);
 
     const totalExpense = currentMonthTransactions
-      .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((txn) => txn.type === 'expense')
+      .reduce((sum, txn) => sum + txn.amount, 0);
 
     return {
       totalIncome,
       totalExpense,
       balance: totalIncome - totalExpense,
     };
-  }, [clientTransactions]);
+  }, [transactions]);
 
   const monthlyFlowData: MonthlyFlowData[] = useMemo(() => {
     const now = new Date();
@@ -53,18 +48,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
 
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthTransactions = clientTransactions.filter((t) => {
-        const tDate = new Date(t.date);
+      const monthTransactions = transactions.filter((txn) => {
+        const tDate = new Date(txn.date);
         return tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
       });
 
       const income = monthTransactions
-        .filter((t) => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0);
+        .filter((txn) => txn.type === 'income')
+        .reduce((sum, txn) => sum + txn.amount, 0);
 
       const expense = monthTransactions
-        .filter((t) => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0);
+        .filter((txn) => txn.type === 'expense')
+        .reduce((sum, txn) => sum + txn.amount, 0);
 
       data.push({
         month: getMonthLabel(date.getMonth()),
@@ -74,7 +69,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
     }
 
     return data;
-  }, [clientTransactions, language]);
+  }, [transactions, language]);
 
   if (!currentClient) {
     return (
@@ -103,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MonthlyFlowChart data={monthlyFlowData} />
         <RecentTransactions
-          transactions={clientTransactions}
+          transactions={transactions}
           onViewAll={onNavigateToTransactions}
         />
       </div>
