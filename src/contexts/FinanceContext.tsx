@@ -1,11 +1,87 @@
-// Finance Context - Global State Management
+// Finance Context - Global State Management with Supabase
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Language, Client, Category, Transaction, TransactionType } from '@/types/finance';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Language, TransactionType } from '@/types/finance';
 import { translations, Translations } from '@/i18n/translations';
 import { getDefaultCategoriesForLanguage } from '@/data/defaultChartOfAccounts';
+import { toast } from '@/hooks/use-toast';
+
+// Database types
+interface DbClient {
+  id: string;
+  user_id: string;
+  name: string;
+  tax_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbCategory {
+  id: string;
+  user_id: string;
+  client_id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  code: string;
+  sort_order: number;
+  created_at: string;
+}
+
+interface DbTransaction {
+  id: string;
+  user_id: string;
+  client_id: string;
+  category_id: string;
+  type: string;
+  amount: number;
+  description: string;
+  date: string;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+// App types
+export interface Client {
+  id: string;
+  name: string;
+  taxId?: string;
+  createdAt: Date;
+}
+
+export interface Category {
+  id: string;
+  clientId: string;
+  name: string;
+  type: TransactionType;
+  parentId: string | null;
+  code: string;
+  order: number;
+  createdAt: Date;
+}
+
+export interface Transaction {
+  id: string;
+  clientId: string;
+  categoryId: string;
+  type: TransactionType;
+  amount: number;
+  description: string;
+  date: Date;
+  reference?: string;
+  notes?: string;
+  createdAt: Date;
+}
 
 interface FinanceContextType {
+  // Auth
+  isAuthenticated: boolean;
+  authLoading: boolean;
+  signOut: () => Promise<void>;
+
   // Language
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -15,193 +91,371 @@ interface FinanceContextType {
   clients: Client[];
   currentClient: Client | null;
   setCurrentClient: (client: Client | null) => void;
-  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => void;
+  addClient: (client: { name: string; taxId?: string }) => Promise<void>;
+  loadingClients: boolean;
 
   // Categories
   categories: Category[];
-  addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Promise<void>;
+  updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   getCategoriesByType: (type: TransactionType) => Category[];
   getCategoryById: (id: string) => Category | undefined;
 
   // Transactions
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
-  updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
-  deleteTransaction: (id: string) => void;
-  getTransactionsByClient: (clientId: string) => Transaction[];
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>;
+  updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const generateId = () => Math.random().toString(36).substring(2, 15);
-
-// Sample transactions for demo
-const generateSampleTransactions = (clientId: string, categories: Category[]): Transaction[] => {
-  const incomeCategories = categories.filter(c => c.type === 'income' && c.parentId !== null);
-  const expenseCategories = categories.filter(c => c.type === 'expense' && c.parentId !== null);
-
-  const now = new Date();
-  const transactions: Transaction[] = [];
-
-  // Generate transactions for the last 6 months
-  for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
-    const month = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
-
-    // Income transactions
-    for (let i = 0; i < 3; i++) {
-      const cat = incomeCategories[Math.floor(Math.random() * incomeCategories.length)];
-      if (cat) {
-        transactions.push({
-          id: generateId(),
-          clientId,
-          categoryId: cat.id,
-          type: 'income',
-          amount: Math.floor(Math.random() * 15000) + 5000,
-          description: `Revenue ${month.toLocaleDateString('en', { month: 'short' })}`,
-          date: new Date(month.getFullYear(), month.getMonth(), Math.floor(Math.random() * 28) + 1),
-          createdAt: new Date(),
-        });
-      }
-    }
-
-    // Expense transactions
-    for (let i = 0; i < 5; i++) {
-      const cat = expenseCategories[Math.floor(Math.random() * expenseCategories.length)];
-      if (cat) {
-        transactions.push({
-          id: generateId(),
-          clientId,
-          categoryId: cat.id,
-          type: 'expense',
-          amount: Math.floor(Math.random() * 8000) + 1000,
-          description: `Expense ${month.toLocaleDateString('en', { month: 'short' })}`,
-          date: new Date(month.getFullYear(), month.getMonth(), Math.floor(Math.random() * 28) + 1),
-          createdAt: new Date(),
-        });
-      }
-    }
-  }
-
-  return transactions;
-};
-
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [language, setLanguage] = useState<Language>('pt');
   const [clients, setClients] = useState<Client[]>([]);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
   const t = translations[language];
+  const isAuthenticated = !!user;
 
-  // Initialize default clients and categories
-  useEffect(() => {
-    if (clients.length === 0) {
-      const defaultClients: Client[] = [
-        { id: 'client-1', name: 'Empresa Alpha Ltda', taxId: '12.345.678/0001-90', createdAt: new Date() },
-        { id: 'client-2', name: 'Beta Serviços S/A', taxId: '98.765.432/0001-10', createdAt: new Date() },
-      ];
-      setClients(defaultClients);
-      setCurrentClient(defaultClients[0]);
-    }
-  }, []);
+  // Load clients when user is authenticated
+  const loadClients = useCallback(async () => {
+    if (!user) return;
+    
+    setLoadingClients(true);
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: true });
 
-  // Initialize categories when client changes or language changes
-  useEffect(() => {
-    if (currentClient && categories.filter(c => c.clientId === currentClient.id).length === 0) {
-      const defaultCats = getDefaultCategoriesForLanguage(language);
-      const codeToId: Record<string, string> = {};
-
-      const newCategories: Category[] = defaultCats.map((cat, index) => {
-        const id = generateId();
-        codeToId[cat.code] = id;
-        return {
-          id,
-          clientId: currentClient.id,
-          name: cat.name,
-          type: cat.type,
-          parentId: cat.parentCode ? codeToId[cat.parentCode] : null,
-          code: cat.code,
-          order: index,
-          createdAt: new Date(),
-        };
-      });
-
-      setCategories(prev => [...prev.filter(c => c.clientId !== currentClient.id), ...newCategories]);
-
-      // Add sample transactions
-      if (transactions.filter(t => t.clientId === currentClient.id).length === 0) {
-        const sampleTransactions = generateSampleTransactions(currentClient.id, newCategories);
-        setTransactions(prev => [...prev, ...sampleTransactions]);
+    if (error) {
+      console.error('Error loading clients:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else if (data) {
+      const mappedClients: Client[] = data.map((c: DbClient) => ({
+        id: c.id,
+        name: c.name,
+        taxId: c.tax_id || undefined,
+        createdAt: new Date(c.created_at),
+      }));
+      setClients(mappedClients);
+      if (mappedClients.length > 0 && !currentClient) {
+        setCurrentClient(mappedClients[0]);
       }
     }
-  }, [currentClient, language]);
+    setLoadingClients(false);
+  }, [user, t.error, currentClient]);
 
-  const addClient = (client: Omit<Client, 'id' | 'createdAt'>) => {
-    const newClient: Client = {
-      ...client,
-      id: generateId(),
-      createdAt: new Date(),
-    };
-    setClients(prev => [...prev, newClient]);
+  // Load categories for current client
+  const loadCategories = useCallback(async () => {
+    if (!user || !currentClient) {
+      setCategories([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('client_id', currentClient.id)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('Error loading categories:', error);
+    } else if (data) {
+      const mappedCategories: Category[] = data.map((c: DbCategory) => ({
+        id: c.id,
+        clientId: c.client_id,
+        name: c.name,
+        type: c.type as TransactionType,
+        parentId: c.parent_id,
+        code: c.code,
+        order: c.sort_order,
+        createdAt: new Date(c.created_at),
+      }));
+      setCategories(mappedCategories);
+    }
+  }, [user, currentClient]);
+
+  // Load transactions for current client
+  const loadTransactions = useCallback(async () => {
+    if (!user || !currentClient) {
+      setTransactions([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('client_id', currentClient.id)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error loading transactions:', error);
+    } else if (data) {
+      const mappedTransactions: Transaction[] = data.map((t: DbTransaction) => ({
+        id: t.id,
+        clientId: t.client_id,
+        categoryId: t.category_id,
+        type: t.type as TransactionType,
+        amount: Number(t.amount),
+        description: t.description,
+        date: new Date(t.date),
+        reference: t.reference || undefined,
+        notes: t.notes || undefined,
+        createdAt: new Date(t.created_at),
+      }));
+      setTransactions(mappedTransactions);
+    }
+  }, [user, currentClient]);
+
+  useEffect(() => {
+    if (user) {
+      loadClients();
+    } else {
+      setClients([]);
+      setCurrentClient(null);
+      setCategories([]);
+      setTransactions([]);
+    }
+  }, [user, loadClients]);
+
+  useEffect(() => {
+    loadCategories();
+    loadTransactions();
+  }, [currentClient, loadCategories, loadTransactions]);
+
+  // Add client
+  const addClient = async (client: { name: string; taxId?: string }) => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({
+        user_id: user.id,
+        name: client.name,
+        tax_id: client.taxId || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding client:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else if (data) {
+      const newClient: Client = {
+        id: data.id,
+        name: data.name,
+        taxId: data.tax_id || undefined,
+        createdAt: new Date(data.created_at),
+      };
+      setClients(prev => [...prev, newClient]);
+      
+      // Create default categories for new client
+      await createDefaultCategories(data.id);
+      setCurrentClient(newClient);
+      toast({ title: t.saved });
+    }
   };
 
-  const addCategory = (category: Omit<Category, 'id' | 'createdAt'>) => {
-    const newCategory: Category = {
-      ...category,
-      id: generateId(),
-      createdAt: new Date(),
-    };
-    setCategories(prev => [...prev, newCategory]);
+  // Create default chart of accounts for a client
+  const createDefaultCategories = async (clientId: string) => {
+    if (!user) return;
+
+    const defaultCats = getDefaultCategoriesForLanguage(language);
+    const codeToId: Record<string, string> = {};
+
+    // First, insert parent categories (those without parentCode)
+    for (const cat of defaultCats.filter(c => !c.parentCode)) {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({
+          user_id: user.id,
+          client_id: clientId,
+          name: cat.name,
+          type: cat.type,
+          code: cat.code,
+          parent_id: null,
+          sort_order: defaultCats.indexOf(cat),
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        codeToId[cat.code] = data.id;
+      }
+    }
+
+    // Then, insert child categories
+    for (const cat of defaultCats.filter(c => c.parentCode)) {
+      const parentId = codeToId[cat.parentCode!];
+      if (parentId) {
+        const { data, error } = await supabase
+          .from('categories')
+          .insert({
+            user_id: user.id,
+            client_id: clientId,
+            name: cat.name,
+            type: cat.type,
+            code: cat.code,
+            parent_id: parentId,
+            sort_order: defaultCats.indexOf(cat),
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          codeToId[cat.code] = data.id;
+        }
+      }
+    }
+
+    // Reload categories
+    await loadCategories();
   };
 
-  const updateCategory = (id: string, updates: Partial<Category>) => {
-    setCategories(prev =>
-      prev.map(cat => (cat.id === id ? { ...cat, ...updates } : cat))
-    );
+  // Category operations
+  const addCategory = async (category: Omit<Category, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('categories')
+      .insert({
+        user_id: user.id,
+        client_id: category.clientId,
+        name: category.name,
+        type: category.type,
+        code: category.code,
+        parent_id: category.parentId,
+        sort_order: category.order,
+      });
+
+    if (error) {
+      console.error('Error adding category:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadCategories();
+      toast({ title: t.saved });
+    }
   };
 
-  const deleteCategory = (id: string) => {
-    setCategories(prev => prev.filter(cat => cat.id !== id && cat.parentId !== id));
+  const updateCategory = async (id: string, updates: Partial<Category>) => {
+    const { error } = await supabase
+      .from('categories')
+      .update({
+        name: updates.name,
+        code: updates.code,
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating category:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadCategories();
+      toast({ title: t.saved });
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting category:', error);
+      toast({ title: t.error, description: 'Não é possível excluir categorias com lançamentos', variant: 'destructive' });
+    } else {
+      await loadCategories();
+      toast({ title: t.deleted });
+    }
   };
 
   const getCategoriesByType = (type: TransactionType) => {
-    if (!currentClient) return [];
-    return categories.filter(c => c.clientId === currentClient.id && c.type === type);
+    return categories.filter(c => c.type === type);
   };
 
   const getCategoryById = (id: string) => {
     return categories.find(c => c.id === id);
   };
 
-  const addTransaction = (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: generateId(),
-      createdAt: new Date(),
-    };
-    setTransactions(prev => [...prev, newTransaction]);
+  // Transaction operations
+  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        client_id: transaction.clientId,
+        category_id: transaction.categoryId,
+        type: transaction.type,
+        amount: transaction.amount,
+        description: transaction.description,
+        date: transaction.date.toISOString().split('T')[0],
+        reference: transaction.reference || null,
+        notes: transaction.notes || null,
+      });
+
+    if (error) {
+      console.error('Error adding transaction:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadTransactions();
+      toast({ title: t.saved });
+    }
   };
 
-  const updateTransaction = (id: string, updates: Partial<Transaction>) => {
-    setTransactions(prev =>
-      prev.map(t => (t.id === id ? { ...t, ...updates } : t))
-    );
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    const updateData: Record<string, unknown> = {};
+    if (updates.type) updateData.type = updates.type;
+    if (updates.categoryId) updateData.category_id = updates.categoryId;
+    if (updates.amount) updateData.amount = updates.amount;
+    if (updates.description) updateData.description = updates.description;
+    if (updates.date) updateData.date = updates.date.toISOString().split('T')[0];
+    if (updates.reference !== undefined) updateData.reference = updates.reference || null;
+    if (updates.notes !== undefined) updateData.notes = updates.notes || null;
+
+    const { error } = await supabase
+      .from('transactions')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating transaction:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadTransactions();
+      toast({ title: t.saved });
+    }
   };
 
-  const deleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  };
+  const deleteTransaction = async (id: string) => {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id);
 
-  const getTransactionsByClient = (clientId: string) => {
-    return transactions.filter(t => t.clientId === clientId);
+    if (error) {
+      console.error('Error deleting transaction:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadTransactions();
+      toast({ title: t.deleted });
+    }
   };
 
   return (
     <FinanceContext.Provider
       value={{
+        isAuthenticated,
+        authLoading,
+        signOut,
         language,
         setLanguage,
         t,
@@ -209,6 +463,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         currentClient,
         setCurrentClient,
         addClient,
+        loadingClients,
         categories,
         addCategory,
         updateCategory,
@@ -219,7 +474,6 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         addTransaction,
         updateTransaction,
         deleteTransaction,
-        getTransactionsByClient,
       }}
     >
       {children}

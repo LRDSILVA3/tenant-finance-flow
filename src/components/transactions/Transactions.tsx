@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { Transaction, TransactionType } from '@/types/finance';
+import { TransactionType } from '@/types/finance';
+import { Transaction } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,8 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Plus, Pencil, Trash2, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -59,7 +59,6 @@ export const Transactions: React.FC = () => {
     t,
     currentClient,
     transactions,
-    categories,
     getCategoriesByType,
     getCategoryById,
     addTransaction,
@@ -71,6 +70,7 @@ export const Transactions: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     type: 'income' as TransactionType,
     categoryId: '',
@@ -81,12 +81,11 @@ export const Transactions: React.FC = () => {
     notes: '',
   });
 
-  const clientTransactions = useMemo(() => {
-    if (!currentClient) return [];
-    return transactions
-      .filter((t) => t.clientId === currentClient.id)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [currentClient, transactions]);
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [transactions]);
 
   const availableCategories = useMemo(() => {
     const cats = getCategoriesByType(formData.type);
@@ -121,14 +120,16 @@ export const Transactions: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.categoryId || !formData.amount || !formData.description || !currentClient) return;
 
     const amount = parseFloat(formData.amount.replace(/[^\d.,]/g, '').replace(',', '.'));
     if (isNaN(amount) || amount <= 0) return;
 
+    setSaving(true);
+
     if (editingTransaction) {
-      updateTransaction(editingTransaction.id, {
+      await updateTransaction(editingTransaction.id, {
         type: formData.type,
         categoryId: formData.categoryId,
         amount,
@@ -137,9 +138,8 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
-      toast({ title: t.saved });
     } else {
-      addTransaction({
+      await addTransaction({
         clientId: currentClient.id,
         type: formData.type,
         categoryId: formData.categoryId,
@@ -149,16 +149,15 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
-      toast({ title: t.saved });
     }
 
+    setSaving(false);
     setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingTransaction) {
-      deleteTransaction(deletingTransaction.id);
-      toast({ title: t.deleted });
+      await deleteTransaction(deletingTransaction.id);
     }
     setIsDeleteDialogOpen(false);
     setDeletingTransaction(null);
@@ -199,14 +198,14 @@ export const Transactions: React.FC = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clientTransactions.length === 0 ? (
+            {sortedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {t.noTransactions}
                 </TableCell>
               </TableRow>
             ) : (
-              clientTransactions.map((transaction) => {
+              sortedTransactions.map((transaction) => {
                 const category = getCategoryById(transaction.categoryId);
                 return (
                   <TableRow key={transaction.id}>
@@ -377,7 +376,16 @@ export const Transactions: React.FC = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               {t.cancel}
             </Button>
-            <Button onClick={handleSave}>{t.save}</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                t.save
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

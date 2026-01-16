@@ -1,8 +1,7 @@
 // Recent Transactions Component
 
 import React from 'react';
-import { useFinance } from '@/contexts/FinanceContext';
-import { Transaction } from '@/types/finance';
+import { useFinance, Transaction } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
 }) => {
   const { t, getCategoryById } = useFinance();
 
-  const recentTransactions = transactions
+  const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
