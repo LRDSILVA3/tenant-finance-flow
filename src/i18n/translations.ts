@@ -1,0 +1,284 @@
+// Internationalization - Translations
+
+import { Language } from '@/types/finance';
+
+export interface Translations {
+  // Header
+  appName: string;
+  selectClient: string;
+  selectLanguage: string;
+
+  // Navigation
+  dashboard: string;
+  chartOfAccounts: string;
+  transactions: string;
+
+  // Dashboard
+  financialOverview: string;
+  monthlyOverview: string;
+  balance: string;
+  income: string;
+  incomes: string;
+  expenses: string;
+  monthlyFlow: string;
+  recentTransactions: string;
+  noTransactions: string;
+  viewAll: string;
+
+  // Chart of Accounts
+  chartOfAccountsTitle: string;
+  chartOfAccountsSubtitle: string;
+  categories: string;
+  subcategories: string;
+  addCategory: string;
+  addSubcategory: string;
+  editCategory: string;
+  deleteCategory: string;
+  categoryName: string;
+  categoryType: string;
+  categoryCode: string;
+  parentCategory: string;
+  noCategories: string;
+  incomeCategories: string;
+  expenseCategories: string;
+
+  // Transactions
+  transactionsTitle: string;
+  transactionsSubtitle: string;
+  addTransaction: string;
+  editTransaction: string;
+  deleteTransaction: string;
+  amount: string;
+  description: string;
+  date: string;
+  category: string;
+  type: string;
+  reference: string;
+  notes: string;
+  noData: string;
+
+  // Forms
+  save: string;
+  cancel: string;
+  delete: string;
+  confirm: string;
+  required: string;
+  
+  // Messages
+  saved: string;
+  deleted: string;
+  error: string;
+  confirmDelete: string;
+
+  // Months
+  jan: string;
+  feb: string;
+  mar: string;
+  apr: string;
+  may: string;
+  jun: string;
+  jul: string;
+  aug: string;
+  sep: string;
+  oct: string;
+  nov: string;
+  dec: string;
+}
+
+export const translations: Record<Language, Translations> = {
+  pt: {
+    appName: 'Gestão Financeira',
+    selectClient: 'Selecionar Empresa',
+    selectLanguage: 'Idioma',
+
+    dashboard: 'Painel',
+    chartOfAccounts: 'Plano de Contas',
+    transactions: 'Lançamentos',
+
+    financialOverview: 'Visão Financeira',
+    monthlyOverview: 'Visão do mês atual',
+    balance: 'Saldo',
+    income: 'Entrada',
+    incomes: 'Entradas',
+    expenses: 'Saídas',
+    monthlyFlow: 'Fluxo Mensal',
+    recentTransactions: 'Lançamentos Recentes',
+    noTransactions: 'Nenhum lançamento encontrado',
+    viewAll: 'Ver Todos',
+
+    chartOfAccountsTitle: 'Plano de Contas',
+    chartOfAccountsSubtitle: 'Gerencie suas categorias e subcategorias',
+    categories: 'Categorias',
+    subcategories: 'Subcategorias',
+    addCategory: 'Adicionar Categoria',
+    addSubcategory: 'Adicionar Subcategoria',
+    editCategory: 'Editar Categoria',
+    deleteCategory: 'Excluir Categoria',
+    categoryName: 'Nome da Categoria',
+    categoryType: 'Tipo',
+    categoryCode: 'Código',
+    parentCategory: 'Categoria Pai',
+    noCategories: 'Nenhuma categoria cadastrada',
+    incomeCategories: 'Categorias de Entrada',
+    expenseCategories: 'Categorias de Saída',
+
+    transactionsTitle: 'Lançamentos',
+    transactionsSubtitle: 'Registre e gerencie suas transações financeiras',
+    addTransaction: 'Novo Lançamento',
+    editTransaction: 'Editar Lançamento',
+    deleteTransaction: 'Excluir Lançamento',
+    amount: 'Valor',
+    description: 'Descrição',
+    date: 'Data',
+    category: 'Categoria',
+    type: 'Tipo',
+    reference: 'Referência',
+    notes: 'Observações',
+    noData: 'Sem dados',
+
+    save: 'Salvar',
+    cancel: 'Cancelar',
+    delete: 'Excluir',
+    confirm: 'Confirmar',
+    required: 'Campo obrigatório',
+
+    saved: 'Salvo com sucesso',
+    deleted: 'Excluído com sucesso',
+    error: 'Ocorreu um erro',
+    confirmDelete: 'Tem certeza que deseja excluir?',
+
+    jan: 'Jan', feb: 'Fev', mar: 'Mar', apr: 'Abr',
+    may: 'Mai', jun: 'Jun', jul: 'Jul', aug: 'Ago',
+    sep: 'Set', oct: 'Out', nov: 'Nov', dec: 'Dez',
+  },
+  en: {
+    appName: 'Financial Management',
+    selectClient: 'Select Company',
+    selectLanguage: 'Language',
+
+    dashboard: 'Dashboard',
+    chartOfAccounts: 'Chart of Accounts',
+    transactions: 'Transactions',
+
+    financialOverview: 'Financial Overview',
+    monthlyOverview: 'Current month overview',
+    balance: 'Balance',
+    income: 'Income',
+    incomes: 'Incomes',
+    expenses: 'Expenses',
+    monthlyFlow: 'Monthly Flow',
+    recentTransactions: 'Recent Transactions',
+    noTransactions: 'No transactions found',
+    viewAll: 'View All',
+
+    chartOfAccountsTitle: 'Chart of Accounts',
+    chartOfAccountsSubtitle: 'Manage your categories and subcategories',
+    categories: 'Categories',
+    subcategories: 'Subcategories',
+    addCategory: 'Add Category',
+    addSubcategory: 'Add Subcategory',
+    editCategory: 'Edit Category',
+    deleteCategory: 'Delete Category',
+    categoryName: 'Category Name',
+    categoryType: 'Type',
+    categoryCode: 'Code',
+    parentCategory: 'Parent Category',
+    noCategories: 'No categories registered',
+    incomeCategories: 'Income Categories',
+    expenseCategories: 'Expense Categories',
+
+    transactionsTitle: 'Transactions',
+    transactionsSubtitle: 'Record and manage your financial transactions',
+    addTransaction: 'New Transaction',
+    editTransaction: 'Edit Transaction',
+    deleteTransaction: 'Delete Transaction',
+    amount: 'Amount',
+    description: 'Description',
+    date: 'Date',
+    category: 'Category',
+    type: 'Type',
+    reference: 'Reference',
+    notes: 'Notes',
+    noData: 'No data',
+
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    confirm: 'Confirm',
+    required: 'Required field',
+
+    saved: 'Saved successfully',
+    deleted: 'Deleted successfully',
+    error: 'An error occurred',
+    confirmDelete: 'Are you sure you want to delete?',
+
+    jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr',
+    may: 'May', jun: 'Jun', jul: 'Jul', aug: 'Aug',
+    sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dec',
+  },
+  es: {
+    appName: 'Gestión Financiera',
+    selectClient: 'Seleccionar Empresa',
+    selectLanguage: 'Idioma',
+
+    dashboard: 'Panel',
+    chartOfAccounts: 'Plan de Cuentas',
+    transactions: 'Transacciones',
+
+    financialOverview: 'Visión Financiera',
+    monthlyOverview: 'Visión del mes actual',
+    balance: 'Saldo',
+    income: 'Ingreso',
+    incomes: 'Ingresos',
+    expenses: 'Gastos',
+    monthlyFlow: 'Flujo Mensual',
+    recentTransactions: 'Transacciones Recientes',
+    noTransactions: 'No se encontraron transacciones',
+    viewAll: 'Ver Todo',
+
+    chartOfAccountsTitle: 'Plan de Cuentas',
+    chartOfAccountsSubtitle: 'Administre sus categorías y subcategorías',
+    categories: 'Categorías',
+    subcategories: 'Subcategorías',
+    addCategory: 'Agregar Categoría',
+    addSubcategory: 'Agregar Subcategoría',
+    editCategory: 'Editar Categoría',
+    deleteCategory: 'Eliminar Categoría',
+    categoryName: 'Nombre de Categoría',
+    categoryType: 'Tipo',
+    categoryCode: 'Código',
+    parentCategory: 'Categoría Padre',
+    noCategories: 'No hay categorías registradas',
+    incomeCategories: 'Categorías de Ingresos',
+    expenseCategories: 'Categorías de Gastos',
+
+    transactionsTitle: 'Transacciones',
+    transactionsSubtitle: 'Registre y administre sus transacciones financieras',
+    addTransaction: 'Nueva Transacción',
+    editTransaction: 'Editar Transacción',
+    deleteTransaction: 'Eliminar Transacción',
+    amount: 'Monto',
+    description: 'Descripción',
+    date: 'Fecha',
+    category: 'Categoría',
+    type: 'Tipo',
+    reference: 'Referencia',
+    notes: 'Notas',
+    noData: 'Sin datos',
+
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    delete: 'Eliminar',
+    confirm: 'Confirmar',
+    required: 'Campo obligatorio',
+
+    saved: 'Guardado exitosamente',
+    deleted: 'Eliminado exitosamente',
+    error: 'Ocurrió un error',
+    confirmDelete: '¿Está seguro de que desea eliminar?',
+
+    jan: 'Ene', feb: 'Feb', mar: 'Mar', apr: 'Abr',
+    may: 'May', jun: 'Jun', jul: 'Jul', aug: 'Ago',
+    sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dic',
+  },
+};
