@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -105,9 +106,9 @@ export const Transactions: React.FC = () => {
   const [formData, setFormData] = useState({
     type: 'income' as TransactionType,
     categoryId: '',
-    amount: '',
+    amount: 0,
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date(),
     reference: '',
     notes: '',
   });
@@ -186,11 +187,9 @@ export const Transactions: React.FC = () => {
     setFormData({
       type: 'income',
       categoryId: '',
-      amount: '',
+      amount: 0,
       description: '',
-      date: selectedCalendarDate 
-        ? selectedCalendarDate.toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0],
+      date: selectedCalendarDate || new Date(),
       reference: '',
       notes: '',
     });
@@ -202,9 +201,9 @@ export const Transactions: React.FC = () => {
     setFormData({
       type: transaction.type,
       categoryId: transaction.categoryId,
-      amount: transaction.amount.toString(),
+      amount: transaction.amount,
       description: transaction.description,
-      date: new Date(transaction.date).toISOString().split('T')[0],
+      date: new Date(transaction.date),
       reference: transaction.reference || '',
       notes: transaction.notes || '',
     });
@@ -212,10 +211,7 @@ export const Transactions: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.categoryId || !formData.amount || !formData.description || !currentClient) return;
-
-    const amount = parseFloat(formData.amount.replace(/[^\d.,]/g, '').replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) return;
+    if (!formData.categoryId || formData.amount <= 0 || !formData.description || !currentClient) return;
 
     setSaving(true);
 
@@ -223,9 +219,9 @@ export const Transactions: React.FC = () => {
       await updateTransaction(editingTransaction.id, {
         type: formData.type,
         categoryId: formData.categoryId,
-        amount,
+        amount: formData.amount,
         description: formData.description,
-        date: new Date(formData.date),
+        date: formData.date,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
@@ -234,9 +230,9 @@ export const Transactions: React.FC = () => {
         clientId: currentClient.id,
         type: formData.type,
         categoryId: formData.categoryId,
-        amount,
+        amount: formData.amount,
         description: formData.description,
-        date: new Date(formData.date),
+        date: formData.date,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
@@ -686,22 +682,37 @@ export const Transactions: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">{t.amount}</Label>
-                <Input
+                <MoneyInput
                   id="amount"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  placeholder="0,00"
-                  className="font-mono"
+                  onChange={(value) => setFormData({ ...formData, amount: value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date">{t.date}</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                />
+                <Label>{t.date}</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.date ? format(formData.date, 'dd/MM/yyyy', { locale }) : t.date}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.date}
+                      onSelect={(date) => date && setFormData({ ...formData, date })}
+                      locale={locale}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
