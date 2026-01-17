@@ -58,6 +58,13 @@ export interface Translations {
   reference: string;
   notes: string;
   noData: string;
+  filters: string;
+  clearFilters: string;
+  listView: string;
+  calendarView: string;
+  allCategories: string;
+  allTypes: string;
+  from: string;
 
   // Forms
   save: string;
@@ -139,6 +146,13 @@ export const translations: Record<Language, Translations> = {
     reference: 'Referência',
     notes: 'Observações',
     noData: 'Sem dados',
+    filters: 'Filtros',
+    clearFilters: 'Limpar Filtros',
+    listView: 'Lista',
+    calendarView: 'Calendário',
+    allCategories: 'Todas as Categorias',
+    allTypes: 'Todos os Tipos',
+    from: 'De',
 
     save: 'Salvar',
     cancel: 'Cancelar',
@@ -206,6 +220,13 @@ export const translations: Record<Language, Translations> = {
     reference: 'Reference',
     notes: 'Notes',
     noData: 'No data',
+    filters: 'Filters',
+    clearFilters: 'Clear Filters',
+    listView: 'List',
+    calendarView: 'Calendar',
+    allCategories: 'All Categories',
+    allTypes: 'All Types',
+    from: 'From',
 
     save: 'Save',
     cancel: 'Cancel',
@@ -273,6 +294,13 @@ export const translations: Record<Language, Translations> = {
     reference: 'Referencia',
     notes: 'Notas',
     noData: 'Sin datos',
+    filters: 'Filtros',
+    clearFilters: 'Limpiar Filtros',
+    listView: 'Lista',
+    calendarView: 'Calendario',
+    allCategories: 'Todas las Categorías',
+    allTypes: 'Todos los Tipos',
+    from: 'Desde',
 
     save: 'Guardar',
     cancel: 'Cancelar',
