@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { StatCard } from './StatCard';
 import { MonthlyFlowChart } from './MonthlyFlowChart';
+import { DateRangeTransactions } from './DateRangeTransactions';
 import { RecentTransactions } from './RecentTransactions';
 import { MonthlyFlowData, FinancialSummary } from '@/types/finance';
 
@@ -94,9 +95,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
         <StatCard title={t.expenses} value={summary.totalExpense} type="expense" />
       </div>
 
-      {/* Charts and Recent Transactions */}
+      {/* Charts and Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MonthlyFlowChart data={monthlyFlowData} />
+        <DateRangeTransactions
+          transactions={transactions}
+          onViewAll={onNavigateToTransactions}
+        />
+      </div>
+
+      {/* Recent Transactions */}
+      <div className="grid grid-cols-1 gap-6">
         <RecentTransactions
           transactions={transactions}
           onViewAll={onNavigateToTransactions}

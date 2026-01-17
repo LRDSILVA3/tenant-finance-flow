@@ -22,6 +22,8 @@ export interface Translations {
   expenses: string;
   monthlyFlow: string;
   recentTransactions: string;
+  transactionsByPeriod: string;
+  to: string;
   noTransactions: string;
   viewAll: string;
 
@@ -103,6 +105,8 @@ export const translations: Record<Language, Translations> = {
     expenses: 'Saídas',
     monthlyFlow: 'Fluxo Mensal',
     recentTransactions: 'Lançamentos Recentes',
+    transactionsByPeriod: 'Lançamentos por Período',
+    to: 'até',
     noTransactions: 'Nenhum lançamento encontrado',
     viewAll: 'Ver Todos',
 
@@ -168,6 +172,8 @@ export const translations: Record<Language, Translations> = {
     expenses: 'Expenses',
     monthlyFlow: 'Monthly Flow',
     recentTransactions: 'Recent Transactions',
+    transactionsByPeriod: 'Transactions by Period',
+    to: 'to',
     noTransactions: 'No transactions found',
     viewAll: 'View All',
 
@@ -233,6 +239,8 @@ export const translations: Record<Language, Translations> = {
     expenses: 'Gastos',
     monthlyFlow: 'Flujo Mensual',
     recentTransactions: 'Transacciones Recientes',
+    transactionsByPeriod: 'Transacciones por Período',
+    to: 'hasta',
     noTransactions: 'No se encontraron transacciones',
     viewAll: 'Ver Todo',
 
