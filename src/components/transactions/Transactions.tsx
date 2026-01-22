@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -85,6 +87,8 @@ export const Transactions: React.FC = () => {
     deleteTransaction,
     language,
   } = useFinance();
+
+  const { descriptions } = useTransactionDescriptions(currentClient?.id);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -718,10 +722,14 @@ export const Transactions: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="description">{t.description}</Label>
-              <Input
-                id="description"
+              <SearchableSelect
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, description: value })}
+                options={descriptions}
+                placeholder={t.description}
+                searchPlaceholder="Buscar descrição..."
+                emptyMessage="Nenhuma descrição encontrada."
+                addNewLabel="Adicionar"
               />
             </div>
 
