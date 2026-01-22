@@ -90,14 +90,6 @@ export const Transactions: React.FC = () => {
 
   const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
 
-  // Convert groups to SearchableSelect format (extract just the description strings, already sorted by frequency)
-  const groupedDescriptionOptions = useMemo(() => {
-    return descriptionGroups.map(g => ({
-      label: `${g.categoryCode} - ${g.categoryName}`,
-      options: g.descriptions.map(d => d.description),
-    }));
-  }, [descriptionGroups]);
-
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -186,6 +178,28 @@ export const Transactions: React.FC = () => {
     const cats = getCategoriesByType(formData.type);
     return cats.filter((c) => c.parentId !== null);
   }, [formData.type, getCategoriesByType]);
+
+  // Filter descriptions by selected category (extract just the description strings, already sorted by frequency)
+  const filteredDescriptionOptions = useMemo(() => {
+    if (!formData.categoryId) {
+      // No category selected, show all grouped
+      return descriptionGroups.map(g => ({
+        label: `${g.categoryCode} - ${g.categoryName}`,
+        options: g.descriptions.map(d => d.description),
+      }));
+    }
+    
+    // Filter to only show descriptions from the selected category
+    const selectedGroup = descriptionGroups.find(g => g.categoryId === formData.categoryId);
+    if (selectedGroup) {
+      return [{
+        label: `${selectedGroup.categoryCode} - ${selectedGroup.categoryName}`,
+        options: selectedGroup.descriptions.map(d => d.description),
+      }];
+    }
+    
+    return [];
+  }, [descriptionGroups, formData.categoryId]);
 
   const handleClearFilters = () => {
     setFilterStartDate(startOfMonth(now));
@@ -733,7 +747,7 @@ export const Transactions: React.FC = () => {
               <SearchableSelect
                 value={formData.description}
                 onChange={(value) => setFormData({ ...formData, description: value })}
-                groupedOptions={groupedDescriptionOptions}
+                groupedOptions={filteredDescriptionOptions}
                 placeholder={t.description}
                 searchPlaceholder="Buscar descrição..."
                 emptyMessage="Nenhuma descrição encontrada."
