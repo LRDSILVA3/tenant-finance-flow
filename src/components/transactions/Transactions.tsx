@@ -88,7 +88,15 @@ export const Transactions: React.FC = () => {
     language,
   } = useFinance();
 
-  const { descriptions } = useTransactionDescriptions(currentClient?.id);
+  const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
+
+  // Convert groups to SearchableSelect format
+  const groupedDescriptionOptions = useMemo(() => {
+    return descriptionGroups.map(g => ({
+      label: `${g.categoryCode} - ${g.categoryName}`,
+      options: g.descriptions,
+    }));
+  }, [descriptionGroups]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -725,7 +733,7 @@ export const Transactions: React.FC = () => {
               <SearchableSelect
                 value={formData.description}
                 onChange={(value) => setFormData({ ...formData, description: value })}
-                options={descriptions}
+                groupedOptions={groupedDescriptionOptions}
                 placeholder={t.description}
                 searchPlaceholder="Buscar descrição..."
                 emptyMessage="Nenhuma descrição encontrada."

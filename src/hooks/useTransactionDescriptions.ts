@@ -1,36 +1,83 @@
-// Hook to fetch unique transaction descriptions from database
+// Hook to fetch unique transaction descriptions from database grouped by category
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+export interface DescriptionGroup {
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+  descriptions: string[];
+}
+
 export const useTransactionDescriptions = (clientId: string | undefined) => {
   const { user } = useAuth();
-  const [descriptions, setDescriptions] = useState<string[]>([]);
+  const [descriptionGroups, setDescriptionGroups] = useState<DescriptionGroup[]>([]);
+  const [allDescriptions, setAllDescriptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchDescriptions = async () => {
       if (!user || !clientId) {
-        setDescriptions([]);
+        setDescriptionGroups([]);
+        setAllDescriptions([]);
         return;
       }
 
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Fetch transactions with category info
+      const { data: transactions, error: txnError } = await supabase
         .from('transactions')
-        .select('description')
-        .eq('client_id', clientId)
-        .order('description', { ascending: true });
+        .select('description, category_id')
+        .eq('client_id', clientId);
 
-      if (error) {
-        console.error('Error fetching descriptions:', error);
-        setDescriptions([]);
-      } else if (data) {
-        // Get unique descriptions
-        const uniqueDescriptions = [...new Set(data.map(t => t.description))];
-        setDescriptions(uniqueDescriptions);
+      const { data: categories, error: catError } = await supabase
+        .from('categories')
+        .select('id, name, code')
+        .eq('client_id', clientId);
+
+      if (txnError || catError) {
+        console.error('Error fetching data:', txnError || catError);
+        setDescriptionGroups([]);
+        setAllDescriptions([]);
+      } else if (transactions && categories) {
+        // Create a map of category_id -> category info
+        const categoryMap = new Map(categories.map(c => [c.id, { name: c.name, code: c.code }]));
+        
+        // Group descriptions by category
+        const groupedMap = new Map<string, Set<string>>();
+        
+        transactions.forEach(t => {
+          if (!groupedMap.has(t.category_id)) {
+            groupedMap.set(t.category_id, new Set());
+          }
+          groupedMap.get(t.category_id)!.add(t.description);
+        });
+
+        // Convert to array format
+        const groups: DescriptionGroup[] = [];
+        groupedMap.forEach((descriptions, categoryId) => {
+          const catInfo = categoryMap.get(categoryId);
+          if (catInfo) {
+            groups.push({
+              categoryId,
+              categoryName: catInfo.name,
+              categoryCode: catInfo.code,
+              descriptions: Array.from(descriptions).sort(),
+            });
+          }
+        });
+
+        // Sort groups by category code
+        groups.sort((a, b) => a.categoryCode.localeCompare(b.categoryCode));
+        
+        setDescriptionGroups(groups);
+        
+        // Also keep flat list for filtering
+        const allDescs = [...new Set(transactions.map(t => t.description))].sort();
+        setAllDescriptions(allDescs);
       }
       
       setLoading(false);
@@ -39,5 +86,5 @@ export const useTransactionDescriptions = (clientId: string | undefined) => {
     fetchDescriptions();
   }, [user, clientId]);
 
-  return { descriptions, loading };
+  return { descriptionGroups, allDescriptions, loading };
 };

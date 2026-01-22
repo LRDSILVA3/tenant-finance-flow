@@ -1,6 +1,6 @@
-// Searchable Select Component with Add New Option
+// Searchable Select Component with Add New Option and Grouping
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from '@/components/ui/command';
 import {
   Popover,
@@ -18,10 +19,16 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 
+export interface OptionGroup {
+  label: string;
+  options: string[];
+}
+
 interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options?: string[];
+  groupedOptions?: OptionGroup[];
   placeholder?: string;
   searchPlaceholder?: string;
   emptyMessage?: string;
@@ -33,7 +40,8 @@ interface SearchableSelectProps {
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   value,
   onChange,
-  options,
+  options = [],
+  groupedOptions,
   placeholder = 'Selecione...',
   searchPlaceholder = 'Buscar...',
   emptyMessage = 'Nenhum resultado encontrado.',
@@ -44,14 +52,30 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
+  // Get all options for filtering (from either flat or grouped)
+  const allOptions = groupedOptions 
+    ? groupedOptions.flatMap(g => g.options)
+    : options;
+
   // Filter options based on search
-  const filteredOptions = options.filter((option) =>
-    option.toLowerCase().includes(searchValue.toLowerCase())
+  const searchLower = searchValue.toLowerCase();
+  
+  const filteredGroupedOptions = groupedOptions?.map(group => ({
+    ...group,
+    options: group.options.filter(opt => opt.toLowerCase().includes(searchLower))
+  })).filter(group => group.options.length > 0);
+
+  const filteredFlatOptions = options.filter(opt => 
+    opt.toLowerCase().includes(searchLower)
   );
 
   // Check if search value is a new option
   const isNewOption = searchValue.trim() !== '' && 
-    !options.some(opt => opt.toLowerCase() === searchValue.trim().toLowerCase());
+    !allOptions.some(opt => opt.toLowerCase() === searchValue.trim().toLowerCase());
+
+  const hasResults = groupedOptions 
+    ? (filteredGroupedOptions && filteredGroupedOptions.length > 0)
+    : filteredFlatOptions.length > 0;
 
   const handleSelect = (selectedValue: string) => {
     onChange(selectedValue);
@@ -95,9 +119,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             onValueChange={setSearchValue}
           />
           <CommandList>
-            <CommandEmpty className="py-2 px-3 text-sm text-muted-foreground">
-              {emptyMessage}
-            </CommandEmpty>
+            {!hasResults && !isNewOption && (
+              <CommandEmpty className="py-2 px-3 text-sm text-muted-foreground">
+                {emptyMessage}
+              </CommandEmpty>
+            )}
             
             {/* Add new option button */}
             {isNewOption && (
@@ -112,10 +138,35 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               </CommandGroup>
             )}
 
-            {/* Existing options */}
-            {filteredOptions.length > 0 && (
+            {/* Grouped options */}
+            {groupedOptions && filteredGroupedOptions?.map((group, index) => (
+              <React.Fragment key={group.label}>
+                {index > 0 && <CommandSeparator />}
+                <CommandGroup heading={group.label}>
+                  {group.options.map((option) => (
+                    <CommandItem
+                      key={option}
+                      value={option}
+                      onSelect={() => handleSelect(option)}
+                      className="cursor-pointer"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === option ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {option}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </React.Fragment>
+            ))}
+
+            {/* Flat options (when not using groups) */}
+            {!groupedOptions && filteredFlatOptions.length > 0 && (
               <CommandGroup>
-                {filteredOptions.map((option) => (
+                {filteredFlatOptions.map((option) => (
                   <CommandItem
                     key={option}
                     value={option}
