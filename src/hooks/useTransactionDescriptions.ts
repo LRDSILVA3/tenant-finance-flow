@@ -4,11 +4,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+export interface DescriptionWithCount {
+  description: string;
+  count: number;
+}
+
 export interface DescriptionGroup {
   categoryId: string;
   categoryName: string;
   categoryCode: string;
-  descriptions: string[];
+  descriptions: DescriptionWithCount[];
 }
 
 export const useTransactionDescriptions = (clientId: string | undefined) => {
@@ -46,26 +51,32 @@ export const useTransactionDescriptions = (clientId: string | undefined) => {
         // Create a map of category_id -> category info
         const categoryMap = new Map(categories.map(c => [c.id, { name: c.name, code: c.code }]));
         
-        // Group descriptions by category
-        const groupedMap = new Map<string, Set<string>>();
+        // Group descriptions by category and count frequency
+        const groupedMap = new Map<string, Map<string, number>>();
         
         transactions.forEach(t => {
           if (!groupedMap.has(t.category_id)) {
-            groupedMap.set(t.category_id, new Set());
+            groupedMap.set(t.category_id, new Map());
           }
-          groupedMap.get(t.category_id)!.add(t.description);
+          const descMap = groupedMap.get(t.category_id)!;
+          descMap.set(t.description, (descMap.get(t.description) || 0) + 1);
         });
 
-        // Convert to array format
+        // Convert to array format, sorted by frequency
         const groups: DescriptionGroup[] = [];
-        groupedMap.forEach((descriptions, categoryId) => {
+        groupedMap.forEach((descMap, categoryId) => {
           const catInfo = categoryMap.get(categoryId);
           if (catInfo) {
+            // Convert map to array and sort by count (descending)
+            const descriptionsWithCount: DescriptionWithCount[] = Array.from(descMap.entries())
+              .map(([description, count]) => ({ description, count }))
+              .sort((a, b) => b.count - a.count);
+
             groups.push({
               categoryId,
               categoryName: catInfo.name,
               categoryCode: catInfo.code,
-              descriptions: Array.from(descriptions).sort(),
+              descriptions: descriptionsWithCount,
             });
           }
         });
@@ -75,8 +86,14 @@ export const useTransactionDescriptions = (clientId: string | undefined) => {
         
         setDescriptionGroups(groups);
         
-        // Also keep flat list for filtering
-        const allDescs = [...new Set(transactions.map(t => t.description))].sort();
+        // Also keep flat list for filtering (sorted by overall frequency)
+        const descFrequency = new Map<string, number>();
+        transactions.forEach(t => {
+          descFrequency.set(t.description, (descFrequency.get(t.description) || 0) + 1);
+        });
+        const allDescs = Array.from(descFrequency.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([desc]) => desc);
         setAllDescriptions(allDescs);
       }
       

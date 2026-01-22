@@ -90,11 +90,11 @@ export const Transactions: React.FC = () => {
 
   const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
 
-  // Convert groups to SearchableSelect format
+  // Convert groups to SearchableSelect format (extract just the description strings, already sorted by frequency)
   const groupedDescriptionOptions = useMemo(() => {
     return descriptionGroups.map(g => ({
       label: `${g.categoryCode} - ${g.categoryName}`,
-      options: g.descriptions,
+      options: g.descriptions.map(d => d.description),
     }));
   }, [descriptionGroups]);
 
