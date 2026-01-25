@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
+import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -89,6 +90,7 @@ export const Transactions: React.FC = () => {
   } = useFinance();
 
   const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
+  const { referenceGroups } = useTransactionReferences(currentClient?.id);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -200,6 +202,28 @@ export const Transactions: React.FC = () => {
     
     return [];
   }, [descriptionGroups, formData.categoryId]);
+
+  // Filter references by selected description (sorted by frequency)
+  const filteredReferenceOptions = useMemo(() => {
+    if (!formData.description) {
+      // No description selected, show all grouped
+      return referenceGroups.map(g => ({
+        label: g.description,
+        options: g.references.map(r => r.reference),
+      }));
+    }
+    
+    // Filter to only show references from the selected description
+    const selectedGroup = referenceGroups.find(g => g.description === formData.description);
+    if (selectedGroup) {
+      return [{
+        label: selectedGroup.description,
+        options: selectedGroup.references.map(r => r.reference),
+      }];
+    }
+    
+    return [];
+  }, [referenceGroups, formData.description]);
 
   const handleClearFilters = () => {
     setFilterStartDate(startOfMonth(now));
@@ -757,10 +781,14 @@ export const Transactions: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="reference">{t.reference}</Label>
-              <Input
-                id="reference"
+              <SearchableSelect
                 value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, reference: value })}
+                groupedOptions={filteredReferenceOptions}
+                placeholder={t.reference}
+                searchPlaceholder="Buscar referência..."
+                emptyMessage="Nenhuma referência encontrada."
+                addNewLabel="Adicionar"
               />
             </div>
 
