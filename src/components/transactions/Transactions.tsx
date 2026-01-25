@@ -770,7 +770,7 @@ export const Transactions: React.FC = () => {
               <Label htmlFor="description">{t.description}</Label>
               <SearchableSelect
                 value={formData.description}
-                onChange={(value) => setFormData({ ...formData, description: value })}
+                onChange={(value) => setFormData({ ...formData, description: value, reference: '' })}
                 groupedOptions={filteredDescriptionOptions}
                 placeholder={t.description}
                 searchPlaceholder="Buscar descrição..."
