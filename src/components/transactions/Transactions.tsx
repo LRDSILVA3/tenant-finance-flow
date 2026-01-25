@@ -503,6 +503,7 @@ export const Transactions: React.FC = () => {
               <TableRow>
                 <TableHead className="w-[100px]">{t.date}</TableHead>
                 <TableHead>{t.description}</TableHead>
+                <TableHead>{t.reference}</TableHead>
                 <TableHead>{t.category}</TableHead>
                 <TableHead className="text-right">{t.amount}</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
@@ -511,7 +512,7 @@ export const Transactions: React.FC = () => {
             <TableBody>
               {sortedTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {t.noTransactions}
                   </TableCell>
                 </TableRow>
@@ -541,6 +542,9 @@ export const Transactions: React.FC = () => {
                           </div>
                           <span className="font-medium">{transaction.description}</span>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {transaction.reference || '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {category?.name || '-'}
