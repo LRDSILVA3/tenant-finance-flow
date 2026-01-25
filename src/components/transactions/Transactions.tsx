@@ -14,6 +14,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
+import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -57,7 +58,8 @@ import {
   CalendarIcon,
   List,
   CalendarDays,
-  X
+  X,
+  FileDown
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -91,6 +93,7 @@ export const Transactions: React.FC = () => {
 
   const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
   const { referenceGroups } = useTransactionReferences(currentClient?.id);
+  const { exportListToPdf, exportCalendarToPdf } = useTransactionPdfExport();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -232,6 +235,34 @@ export const Transactions: React.FC = () => {
     setFilterType('all');
   };
 
+  const handleExportPdf = () => {
+    if (!currentClient) return;
+    
+    const filters = {
+      startDate: filterStartDate,
+      endDate: filterEndDate,
+      category: filterCategory,
+      type: filterType,
+    };
+    
+    if (viewMode === 'list') {
+      exportListToPdf(
+        sortedTransactions,
+        getCategoryById,
+        filters,
+        currentClient.name
+      );
+    } else {
+      exportCalendarToPdf(
+        sortedTransactions,
+        getCategoryById,
+        filters,
+        currentClient.name,
+        datesWithTransactions
+      );
+    }
+  };
+
   const handleOpenCreate = () => {
     setEditingTransaction(null);
     setFormData({
@@ -338,6 +369,10 @@ export const Transactions: React.FC = () => {
               <span className="hidden sm:inline">{t.calendarView}</span>
             </Button>
           </div>
+          <Button variant="outline" onClick={handleExportPdf} className="gap-2">
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Exportar PDF</span>
+          </Button>
           <Button onClick={handleOpenCreate}>
             <Plus className="h-4 w-4 mr-2" />
             {t.addTransaction}
