@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { TransactionType } from '@/types/finance';
+import { TransactionType, PaymentMethod } from '@/types/finance';
 import { Transaction, Category } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,11 @@ import {
   List,
   CalendarDays,
   X,
-  FileDown
+  FileDown,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Clock
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -77,6 +81,13 @@ const formatDate = (date: Date) => {
 
 type ViewMode = 'list' | 'calendar';
 
+const paymentMethodIcons: Record<PaymentMethod, React.ReactNode> = {
+  cash: <Banknote className="h-3 w-3" />,
+  card: <CreditCard className="h-3 w-3" />,
+  pix: <Smartphone className="h-3 w-3" />,
+  pending: <Clock className="h-3 w-3" />,
+};
+
 export const Transactions: React.FC = () => {
   const {
     t,
@@ -89,6 +100,7 @@ export const Transactions: React.FC = () => {
     updateTransaction,
     deleteTransaction,
     language,
+    userSettings,
   } = useFinance();
 
   const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
@@ -120,6 +132,7 @@ export const Transactions: React.FC = () => {
     date: new Date(),
     reference: '',
     notes: '',
+    paymentMethod: '' as PaymentMethod | '',
   });
 
   const locale = language === 'pt' ? ptBR : language === 'es' ? es : enUS;
@@ -273,6 +286,7 @@ export const Transactions: React.FC = () => {
       date: selectedCalendarDate || new Date(),
       reference: '',
       notes: '',
+      paymentMethod: '',
     });
     setIsDialogOpen(true);
   };
@@ -287,6 +301,7 @@ export const Transactions: React.FC = () => {
       date: new Date(transaction.date),
       reference: transaction.reference || '',
       notes: transaction.notes || '',
+      paymentMethod: transaction.paymentMethod || '',
     });
     setIsDialogOpen(true);
   };
@@ -295,6 +310,8 @@ export const Transactions: React.FC = () => {
     if (!formData.categoryId || formData.amount <= 0 || !formData.description || !currentClient) return;
 
     setSaving(true);
+
+    const paymentMethod = formData.paymentMethod || undefined;
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, {
@@ -305,6 +322,7 @@ export const Transactions: React.FC = () => {
         date: formData.date,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
+        paymentMethod,
       });
     } else {
       await addTransaction({
@@ -316,6 +334,7 @@ export const Transactions: React.FC = () => {
         date: formData.date,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
+        paymentMethod,
       });
     }
 
@@ -505,6 +524,9 @@ export const Transactions: React.FC = () => {
                 <TableHead>{t.description}</TableHead>
                 <TableHead>{t.reference}</TableHead>
                 <TableHead>{t.category}</TableHead>
+                {userSettings.enablePaymentMethods && (
+                  <TableHead>{t.paymentMethod}</TableHead>
+                )}
                 <TableHead className="text-right">{t.amount}</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
@@ -512,7 +534,7 @@ export const Transactions: React.FC = () => {
             <TableBody>
               {sortedTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
                     {t.noTransactions}
                   </TableCell>
                 </TableRow>
@@ -549,6 +571,18 @@ export const Transactions: React.FC = () => {
                       <TableCell className="text-muted-foreground">
                         {category?.name || '-'}
                       </TableCell>
+                      {userSettings.enablePaymentMethods && (
+                        <TableCell>
+                          {transaction.type === 'income' && transaction.paymentMethod ? (
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              {paymentMethodIcons[transaction.paymentMethod]}
+                              <span className="text-sm">{t[transaction.paymentMethod]}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell
                         className={cn(
                           'text-right font-semibold money-font',
@@ -830,6 +864,46 @@ export const Transactions: React.FC = () => {
                 addNewLabel="Adicionar"
               />
             </div>
+
+            {userSettings.enablePaymentMethods && formData.type === 'income' && (
+              <div className="space-y-2">
+                <Label>{t.paymentMethod}</Label>
+                <Select
+                  value={formData.paymentMethod}
+                  onValueChange={(val) => setFormData({ ...formData, paymentMethod: val as PaymentMethod })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t.paymentMethod} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-4 w-4" />
+                        {t.cash}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="card">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        {t.card}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pix">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4" />
+                        {t.pix}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {t.pending}
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">{t.notes}</Label>

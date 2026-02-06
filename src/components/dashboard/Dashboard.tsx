@@ -6,28 +6,44 @@ import { StatCard } from './StatCard';
 import { MonthlyFlowChart } from './MonthlyFlowChart';
 import { DateRangeTransactions } from './DateRangeTransactions';
 import { RecentTransactions } from './RecentTransactions';
-import { MonthlyFlowData, FinancialSummary } from '@/types/finance';
+import { MonthlyFlowData, FinancialSummary, PaymentMethod } from '@/types/finance';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Banknote, CreditCard, Smartphone, Clock } from 'lucide-react';
 
 interface DashboardProps {
   onNavigateToTransactions: () => void;
 }
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
+};
+
+const paymentMethodConfig: Record<PaymentMethod, { icon: React.ReactNode; color: string }> = {
+  cash: { icon: <Banknote className="h-4 w-4" />, color: 'text-emerald-600' },
+  card: { icon: <CreditCard className="h-4 w-4" />, color: 'text-blue-600' },
+  pix: { icon: <Smartphone className="h-4 w-4" />, color: 'text-teal-600' },
+  pending: { icon: <Clock className="h-4 w-4" />, color: 'text-amber-600' },
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }) => {
-  const { t, currentClient, transactions, language } = useFinance();
+  const { t, currentClient, transactions, language, userSettings } = useFinance();
   const [isDailyView, setIsDailyView] = useState(false);
 
   const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
   const getMonthLabel = (monthIndex: number) => t[monthKeys[monthIndex]];
 
-  const summary: FinancialSummary = useMemo(() => {
+  const filteredTransactionsForPeriod = useMemo(() => {
     const now = new Date();
     const currentDay = now.getDate();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const filteredTransactions = transactions.filter((txn) => {
+    return transactions.filter((txn) => {
       const date = new Date(txn.date);
       if (isDailyView) {
         return (
@@ -38,12 +54,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
       }
       return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
+  }, [transactions, isDailyView]);
 
-    const totalIncome = filteredTransactions
+  const summary: FinancialSummary = useMemo(() => {
+    const totalIncome = filteredTransactionsForPeriod
       .filter((txn) => txn.type === 'income')
       .reduce((sum, txn) => sum + txn.amount, 0);
 
-    const totalExpense = filteredTransactions
+    const totalExpense = filteredTransactionsForPeriod
       .filter((txn) => txn.type === 'expense')
       .reduce((sum, txn) => sum + txn.amount, 0);
 
@@ -52,7 +70,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
       totalExpense,
       balance: totalIncome - totalExpense,
     };
-  }, [transactions, isDailyView]);
+  }, [filteredTransactionsForPeriod]);
+
+  const paymentMethodBreakdown = useMemo(() => {
+    if (!userSettings.enablePaymentMethods) return null;
+
+    const incomeTransactions = filteredTransactionsForPeriod.filter(txn => txn.type === 'income');
+    
+    const breakdown: Record<PaymentMethod, number> = {
+      cash: 0,
+      card: 0,
+      pix: 0,
+      pending: 0,
+    };
+
+    incomeTransactions.forEach(txn => {
+      if (txn.paymentMethod) {
+        breakdown[txn.paymentMethod] += txn.amount;
+      }
+    });
+
+    return breakdown;
+  }, [filteredTransactionsForPeriod, userSettings.enablePaymentMethods]);
 
   const monthlyFlowData: MonthlyFlowData[] = useMemo(() => {
     const now = new Date();
@@ -132,6 +171,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
         <StatCard title={t.incomes} value={summary.totalIncome} type="income" />
         <StatCard title={t.expenses} value={summary.totalExpense} type="expense" />
       </div>
+
+      {/* Payment Method Breakdown */}
+      {paymentMethodBreakdown && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">{t.paymentMethodBreakdown}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(Object.keys(paymentMethodBreakdown) as PaymentMethod[]).map((method) => {
+                const config = paymentMethodConfig[method];
+                const value = paymentMethodBreakdown[method];
+                return (
+                  <div key={method} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className={`p-2 rounded-full bg-background ${config.color}`}>
+                      {config.icon}
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t[method]}</p>
+                      <p className="font-semibold money-font">{formatCurrency(value)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts and Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
