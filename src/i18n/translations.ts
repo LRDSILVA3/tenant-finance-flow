@@ -71,6 +71,17 @@ export interface Translations {
   allCategories: string;
   allTypes: string;
   from: string;
+  paymentMethod: string;
+  cash: string;
+  card: string;
+  pix: string;
+  pending: string;
+
+  // Settings
+  settingsSubtitle: string;
+  enablePaymentMethods: string;
+  enablePaymentMethodsDescription: string;
+  paymentMethodBreakdown: string;
 
   // Forms
   save: string;
@@ -163,6 +174,16 @@ export const translations: Record<Language, Translations> = {
     allCategories: 'Todas as Categorias',
     allTypes: 'Todos os Tipos',
     from: 'De',
+    paymentMethod: 'Forma de Recebimento',
+    cash: 'Dinheiro',
+    card: 'Cartão',
+    pix: 'PIX',
+    pending: 'Pendente',
+
+    settingsSubtitle: 'Gerencie as configurações do sistema',
+    enablePaymentMethods: 'Habilitar Formas de Recebimento',
+    enablePaymentMethodsDescription: 'Permite informar como a receita foi recebida (Dinheiro, Cartão, PIX ou Pendente)',
+    paymentMethodBreakdown: 'Por Forma de Recebimento',
 
     save: 'Salvar',
     cancel: 'Cancelar',
@@ -241,6 +262,16 @@ export const translations: Record<Language, Translations> = {
     allCategories: 'All Categories',
     allTypes: 'All Types',
     from: 'From',
+    paymentMethod: 'Payment Method',
+    cash: 'Cash',
+    card: 'Card',
+    pix: 'PIX',
+    pending: 'Pending',
+
+    settingsSubtitle: 'Manage system settings',
+    enablePaymentMethods: 'Enable Payment Methods',
+    enablePaymentMethodsDescription: 'Allows specifying how income was received (Cash, Card, PIX or Pending)',
+    paymentMethodBreakdown: 'By Payment Method',
 
     save: 'Save',
     cancel: 'Cancel',
@@ -319,6 +350,16 @@ export const translations: Record<Language, Translations> = {
     allCategories: 'Todas las Categorías',
     allTypes: 'Todos los Tipos',
     from: 'Desde',
+    paymentMethod: 'Forma de Pago',
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    pix: 'PIX',
+    pending: 'Pendiente',
+
+    settingsSubtitle: 'Administrar configuración del sistema',
+    enablePaymentMethods: 'Habilitar Formas de Pago',
+    enablePaymentMethodsDescription: 'Permite especificar cómo se recibió el ingreso (Efectivo, Tarjeta, PIX o Pendiente)',
+    paymentMethodBreakdown: 'Por Forma de Pago',
 
     save: 'Guardar',
     cancel: 'Cancelar',

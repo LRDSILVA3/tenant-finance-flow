@@ -4,6 +4,8 @@ export type Language = 'pt' | 'en' | 'es';
 
 export type TransactionType = 'income' | 'expense';
 
+export type PaymentMethod = 'cash' | 'card' | 'pix' | 'pending';
+
 export interface Client {
   id: string;
   name: string;
@@ -32,7 +34,14 @@ export interface Transaction {
   date: Date;
   reference?: string;
   notes?: string;
+  paymentMethod?: PaymentMethod;
   createdAt: Date;
+}
+
+export interface UserSettings {
+  id: string;
+  userId: string;
+  enablePaymentMethods: boolean;
 }
 
 export interface MonthlyFlowData {

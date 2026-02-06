@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Language, TransactionType } from '@/types/finance';
+import { Language, TransactionType, PaymentMethod } from '@/types/finance';
 import { translations, Translations } from '@/i18n/translations';
 import { getDefaultCategoriesForLanguage } from '@/data/defaultChartOfAccounts';
 import { toast } from '@/hooks/use-toast';
@@ -41,7 +41,16 @@ interface DbTransaction {
   date: string;
   reference: string | null;
   notes: string | null;
+  payment_method: string | null;
   created_at: string;
+}
+
+interface DbUserSettings {
+  id: string;
+  user_id: string;
+  enable_payment_methods: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // App types
@@ -73,7 +82,12 @@ export interface Transaction {
   date: Date;
   reference?: string;
   notes?: string;
+  paymentMethod?: PaymentMethod;
   createdAt: Date;
+}
+
+export interface UserSettings {
+  enablePaymentMethods: boolean;
 }
 
 interface FinanceContextType {
@@ -107,6 +121,10 @@ interface FinanceContextType {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+
+  // User Settings
+  userSettings: UserSettings;
+  updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -119,6 +137,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserSettings>({ enablePaymentMethods: false });
 
   const t = translations[language];
   const isAuthenticated = !!user;
@@ -207,22 +226,92 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         date: new Date(t.date),
         reference: t.reference || undefined,
         notes: t.notes || undefined,
+        paymentMethod: t.payment_method as PaymentMethod | undefined,
         createdAt: new Date(t.created_at),
       }));
       setTransactions(mappedTransactions);
     }
   }, [user, currentClient]);
 
+  // Load user settings
+  const loadUserSettings = useCallback(async () => {
+    if (!user) {
+      setUserSettings({ enablePaymentMethods: false });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error loading user settings:', error);
+    } else if (data) {
+      setUserSettings({
+        enablePaymentMethods: (data as DbUserSettings).enable_payment_methods,
+      });
+    }
+  }, [user]);
+
+  // Update user settings
+  const updateUserSettings = async (settings: Partial<UserSettings>) => {
+    if (!user) return;
+
+    const newSettings = { ...userSettings, ...settings };
+
+    // Try to update first, if no rows affected, insert
+    const { data: existingData } = await supabase
+      .from('user_settings')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingData) {
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          enable_payment_methods: newSettings.enablePaymentMethods,
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating user settings:', error);
+        toast({ title: t.error, variant: 'destructive' });
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from('user_settings')
+        .insert({
+          user_id: user.id,
+          enable_payment_methods: newSettings.enablePaymentMethods,
+        });
+
+      if (error) {
+        console.error('Error creating user settings:', error);
+        toast({ title: t.error, variant: 'destructive' });
+        return;
+      }
+    }
+
+    setUserSettings(newSettings);
+    toast({ title: t.saved });
+  };
+
   useEffect(() => {
     if (user) {
       loadClients();
+      loadUserSettings();
     } else {
       setClients([]);
       setCurrentClient(null);
       setCategories([]);
       setTransactions([]);
+      setUserSettings({ enablePaymentMethods: false });
     }
-  }, [user, loadClients]);
+  }, [user, loadClients, loadUserSettings]);
 
   useEffect(() => {
     loadCategories();
@@ -400,6 +489,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         date: transaction.date.toISOString().split('T')[0],
         reference: transaction.reference || null,
         notes: transaction.notes || null,
+        payment_method: transaction.paymentMethod || null,
       });
 
     if (error) {
@@ -420,6 +510,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (updates.date) updateData.date = updates.date.toISOString().split('T')[0];
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
+    if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
 
     const { error } = await supabase
       .from('transactions')
@@ -474,6 +565,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         addTransaction,
         updateTransaction,
         deleteTransaction,
+        userSettings,
+        updateUserSettings,
       }}
     >
       {children}
