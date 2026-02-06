@@ -12,6 +12,12 @@ export interface Translations {
   dashboard: string;
   chartOfAccounts: string;
   transactions: string;
+  settings: string;
+
+  // Dashboard
+  dailyView: string;
+  monthlyView: string;
+  dailyOverview: string;
 
   // Dashboard
   financialOverview: string;
@@ -103,9 +109,13 @@ export const translations: Record<Language, Translations> = {
     dashboard: 'Painel',
     chartOfAccounts: 'Plano de Contas',
     transactions: 'Lançamentos',
+    settings: 'Configurações',
 
     financialOverview: 'Visão Financeira',
     monthlyOverview: 'Visão do mês atual',
+    dailyView: 'Diário',
+    monthlyView: 'Mensal',
+    dailyOverview: 'Visão do dia atual',
     balance: 'Saldo',
     income: 'Entrada',
     incomes: 'Entradas',
@@ -177,9 +187,13 @@ export const translations: Record<Language, Translations> = {
     dashboard: 'Dashboard',
     chartOfAccounts: 'Chart of Accounts',
     transactions: 'Transactions',
+    settings: 'Settings',
 
     financialOverview: 'Financial Overview',
     monthlyOverview: 'Current month overview',
+    dailyView: 'Daily',
+    monthlyView: 'Monthly',
+    dailyOverview: 'Current day overview',
     balance: 'Balance',
     income: 'Income',
     incomes: 'Incomes',
@@ -251,9 +265,13 @@ export const translations: Record<Language, Translations> = {
     dashboard: 'Panel',
     chartOfAccounts: 'Plan de Cuentas',
     transactions: 'Transacciones',
+    settings: 'Configuración',
 
     financialOverview: 'Visión Financiera',
     monthlyOverview: 'Visión del mes actual',
+    dailyView: 'Diario',
+    monthlyView: 'Mensual',
+    dailyOverview: 'Visión del día actual',
     balance: 'Saldo',
     income: 'Ingreso',
     incomes: 'Ingresos',
