@@ -6,11 +6,11 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
-import { ChartOfAccounts } from '@/components/chart-of-accounts/ChartOfAccounts';
+import { Settings } from '@/components/settings/Settings';
 import { Transactions } from '@/components/transactions/Transactions';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'chart-of-accounts' | 'transactions';
+type View = 'dashboard' | 'transactions' | 'settings';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -58,8 +58,8 @@ const Index: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
-      case 'chart-of-accounts':
-        return <ChartOfAccounts />;
+      case 'settings':
+        return <Settings />;
       case 'transactions':
         return <Transactions />;
       default:

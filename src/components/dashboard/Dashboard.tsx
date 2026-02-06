@@ -1,12 +1,14 @@
 // Dashboard Component
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { StatCard } from './StatCard';
 import { MonthlyFlowChart } from './MonthlyFlowChart';
 import { DateRangeTransactions } from './DateRangeTransactions';
 import { RecentTransactions } from './RecentTransactions';
 import { MonthlyFlowData, FinancialSummary } from '@/types/finance';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface DashboardProps {
   onNavigateToTransactions: () => void;
@@ -14,25 +16,34 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }) => {
   const { t, currentClient, transactions, language } = useFinance();
+  const [isDailyView, setIsDailyView] = useState(false);
 
   const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
   const getMonthLabel = (monthIndex: number) => t[monthKeys[monthIndex]];
 
   const summary: FinancialSummary = useMemo(() => {
     const now = new Date();
+    const currentDay = now.getDate();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const currentMonthTransactions = transactions.filter((txn) => {
+    const filteredTransactions = transactions.filter((txn) => {
       const date = new Date(txn.date);
+      if (isDailyView) {
+        return (
+          date.getDate() === currentDay &&
+          date.getMonth() === currentMonth &&
+          date.getFullYear() === currentYear
+        );
+      }
       return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
 
-    const totalIncome = currentMonthTransactions
+    const totalIncome = filteredTransactions
       .filter((txn) => txn.type === 'income')
       .reduce((sum, txn) => sum + txn.amount, 0);
 
-    const totalExpense = currentMonthTransactions
+    const totalExpense = filteredTransactions
       .filter((txn) => txn.type === 'expense')
       .reduce((sum, txn) => sum + txn.amount, 0);
 
@@ -41,7 +52,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
       totalExpense,
       balance: totalIncome - totalExpense,
     };
-  }, [transactions]);
+  }, [transactions, isDailyView]);
 
   const monthlyFlowData: MonthlyFlowData[] = useMemo(() => {
     const now = new Date();
@@ -82,10 +93,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="page-header">
-        <h2 className="page-title">{t.financialOverview}</h2>
-        <p className="page-subtitle">{t.monthlyOverview}</p>
+      {/* Page Header with Toggle */}
+      <div className="page-header flex items-start justify-between">
+        <div>
+          <h2 className="page-title">{t.financialOverview}</h2>
+          <p className="page-subtitle">
+            {isDailyView ? t.dailyOverview : t.monthlyOverview}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-2">
+          <Label 
+            htmlFor="view-toggle" 
+            className={`text-sm font-medium cursor-pointer transition-colors ${
+              !isDailyView ? 'text-foreground' : 'text-muted-foreground'
+            }`}
+          >
+            {t.monthlyView}
+          </Label>
+          <Switch
+            id="view-toggle"
+            checked={isDailyView}
+            onCheckedChange={setIsDailyView}
+          />
+          <Label 
+            htmlFor="view-toggle" 
+            className={`text-sm font-medium cursor-pointer transition-colors ${
+              isDailyView ? 'text-foreground' : 'text-muted-foreground'
+            }`}
+          >
+            {t.dailyView}
+          </Label>
+        </div>
       </div>
 
       {/* Summary Cards */}

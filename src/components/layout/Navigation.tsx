@@ -3,9 +3,9 @@
 import React from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, List, ArrowRightLeft } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, Settings } from 'lucide-react';
 
-type View = 'dashboard' | 'chart-of-accounts' | 'transactions';
+type View = 'dashboard' | 'transactions' | 'settings';
 
 interface NavigationProps {
   currentView: View;
@@ -17,8 +17,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
 
   const navItems: { id: View; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: t.dashboard, icon: <LayoutDashboard className="h-4 w-4" /> },
-    { id: 'chart-of-accounts', label: t.chartOfAccounts, icon: <List className="h-4 w-4" /> },
     { id: 'transactions', label: t.transactions, icon: <ArrowRightLeft className="h-4 w-4" /> },
+    { id: 'settings', label: t.settings, icon: <Settings className="h-4 w-4" /> },
   ];
 
   return (
