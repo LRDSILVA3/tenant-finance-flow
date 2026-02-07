@@ -473,6 +473,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return categories.find(c => c.id === id);
   };
 
+  // Helper to format date in local timezone for DB storage
+  const formatDateForDB = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Transaction operations
   const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     if (!user) return;
@@ -486,7 +494,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         type: transaction.type,
         amount: transaction.amount,
         description: transaction.description,
-        date: transaction.date.toISOString().split('T')[0],
+        date: formatDateForDB(transaction.date),
         reference: transaction.reference || null,
         notes: transaction.notes || null,
         payment_method: transaction.paymentMethod || null,
@@ -507,7 +515,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (updates.categoryId) updateData.category_id = updates.categoryId;
     if (updates.amount) updateData.amount = updates.amount;
     if (updates.description) updateData.description = updates.description;
-    if (updates.date) updateData.date = updates.date.toISOString().split('T')[0];
+    if (updates.date) updateData.date = formatDateForDB(updates.date);
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
