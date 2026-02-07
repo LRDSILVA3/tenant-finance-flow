@@ -791,7 +791,7 @@ export const Transactions: React.FC = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg w-[95vw]">
+        <DialogContent className="max-w-xl w-[95vw]">
           <DialogHeader>
             <DialogTitle>
               {editingTransaction ? t.editTransaction : t.addTransaction}
