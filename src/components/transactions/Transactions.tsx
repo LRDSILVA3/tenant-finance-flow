@@ -791,7 +791,7 @@ export const Transactions: React.FC = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg w-[95vw]">
           <DialogHeader>
             <DialogTitle>
               {editingTransaction ? t.editTransaction : t.addTransaction}
@@ -799,44 +799,53 @@ export const Transactions: React.FC = () => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t.type}</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(val) =>
-                  setFormData({ ...formData, type: val as TransactionType, categoryId: '' })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="income">{t.income}</SelectItem>
-                  <SelectItem value="expense">{t.expenses}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t.category}</Label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(val) => setFormData({ ...formData, categoryId: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t.category} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.code} - {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+            {/* Type and Category */}
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t.type}</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, type: val as TransactionType, categoryId: '', paymentMethod: '' })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="income">{t.income}</SelectItem>
+                    <SelectItem value="expense">{t.expenses}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t.category}</Label>
+                <Select
+                  value={formData.categoryId}
+                  onValueChange={(val) => setFormData({ ...formData, categoryId: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t.category} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.code} - {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Amount, Date and Payment Method */}
+            <div className={cn(
+              "grid gap-4",
+              userSettings.enablePaymentMethods && formData.type === 'income' 
+                ? "grid-cols-3" 
+                : "grid-cols-2"
+            )}>
               <div className="space-y-2">
                 <Label htmlFor="amount">{t.amount}</Label>
                 <MoneyInput
@@ -871,73 +880,75 @@ export const Transactions: React.FC = () => {
                   </PopoverContent>
                 </Popover>
               </div>
+              {userSettings.enablePaymentMethods && formData.type === 'income' && (
+                <div className="space-y-2">
+                  <Label>{t.paymentMethod}</Label>
+                  <Select
+                    value={formData.paymentMethod}
+                    onValueChange={(val) => setFormData({ ...formData, paymentMethod: val as PaymentMethod })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t.paymentMethod} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-4 w-4" />
+                          {t.cash}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="card">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          {t.card}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="pix">
+                        <div className="flex items-center gap-2">
+                          <Smartphone className="h-4 w-4" />
+                          {t.pix}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="pending">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {t.pending}
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">{t.description}</Label>
-              <SearchableSelect
-                value={formData.description}
-                onChange={(value) => setFormData({ ...formData, description: value, reference: '' })}
-                groupedOptions={filteredDescriptionOptions}
-                placeholder={t.description}
-                searchPlaceholder="Buscar descrição..."
-                emptyMessage="Nenhuma descrição encontrada."
-                addNewLabel="Adicionar"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reference">{t.reference}</Label>
-              <SearchableSelect
-                value={formData.reference}
-                onChange={(value) => setFormData({ ...formData, reference: value })}
-                groupedOptions={filteredReferenceOptions}
-                placeholder={t.reference}
-                searchPlaceholder="Buscar referência..."
-                emptyMessage="Nenhuma referência encontrada."
-                addNewLabel="Adicionar"
-              />
-            </div>
-
-            {userSettings.enablePaymentMethods && formData.type === 'income' && (
+            {/* Description and Reference */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t.paymentMethod}</Label>
-                <Select
-                  value={formData.paymentMethod}
-                  onValueChange={(val) => setFormData({ ...formData, paymentMethod: val as PaymentMethod })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.paymentMethod} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4" />
-                        {t.cash}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="card">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        {t.card}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pix">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="h-4 w-4" />
-                        {t.pix}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {t.pending}
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="description">{t.description}</Label>
+                <SearchableSelect
+                  value={formData.description}
+                  onChange={(value) => setFormData({ ...formData, description: value, reference: '' })}
+                  groupedOptions={filteredDescriptionOptions}
+                  placeholder={t.description}
+                  searchPlaceholder="Buscar descrição..."
+                  emptyMessage="Nenhuma descrição encontrada."
+                  addNewLabel="Adicionar"
+                />
               </div>
-            )}
+
+              <div className="space-y-2">
+                <Label htmlFor="reference">{t.reference}</Label>
+                <SearchableSelect
+                  value={formData.reference}
+                  onChange={(value) => setFormData({ ...formData, reference: value })}
+                  groupedOptions={filteredReferenceOptions}
+                  placeholder={t.reference}
+                  searchPlaceholder="Buscar referência..."
+                  emptyMessage="Nenhuma referência encontrada."
+                  addNewLabel="Adicionar"
+                />
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="notes">{t.notes}</Label>
