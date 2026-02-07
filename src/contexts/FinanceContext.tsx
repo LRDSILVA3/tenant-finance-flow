@@ -215,7 +215,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     if (error) {
       console.error('Error loading transactions:', error);
-    } else if (data) {
+      } else if (data) {
       const mappedTransactions: Transaction[] = data.map((t: DbTransaction) => ({
         id: t.id,
         clientId: t.client_id,
@@ -223,7 +223,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         type: t.type as TransactionType,
         amount: Number(t.amount),
         description: t.description,
-        date: new Date(t.date),
+        // IMPORTANT: date column comes as YYYY-MM-DD; parse as LOCAL time to avoid timezone shifting a day
+        date: new Date(`${t.date}T00:00:00`),
         reference: t.reference || undefined,
         notes: t.notes || undefined,
         paymentMethod: t.payment_method as PaymentMethod | undefined,
