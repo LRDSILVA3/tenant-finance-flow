@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { UserSettings } from '@/contexts/FinanceContext';
 
 interface Transaction {
   id: string;
@@ -14,12 +15,19 @@ interface Transaction {
   date: Date;
   reference?: string;
   notes?: string;
+  collaboratorId?: string;
+  commissionAmount?: number;
 }
 
 interface Category {
   id: string;
   name: string;
   code: string;
+}
+
+interface Collaborator {
+  id: string;
+  name: string;
 }
 
 interface ExportFilters {
@@ -48,10 +56,12 @@ export const useTransactionPdfExport = () => {
   const exportListToPdf = (
     transactions: Transaction[],
     getCategoryById: (id: string) => Category | undefined,
+    getCollaboratorById: (id: string) => Collaborator | undefined,
     filters: ExportFilters,
-    clientName: string
+    clientName: string,
+    userSettings: UserSettings,
   ) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' }); // Always landscape
     const pageWidth = doc.internal.pageSize.getWidth();
     
     // Header
@@ -119,20 +129,57 @@ export const useTransactionPdfExport = () => {
     // Table data
     const tableData = transactions.map(t => {
       const category = getCategoryById(t.categoryId);
-      return [
+      const row = [
         formatDate(t.date),
         t.type === 'income' ? 'Receita' : 'Despesa',
         t.description,
         category ? `${category.code} - ${category.name}` : '-',
         t.reference || '-',
-        formatCurrency(t.amount)
+        t.notes || '-',
       ];
+      if (userSettings.enableCommission) {
+        const collaborator = t.collaboratorId ? getCollaboratorById(t.collaboratorId) : null;
+        row.push(collaborator ? collaborator.name : '-');
+        row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+      }
+      row.push(formatCurrency(t.amount));
+      return row;
     });
+    
+    const head = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Referência', 'Observações'];
+    if (userSettings.enableCommission) {
+      head.push('Colaborador', 'Comissão');
+    }
+    head.push('Valor');
+
+    const columnStyles: any = {};
+    if (userSettings.enableCommission) {
+      columnStyles[0] = { cellWidth: 18 }; // Data
+      columnStyles[1] = { cellWidth: 18 }; // Tipo
+      columnStyles[2] = { cellWidth: 35 }; // Descrição
+      columnStyles[3] = { cellWidth: 35 }; // Categoria
+      columnStyles[4] = { cellWidth: 25 }; // Referência
+      columnStyles[5] = { cellWidth: 30 }; // Observações
+      columnStyles[6] = { cellWidth: 30 }; // Colaborador
+      columnStyles[7] = { cellWidth: 20, halign: 'right' }; // Comissão
+      columnStyles[8] = { cellWidth: 25, halign: 'right' }; // Valor
+    } else {
+      // Distribute width for 7 columns (Data, Tipo, Descrição, Categoria, Referência, Observações, Valor)
+      // Total landscape width is ~297mm. Subtracting margins (10mm each side) leaves ~277mm.
+      // Let's use proportional widths for portrait
+      columnStyles[0] = { cellWidth: 30 }; // Data
+      columnStyles[1] = { cellWidth: 30 }; // Tipo
+      columnStyles[2] = { cellWidth: 60 }; // Descrição
+      columnStyles[3] = { cellWidth: 50 }; // Categoria
+      columnStyles[4] = { cellWidth: 40 }; // Referência
+      columnStyles[5] = { cellWidth: 40 }; // Observações
+      columnStyles[6] = { cellWidth: 25, halign: 'right' }; // Valor
+    }
     
     // Generate table
     autoTable(doc, {
       startY: yPos,
-      head: [['Data', 'Tipo', 'Descrição', 'Categoria', 'Referência', 'Valor']],
+      head: [head],
       body: tableData,
       theme: 'striped',
       headStyles: { 
@@ -140,14 +187,7 @@ export const useTransactionPdfExport = () => {
         textColor: [255, 255, 255],
         fontStyle: 'bold'
       },
-      columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 45 },
-        3: { cellWidth: 45 },
-        4: { cellWidth: 30 },
-        5: { cellWidth: 25, halign: 'right' }
-      },
+      columnStyles: columnStyles,
       styles: {
         fontSize: 8,
         cellPadding: 2
@@ -162,7 +202,8 @@ export const useTransactionPdfExport = () => {
           }
         }
         // Color code the amount column
-        if (data.column.index === 5 && data.section === 'body') {
+        const amountColumnIndex = userSettings.enableCommission ? 8 : 6;
+        if (data.column.index === amountColumnIndex && data.section === 'body') {
           const rowIndex = data.row.index;
           if (transactions[rowIndex]?.type === 'income') {
             data.cell.styles.textColor = [34, 139, 34];
@@ -195,11 +236,13 @@ export const useTransactionPdfExport = () => {
   const exportCalendarToPdf = (
     transactions: Transaction[],
     getCategoryById: (id: string) => Category | undefined,
+    getCollaboratorById: (id: string) => Collaborator | undefined,
     filters: ExportFilters,
     clientName: string,
-    calendarData: CalendarDayData
+    calendarData: CalendarDayData,
+    userSettings: UserSettings,
   ) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: userSettings.enableCommission ? 'landscape' : 'portrait' });
     const pageWidth = doc.internal.pageSize.getWidth();
     
     // Header
@@ -337,18 +380,47 @@ export const useTransactionPdfExport = () => {
     
     const detailTableData = transactions.map(t => {
       const category = getCategoryById(t.categoryId);
-      return [
+      const row = [
         formatDate(t.date),
         t.type === 'income' ? 'Receita' : 'Despesa',
         t.description,
         category ? `${category.code} - ${category.name}` : '-',
-        formatCurrency(t.amount)
+        t.notes || '-',
       ];
+      if (userSettings.enableCommission) {
+        const collaborator = t.collaboratorId ? getCollaboratorById(t.collaboratorId) : null;
+        row.push(collaborator ? collaborator.name : '-');
+        row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+      }
+      row.push(formatCurrency(t.amount));
+      return row;
     });
     
+    const detailHead = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Observações'];
+    if (userSettings.enableCommission) {
+      detailHead.push('Colaborador', 'Comissão');
+    }
+    detailHead.push('Valor');
+
+    const detailColumnStyles: any = {
+      0: { cellWidth: userSettings.enableCommission ? 20 : 25 }, // Data
+      1: { cellWidth: userSettings.enableCommission ? 18 : 22 }, // Tipo
+      2: { cellWidth: userSettings.enableCommission ? 35 : 55 }, // Descrição
+      3: { cellWidth: userSettings.enableCommission ? 35 : 55 }, // Categoria
+      4: { cellWidth: userSettings.enableCommission ? 30 : 30 }, // Observações
+    };
+
+    if (userSettings.enableCommission) {
+      detailColumnStyles[5] = { cellWidth: 30 }; // Colaborador
+      detailColumnStyles[6] = { cellWidth: 20, halign: 'right' }; // Comissão
+      detailColumnStyles[7] = { cellWidth: 22, halign: 'right' }; // Valor
+    } else {
+      detailColumnStyles[5] = { cellWidth: 22, halign: 'right' }; // Valor
+    }
+
     autoTable(doc, {
       startY: yPos,
-      head: [['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor']],
+      head: [detailHead],
       body: detailTableData,
       theme: 'striped',
       headStyles: { 
@@ -356,13 +428,7 @@ export const useTransactionPdfExport = () => {
         textColor: [255, 255, 255],
         fontStyle: 'bold'
       },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 55 },
-        3: { cellWidth: 55 },
-        4: { cellWidth: 28, halign: 'right' }
-      },
+      columnStyles: detailColumnStyles,
       styles: {
         fontSize: 8,
         cellPadding: 2
@@ -375,7 +441,8 @@ export const useTransactionPdfExport = () => {
             data.cell.styles.textColor = [220, 53, 69];
           }
         }
-        if (data.column.index === 4 && data.section === 'body') {
+        const amountColumnIndex = userSettings.enableCommission ? 7 : 5;
+        if (data.column.index === amountColumnIndex && data.section === 'body') {
           const rowIndex = data.row.index;
           if (transactions[rowIndex]?.type === 'income') {
             data.cell.styles.textColor = [34, 139, 34];

@@ -49,6 +49,16 @@ interface DbUserSettings {
   id: string;
   user_id: string;
   enable_payment_methods: boolean;
+  enable_commission: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbCollaborator {
+  id: string;
+  user_id: string;
+  client_id: string;
+  name: string;
   created_at: string;
   updated_at: string;
 }
@@ -83,11 +93,21 @@ export interface Transaction {
   reference?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
+  collaboratorId?: string;
+  commissionAmount?: number;
+  createdAt: Date;
+}
+
+export interface Collaborator {
+  id: string;
+  name: string;
+  clientId: string;
   createdAt: Date;
 }
 
 export interface UserSettings {
   enablePaymentMethods: boolean;
+  enableCommission: boolean;
 }
 
 interface FinanceContextType {
@@ -125,6 +145,13 @@ interface FinanceContextType {
   // User Settings
   userSettings: UserSettings;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
+
+  // Collaborators
+  collaborators: Collaborator[];
+  addCollaborator: (name: string) => Promise<void>;
+  updateCollaborator: (id: string, name: string) => Promise<void>;
+  deleteCollaborator: (id: string) => Promise<void>;
+  getCollaboratorById: (id: string) => Collaborator | undefined;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -136,8 +163,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [userSettings, setUserSettings] = useState<UserSettings>({ enablePaymentMethods: false });
+  const [userSettings, setUserSettings] = useState<UserSettings>({
+    enablePaymentMethods: false,
+    enableCommission: false,
+  });
 
   const t = translations[language];
   const isAuthenticated = !!user;
@@ -216,7 +247,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (error) {
       console.error('Error loading transactions:', error);
       } else if (data) {
-      const mappedTransactions: Transaction[] = data.map((t: DbTransaction) => ({
+      const mappedTransactions: Transaction[] = data.map((t: any) => ({
         id: t.id,
         clientId: t.client_id,
         categoryId: t.category_id,
@@ -228,16 +259,44 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         reference: t.reference || undefined,
         notes: t.notes || undefined,
         paymentMethod: t.payment_method as PaymentMethod | undefined,
+        collaboratorId: t.collaborator_id || undefined,
+        commissionAmount: t.commission_amount || undefined,
         createdAt: new Date(t.created_at),
       }));
       setTransactions(mappedTransactions);
     }
   }, [user, currentClient]);
 
+  // Load collaborators for current client
+  const loadCollaborators = useCallback(async () => {
+    if (!user || !currentClient) {
+      setCollaborators([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('collaborators')
+      .select('*')
+      .eq('client_id', currentClient.id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error loading collaborators:', error);
+    } else if (data) {
+      const mappedCollaborators: Collaborator[] = data.map((c: DbCollaborator) => ({
+        id: c.id,
+        clientId: c.client_id,
+        name: c.name,
+        createdAt: new Date(c.created_at),
+      }));
+      setCollaborators(mappedCollaborators);
+    }
+  }, [user, currentClient]);
+
   // Load user settings
   const loadUserSettings = useCallback(async () => {
     if (!user) {
-      setUserSettings({ enablePaymentMethods: false });
+      setUserSettings({ enablePaymentMethods: false, enableCommission: false });
       return;
     }
 
@@ -252,6 +311,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     } else if (data) {
       setUserSettings({
         enablePaymentMethods: (data as DbUserSettings).enable_payment_methods,
+        enableCommission: (data as DbUserSettings).enable_commission,
       });
     }
   }, [user]);
@@ -274,6 +334,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         .from('user_settings')
         .update({
           enable_payment_methods: newSettings.enablePaymentMethods,
+          enable_commission: newSettings.enableCommission,
         })
         .eq('user_id', user.id);
 
@@ -288,6 +349,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         .insert({
           user_id: user.id,
           enable_payment_methods: newSettings.enablePaymentMethods,
+          enable_commission: newSettings.enableCommission,
         });
 
       if (error) {
@@ -317,7 +379,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     loadCategories();
     loadTransactions();
-  }, [currentClient, loadCategories, loadTransactions]);
+    loadCollaborators();
+  }, [currentClient, loadCategories, loadTransactions, loadCollaborators]);
 
   // Add client
   const addClient = async (client: { name: string; taxId?: string }) => {
@@ -474,6 +537,61 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return categories.find(c => c.id === id);
   };
 
+  // Collaborator operations
+  const addCollaborator = async (name: string) => {
+    if (!user || !currentClient) return;
+
+    const { error } = await supabase
+      .from('collaborators')
+      .insert({
+        user_id: user.id,
+        client_id: currentClient.id,
+        name,
+      });
+
+    if (error) {
+      console.error('Error adding collaborator:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadCollaborators();
+      toast({ title: t.saved });
+    }
+  };
+
+  const updateCollaborator = async (id: string, name: string) => {
+    const { error } = await supabase
+      .from('collaborators')
+      .update({ name })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating collaborator:', error);
+      toast({ title: t.error, variant: 'destructive' });
+    } else {
+      await loadCollaborators();
+      toast({ title: t.saved });
+    }
+  };
+
+  const deleteCollaborator = async (id: string) => {
+    const { error } = await supabase
+      .from('collaborators')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting collaborator:', error);
+      toast({ title: t.error, description: 'Não é possível excluir colaboradores com lançamentos', variant: 'destructive' });
+    } else {
+      await loadCollaborators();
+      toast({ title: t.deleted });
+    }
+  };
+
+  const getCollaboratorById = (id: string) => {
+    return collaborators.find(c => c.id === id);
+  };
+
   // Helper to format date in local timezone for DB storage
   const formatDateForDB = (date: Date): string => {
     const year = date.getFullYear();
@@ -499,6 +617,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         reference: transaction.reference || null,
         notes: transaction.notes || null,
         payment_method: transaction.paymentMethod || null,
+        collaborator_id: transaction.collaboratorId || null,
+        commission_amount: transaction.commissionAmount || null,
       });
 
     if (error) {
@@ -520,6 +640,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
+    if (updates.collaboratorId !== undefined) updateData.collaborator_id = updates.collaboratorId || null;
+    if (updates.commissionAmount !== undefined) updateData.commission_amount = updates.commissionAmount || null;
 
     const { error } = await supabase
       .from('transactions')
@@ -576,6 +698,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteTransaction,
         userSettings,
         updateUserSettings,
+        collaborators,
+        addCollaborator,
+        updateCollaborator,
+        deleteCollaborator,
+        getCollaboratorById,
       }}
     >
       {children}

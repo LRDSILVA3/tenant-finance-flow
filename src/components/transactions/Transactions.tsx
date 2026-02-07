@@ -94,8 +94,10 @@ export const Transactions: React.FC = () => {
     currentClient,
     transactions,
     categories,
+    collaborators,
     getCategoriesByType,
     getCategoryById,
+    getCollaboratorById,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -133,6 +135,8 @@ export const Transactions: React.FC = () => {
     reference: '',
     notes: '',
     paymentMethod: '' as PaymentMethod | '',
+    collaboratorId: '',
+    commissionAmount: 0,
   });
 
   const locale = language === 'pt' ? ptBR : language === 'es' ? es : enUS;
@@ -262,16 +266,20 @@ export const Transactions: React.FC = () => {
       exportListToPdf(
         sortedTransactions,
         getCategoryById,
+        getCollaboratorById,
         filters,
-        currentClient.name
+        currentClient.name,
+        userSettings
       );
     } else {
       exportCalendarToPdf(
         sortedTransactions,
         getCategoryById,
+        getCollaboratorById,
         filters,
         currentClient.name,
-        datesWithTransactions
+        datesWithTransactions,
+        userSettings
       );
     }
   };
@@ -287,6 +295,8 @@ export const Transactions: React.FC = () => {
       reference: '',
       notes: '',
       paymentMethod: '',
+      collaboratorId: '',
+      commissionAmount: 0,
     });
     setIsDialogOpen(true);
   };
@@ -302,6 +312,8 @@ export const Transactions: React.FC = () => {
       reference: transaction.reference || '',
       notes: transaction.notes || '',
       paymentMethod: transaction.paymentMethod || '',
+      collaboratorId: transaction.collaboratorId || '',
+      commissionAmount: transaction.commissionAmount || 0,
     });
     setIsDialogOpen(true);
   };
@@ -312,6 +324,8 @@ export const Transactions: React.FC = () => {
     setSaving(true);
 
     const paymentMethod = formData.paymentMethod || undefined;
+    const collaboratorId = formData.collaboratorId || undefined;
+    const commissionAmount = formData.commissionAmount || undefined;
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, {
@@ -323,6 +337,8 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
         paymentMethod,
+        collaboratorId,
+        commissionAmount,
       });
     } else {
       await addTransaction({
@@ -335,6 +351,8 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
         paymentMethod,
+        collaboratorId,
+        commissionAmount,
       });
     }
 
@@ -561,6 +579,12 @@ export const Transactions: React.FC = () => {
                 {userSettings.enablePaymentMethods && (
                   <TableHead>{t.paymentMethod}</TableHead>
                 )}
+                {userSettings.enableCommission && (
+                  <>
+                    <TableHead>Colaborador</TableHead>
+                    <TableHead>Comissão</TableHead>
+                  </>
+                )}
                 <TableHead className="text-right">{t.amount}</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
@@ -575,6 +599,7 @@ export const Transactions: React.FC = () => {
               ) : (
                 sortedTransactions.map((transaction) => {
                   const category = getCategoryById(transaction.categoryId);
+                  const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
                   return (
                     <TableRow key={transaction.id}>
                       <TableCell className="font-mono text-sm text-muted-foreground">
@@ -616,6 +641,14 @@ export const Transactions: React.FC = () => {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
+                      )}
+                      {userSettings.enableCommission && (
+                        <>
+                          <TableCell className="text-muted-foreground">{collaborator?.name || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}
+                          </TableCell>
+                        </>
                       )}
                       <TableCell
                         className={cn(
@@ -959,6 +992,37 @@ export const Transactions: React.FC = () => {
                 rows={2}
               />
             </div>
+
+            {userSettings.enableCommission && formData.type === 'income' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Colaborador</Label>
+                  <Select
+                    value={formData.collaboratorId}
+                    onValueChange={(val) => setFormData({ ...formData, collaboratorId: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um colaborador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {collaborators.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="commissionAmount">Comissão (R$)</Label>
+                  <MoneyInput
+                    id="commissionAmount"
+                    value={formData.commissionAmount}
+                    onChange={(value) => setFormData({ ...formData, commissionAmount: value })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

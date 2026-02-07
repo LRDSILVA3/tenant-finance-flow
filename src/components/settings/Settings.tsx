@@ -3,17 +3,22 @@
 import React from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { ChartOfAccounts } from '@/components/chart-of-accounts/ChartOfAccounts';
+import { Collaborators } from '@/components/settings/Collaborators';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { List, Settings as SettingsIcon, Wallet } from 'lucide-react';
+import { List, Settings as SettingsIcon, Wallet, Users } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { t, userSettings, updateUserSettings } = useFinance();
 
   const handlePaymentMethodsToggle = async (checked: boolean) => {
     await updateUserSettings({ enablePaymentMethods: checked });
+  };
+
+  const handleCommissionToggle = async (checked: boolean) => {
+    await updateUserSettings({ enableCommission: checked });
   };
 
   return (
@@ -34,6 +39,12 @@ export const Settings: React.FC = () => {
             <List className="h-4 w-4" />
             {t.chartOfAccounts}
           </TabsTrigger>
+          {userSettings.enableCommission && (
+            <TabsTrigger value="collaborators" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Colaboradores
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general">
@@ -65,12 +76,48 @@ export const Settings: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+          {userSettings.enablePaymentMethods && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Permitir comissão por venda de produtos/serviço
+                </CardTitle>
+                <CardDescription>
+                  Habilite para permitir o cadastro de colaboradores e o cálculo de comissões.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="commission-toggle" className="text-base">
+                      Permitir comissão
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Adicione colaboradores e calcule comissões em vendas.
+                    </p>
+                  </div>
+                  <Switch
+                    id="commission-toggle"
+                    checked={userSettings.enableCommission}
+                    onCheckedChange={handleCommissionToggle}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="chart-of-accounts">
           <ChartOfAccounts />
         </TabsContent>
+        {userSettings.enableCommission && (
+          <TabsContent value="collaborators">
+            <Collaborators />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
 };
+
