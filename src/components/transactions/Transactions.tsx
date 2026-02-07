@@ -512,6 +512,40 @@ export const Transactions: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Payment Method Breakdown */}
+        {userSettings.enablePaymentMethods && (
+          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t text-sm">
+            <div className="flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{t.cash}:</span>
+              <span className="font-semibold money-font">
+                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'cash').reduce((s, txn) => s + txn.amount, 0))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{t.card}:</span>
+              <span className="font-semibold money-font">
+                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'card').reduce((s, txn) => s + txn.amount, 0))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{t.pix}:</span>
+              <span className="font-semibold money-font">
+                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pix').reduce((s, txn) => s + txn.amount, 0))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{t.pending}:</span>
+              <span className="font-semibold money-font">
+                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pending').reduce((s, txn) => s + txn.amount, 0))}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* List View */}
