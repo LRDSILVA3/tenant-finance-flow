@@ -92,11 +92,40 @@ export type Database = {
         }
         Relationships: []
       }
+      collaborators: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
           category_id: string
           client_id: string
+          collaborator_id: string | null
+          commission_amount: number | null
           created_at: string
           date: string
           description: string
@@ -111,6 +140,8 @@ export type Database = {
           amount: number
           category_id: string
           client_id: string
+          collaborator_id?: string | null
+          commission_amount?: number | null
           created_at?: string
           date: string
           description: string
@@ -125,6 +156,8 @@ export type Database = {
           amount?: number
           category_id?: string
           client_id?: string
+          collaborator_id?: string | null
+          commission_amount?: number | null
           created_at?: string
           date?: string
           description?: string
@@ -150,11 +183,19 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transactions_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_settings: {
         Row: {
           created_at: string
+          enable_commission: boolean
           enable_payment_methods: boolean
           id: string
           updated_at: string
@@ -162,6 +203,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enable_commission?: boolean
           enable_payment_methods?: boolean
           id?: string
           updated_at?: string
@@ -169,6 +211,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enable_commission?: boolean
           enable_payment_methods?: boolean
           id?: string
           updated_at?: string
