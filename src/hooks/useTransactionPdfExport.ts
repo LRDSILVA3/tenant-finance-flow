@@ -193,7 +193,6 @@ export const useTransactionPdfExport = () => {
         cellPadding: 2
       },
       didParseCell: (data) => {
-        // Color code the type column
         if (data.column.index === 1 && data.section === 'body') {
           if (data.cell.raw === 'Receita') {
             data.cell.styles.textColor = [34, 139, 34];
@@ -201,7 +200,6 @@ export const useTransactionPdfExport = () => {
             data.cell.styles.textColor = [220, 53, 69];
           }
         }
-        // Color code the amount column
         const amountColumnIndex = userSettings.enableCommission ? 8 : 6;
         if (data.column.index === amountColumnIndex && data.section === 'body') {
           const rowIndex = data.row.index;
@@ -213,6 +211,69 @@ export const useTransactionPdfExport = () => {
         }
       }
     });
+
+    // Commission summary by collaborator
+    if (userSettings.enableCommission) {
+      const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
+      transactions.forEach(t => {
+        if (t.collaboratorId && t.commissionAmount) {
+          const collab = getCollaboratorById(t.collaboratorId);
+          const key = t.collaboratorId;
+          if (!commissionByCollaborator[key]) {
+            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+          }
+          commissionByCollaborator[key].totalCommission += t.commissionAmount;
+          commissionByCollaborator[key].totalSales += t.amount;
+          commissionByCollaborator[key].count += 1;
+        }
+      });
+
+      const commissionEntries = Object.values(commissionByCollaborator);
+      if (commissionEntries.length > 0) {
+        const lastY = (doc as any).lastAutoTable?.finalY || yPos + 20;
+        let commY = lastY + 10;
+        if (commY + 30 > doc.internal.pageSize.getHeight()) {
+          doc.addPage();
+          commY = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Resumo de Comissões por Colaborador:', 14, commY);
+        commY += 4;
+
+        const totalCommission = commissionEntries.reduce((s, e) => s + e.totalCommission, 0);
+
+        const commTableData = commissionEntries.map(e => [
+          e.name,
+          String(e.count),
+          formatCurrency(e.totalSales),
+          formatCurrency(e.totalCommission),
+        ]);
+        commTableData.push(['TOTAL', '', '', formatCurrency(totalCommission)]);
+
+        autoTable(doc, {
+          startY: commY,
+          head: [['Colaborador', 'Qtd Vendas', 'Total Vendas', 'Total Comissão']],
+          body: commTableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 40, halign: 'right' },
+            3: { cellWidth: 40, halign: 'right' },
+          },
+          styles: { fontSize: 9, cellPadding: 3 },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.row.index === commTableData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+      }
+    }
     
     // Footer with date
     const pageCount = doc.getNumberOfPages();
@@ -453,6 +514,69 @@ export const useTransactionPdfExport = () => {
       }
     });
     
+    // Commission summary by collaborator (calendar view)
+    if (userSettings.enableCommission) {
+      const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
+      transactions.forEach(t => {
+        if (t.collaboratorId && t.commissionAmount) {
+          const collab = getCollaboratorById(t.collaboratorId);
+          const key = t.collaboratorId;
+          if (!commissionByCollaborator[key]) {
+            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+          }
+          commissionByCollaborator[key].totalCommission += t.commissionAmount;
+          commissionByCollaborator[key].totalSales += t.amount;
+          commissionByCollaborator[key].count += 1;
+        }
+      });
+
+      const commissionEntries = Object.values(commissionByCollaborator);
+      if (commissionEntries.length > 0) {
+        const lastY = (doc as any).lastAutoTable?.finalY || yPos + 20;
+        let commY = lastY + 10;
+        if (commY + 30 > doc.internal.pageSize.getHeight()) {
+          doc.addPage();
+          commY = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Resumo de Comissões por Colaborador:', 14, commY);
+        commY += 4;
+
+        const totalCommission = commissionEntries.reduce((s, e) => s + e.totalCommission, 0);
+
+        const commTableData = commissionEntries.map(e => [
+          e.name,
+          String(e.count),
+          formatCurrency(e.totalSales),
+          formatCurrency(e.totalCommission),
+        ]);
+        commTableData.push(['TOTAL', '', '', formatCurrency(totalCommission)]);
+
+        autoTable(doc, {
+          startY: commY,
+          head: [['Colaborador', 'Qtd Vendas', 'Total Vendas', 'Total Comissão']],
+          body: commTableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 40, halign: 'right' },
+            3: { cellWidth: 40, halign: 'right' },
+          },
+          styles: { fontSize: 9, cellPadding: 3 },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.row.index === commTableData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+      }
+    }
+
     // Footer with date
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
