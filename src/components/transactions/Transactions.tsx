@@ -499,6 +499,21 @@ export const Transactions: React.FC = () => {
             </Select>
           </div>
 
+          {/* Daily Filter */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              setFilterStartDate(today);
+              setFilterEndDate(today);
+            }}
+            className="gap-1"
+          >
+            <CalendarIcon className="h-4 w-4" />
+            Diário
+          </Button>
+
           {/* Clear Filters */}
           <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1">
             <X className="h-4 w-4" />
