@@ -116,6 +116,7 @@ export const Transactions: React.FC = () => {
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   // Filter states
   const now = new Date();
@@ -285,8 +286,20 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const updateFormField = (field: keyof typeof formData, value: typeof formData[keyof typeof formData]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
   const handleOpenCreate = () => {
     setEditingTransaction(null);
+    setErrors({});
     setFormData({
       type: 'income',
       categoryId: '',
@@ -304,6 +317,7 @@ export const Transactions: React.FC = () => {
 
   const handleOpenEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
+    setErrors({});
     setFormData({
       type: transaction.type,
       categoryId: transaction.categoryId,
@@ -320,7 +334,18 @@ export const Transactions: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.categoryId || formData.amount <= 0 || !formData.description || !currentClient) return;
+    const newErrors: Record<string, string> = {};
+    if (!formData.type) newErrors.type = t.required;
+    if (!formData.categoryId) newErrors.categoryId = t.required;
+    if (formData.amount <= 0) newErrors.amount = t.required;
+    if (!formData.description) newErrors.description = t.required;
+    if (!formData.date) newErrors.date = t.required;
+    if (!formData.reference) newErrors.reference = t.required;
+
+    if (Object.keys(newErrors).length > 0 || !currentClient) {
+      setErrors(newErrors);
+      return;
+    }
 
     setSaving(true);
 
@@ -851,14 +876,18 @@ export const Transactions: React.FC = () => {
             {/* Type and Category */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t.type}</Label>
+                <Label className={cn(errors.type && "text-destructive")}>{t.type}</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(val) =>
-                    setFormData({ ...formData, type: val as TransactionType, categoryId: '', paymentMethod: '' })
-                  }
+                  onValueChange={(val) => {
+                    updateFormField('type', val as TransactionType);
+                    updateFormField('categoryId', '');
+                    if (userSettings.enablePaymentMethods) {
+                      updateFormField('paymentMethod', '');
+                    }
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={cn(errors.type && "border-destructive")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -866,15 +895,16 @@ export const Transactions: React.FC = () => {
                     <SelectItem value="expense">{t.expenses}</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label>{t.category}</Label>
+                <Label className={cn(errors.categoryId && "text-destructive")}>{t.category}</Label>
                 <Select
                   value={formData.categoryId}
-                  onValueChange={(val) => setFormData({ ...formData, categoryId: val })}
+                  onValueChange={(val) => updateFormField('categoryId', val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={cn(errors.categoryId && "border-destructive")}>
                     <SelectValue placeholder={t.category} />
                   </SelectTrigger>
                   <SelectContent>
@@ -885,6 +915,7 @@ export const Transactions: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
               </div>
             </div>
 
@@ -896,22 +927,25 @@ export const Transactions: React.FC = () => {
                 : "grid-cols-2"
             )}>
               <div className="space-y-2">
-                <Label htmlFor="amount">{t.amount}</Label>
+                <Label htmlFor="amount" className={cn(errors.amount && "text-destructive")}>{t.amount}</Label>
                 <MoneyInput
                   id="amount"
                   value={formData.amount}
-                  onChange={(value) => setFormData({ ...formData, amount: value })}
+                  onChange={(value) => updateFormField('amount', value)}
+                  className={cn(errors.amount && "border-destructive")}
                 />
+                {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
               </div>
               <div className="space-y-2">
-                <Label>{t.date}</Label>
+                <Label className={cn(errors.date && "text-destructive")}>{t.date}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !formData.date && "text-muted-foreground"
+                        !formData.date && "text-muted-foreground",
+                        errors.date && "border-destructive"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -922,19 +956,20 @@ export const Transactions: React.FC = () => {
                     <Calendar
                       mode="single"
                       selected={formData.date}
-                      onSelect={(date) => date && setFormData({ ...formData, date })}
+                      onSelect={(date) => date && updateFormField('date', date)}
                       locale={locale}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
               </div>
               {userSettings.enablePaymentMethods && formData.type === 'income' && (
                 <div className="space-y-2">
                   <Label>{t.paymentMethod}</Label>
                   <Select
                     value={formData.paymentMethod}
-                    onValueChange={(val) => setFormData({ ...formData, paymentMethod: val as PaymentMethod })}
+                    onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={t.paymentMethod} />
@@ -973,29 +1008,36 @@ export const Transactions: React.FC = () => {
             {/* Description and Reference */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="description">{t.description}</Label>
+                <Label htmlFor="description" className={cn(errors.description && "text-destructive")}>{t.description}</Label>
                 <SearchableSelect
                   value={formData.description}
-                  onChange={(value) => setFormData({ ...formData, description: value, reference: '' })}
+                  onChange={(value) => {
+                    updateFormField('description', value);
+                    updateFormField('reference', '');
+                  }}
                   groupedOptions={filteredDescriptionOptions}
                   placeholder={t.description}
                   searchPlaceholder="Buscar descrição..."
                   emptyMessage="Nenhuma descrição encontrada."
                   addNewLabel="Adicionar"
+                  className={cn(errors.description && "border-destructive")}
                 />
+                {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reference">{t.reference}</Label>
+                <Label htmlFor="reference" className={cn(errors.reference && "text-destructive")}>{t.reference}</Label>
                 <SearchableSelect
                   value={formData.reference}
-                  onChange={(value) => setFormData({ ...formData, reference: value })}
+                  onChange={(value) => updateFormField('reference', value)}
                   groupedOptions={filteredReferenceOptions}
                   placeholder={t.reference}
                   searchPlaceholder="Buscar referência..."
                   emptyMessage="Nenhuma referência encontrada."
                   addNewLabel="Adicionar"
+                  className={cn(errors.reference && "border-destructive")}
                 />
+                {errors.reference && <p className="text-xs text-destructive">{errors.reference}</p>}
               </div>
             </div>
 
@@ -1004,7 +1046,7 @@ export const Transactions: React.FC = () => {
               <Textarea
                 id="notes"
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) => updateFormField('notes', e.target.value)}
                 rows={2}
               />
             </div>
@@ -1015,19 +1057,26 @@ export const Transactions: React.FC = () => {
                   <Label>Colaborador</Label>
                   <CollaboratorSelect
                     value={formData.collaboratorId}
-                    onChange={(val) => setFormData({ ...formData, collaboratorId: val })}
-                    collaborators={collaborators}
-                    onAddNew={async (name) => {
-                      await addCollaborator(name);
-                    }}
-                  />
+                    onValueChange={(val) => updateFormField('collaboratorId', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um colaborador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {collaborators.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="commissionAmount">Comissão (R$)</Label>
                   <MoneyInput
                     id="commissionAmount"
                     value={formData.commissionAmount}
-                    onChange={(value) => setFormData({ ...formData, commissionAmount: value })}
+                    onChange={(value) => updateFormField('commissionAmount', value)}
                   />
                 </div>
               </div>
