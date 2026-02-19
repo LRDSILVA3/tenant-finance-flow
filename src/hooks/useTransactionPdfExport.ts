@@ -17,6 +17,7 @@ interface Transaction {
   notes?: string;
   collaboratorId?: string;
   commissionAmount?: number;
+  paymentMethod?: string;
 }
 
 interface Category {
@@ -114,17 +115,109 @@ export const useTransactionPdfExport = () => {
     yPos += 6;
     
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(34, 139, 34); // Green
+    doc.setTextColor(34, 139, 34);
     doc.text(`Receitas: ${formatCurrency(totalIncome)}`, 14, yPos);
     
-    doc.setTextColor(220, 53, 69); // Red
+    doc.setTextColor(220, 53, 69);
     doc.text(`Despesas: ${formatCurrency(totalExpense)}`, 70, yPos);
     
     doc.setTextColor(balance >= 0 ? 34 : 220, balance >= 0 ? 139 : 53, balance >= 0 ? 34 : 69);
     doc.text(`Saldo: ${formatCurrency(balance)}`, 130, yPos);
     
     doc.setTextColor(0, 0, 0);
-    yPos += 10;
+    yPos += 8;
+
+    // Payment method breakdown
+    if (userSettings.enablePaymentMethods) {
+      const incomeTransactions = transactions.filter(t => t.type === 'income');
+      const cashTotal = incomeTransactions.filter(t => t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
+      const cardTotal = incomeTransactions.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
+      const pixTotal = incomeTransactions.filter(t => t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
+      const pendingTotal = incomeTransactions.filter(t => t.paymentMethod === 'pending').reduce((s, t) => s + t.amount, 0);
+      const receivedTotal = cashTotal + cardTotal + pixTotal;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Formas de Recebimento (Receitas):', 14, yPos);
+      yPos += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(34, 139, 34);
+      doc.text(`Dinheiro: ${formatCurrency(cashTotal)}`, 14, yPos);
+      doc.text(`Cartão: ${formatCurrency(cardTotal)}`, 70, yPos);
+      doc.text(`Pix: ${formatCurrency(pixTotal)}`, 130, yPos);
+      
+      doc.setTextColor(200, 150, 0);
+      doc.text(`Pendente: ${formatCurrency(pendingTotal)}`, 180, yPos);
+      yPos += 6;
+
+      doc.setTextColor(34, 139, 34);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Já Recebido: ${formatCurrency(receivedTotal)}`, 14, yPos);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    } else {
+      yPos += 2;
+    }
+
+    // Commission summary by collaborator (before transactions table)
+    if (userSettings.enableCommission) {
+      const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
+      transactions.forEach(t => {
+        if (t.collaboratorId && t.commissionAmount) {
+          const collab = getCollaboratorById(t.collaboratorId);
+          const key = t.collaboratorId;
+          if (!commissionByCollaborator[key]) {
+            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+          }
+          commissionByCollaborator[key].totalCommission += t.commissionAmount;
+          commissionByCollaborator[key].totalSales += t.amount;
+          commissionByCollaborator[key].count += 1;
+        }
+      });
+
+      const commissionEntries = Object.values(commissionByCollaborator);
+      if (commissionEntries.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Resumo de Comissões por Colaborador:', 14, yPos);
+        yPos += 4;
+
+        const totalCommission = commissionEntries.reduce((s, e) => s + e.totalCommission, 0);
+
+        const commTableData = commissionEntries.map(e => [
+          e.name,
+          String(e.count),
+          formatCurrency(e.totalSales),
+          formatCurrency(e.totalCommission),
+        ]);
+        commTableData.push(['TOTAL', '', '', formatCurrency(totalCommission)]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Colaborador', 'Qtd Vendas', 'Total Vendas', 'Total Comissão']],
+          body: commTableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 40, halign: 'right' },
+            3: { cellWidth: 40, halign: 'right' },
+          },
+          styles: { fontSize: 9, cellPadding: 3 },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.row.index === commTableData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+
+        yPos = (doc as any).lastAutoTable?.finalY + 10 || yPos + 20;
+      }
+    }
     
     // Table data
     const tableData = transactions.map(t => {
@@ -164,9 +257,6 @@ export const useTransactionPdfExport = () => {
       columnStyles[7] = { cellWidth: 20, halign: 'right' }; // Comissão
       columnStyles[8] = { cellWidth: 25, halign: 'right' }; // Valor
     } else {
-      // Distribute width for 7 columns (Data, Tipo, Descrição, Categoria, Referência, Observações, Valor)
-      // Total landscape width is ~297mm. Subtracting margins (10mm each side) leaves ~277mm.
-      // Let's use proportional widths for portrait
       columnStyles[0] = { cellWidth: 30 }; // Data
       columnStyles[1] = { cellWidth: 30 }; // Tipo
       columnStyles[2] = { cellWidth: 60 }; // Descrição
@@ -193,7 +283,6 @@ export const useTransactionPdfExport = () => {
         cellPadding: 2
       },
       didParseCell: (data) => {
-        // Color code the type column
         if (data.column.index === 1 && data.section === 'body') {
           if (data.cell.raw === 'Receita') {
             data.cell.styles.textColor = [34, 139, 34];
@@ -201,7 +290,6 @@ export const useTransactionPdfExport = () => {
             data.cell.styles.textColor = [220, 53, 69];
           }
         }
-        // Color code the amount column
         const amountColumnIndex = userSettings.enableCommission ? 8 : 6;
         if (data.column.index === amountColumnIndex && data.section === 'body') {
           const rowIndex = data.row.index;
@@ -305,7 +393,41 @@ export const useTransactionPdfExport = () => {
     doc.text(`Saldo: ${formatCurrency(balance)}`, 130, yPos);
     
     doc.setTextColor(0, 0, 0);
-    yPos += 10;
+    yPos += 8;
+
+    // Payment method breakdown
+    if (userSettings.enablePaymentMethods) {
+      const incomeTransactions = transactions.filter(t => t.type === 'income');
+      const cashTotal = incomeTransactions.filter(t => t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
+      const cardTotal = incomeTransactions.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
+      const pixTotal = incomeTransactions.filter(t => t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
+      const pendingTotal = incomeTransactions.filter(t => t.paymentMethod === 'pending').reduce((s, t) => s + t.amount, 0);
+      const receivedTotal = cashTotal + cardTotal + pixTotal;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Formas de Recebimento (Receitas):', 14, yPos);
+      yPos += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(34, 139, 34);
+      doc.text(`Dinheiro: ${formatCurrency(cashTotal)}`, 14, yPos);
+      doc.text(`Cartão: ${formatCurrency(cardTotal)}`, 70, yPos);
+      doc.text(`Pix: ${formatCurrency(pixTotal)}`, 130, yPos);
+      
+      doc.setTextColor(200, 150, 0);
+      doc.text(`Pendente: ${formatCurrency(pendingTotal)}`, 180, yPos);
+      yPos += 6;
+
+      doc.setTextColor(34, 139, 34);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Já Recebido: ${formatCurrency(receivedTotal)}`, 14, yPos);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    } else {
+      yPos += 2;
+    }
     
     // Calendar summary by day
     doc.setFont('helvetica', 'bold');
@@ -374,6 +496,64 @@ export const useTransactionPdfExport = () => {
       yPos = finalY + 10;
     }
     
+    // Commission summary by collaborator (before detail table)
+    if (userSettings.enableCommission) {
+      const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
+      transactions.forEach(t => {
+        if (t.collaboratorId && t.commissionAmount) {
+          const collab = getCollaboratorById(t.collaboratorId);
+          const key = t.collaboratorId;
+          if (!commissionByCollaborator[key]) {
+            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+          }
+          commissionByCollaborator[key].totalCommission += t.commissionAmount;
+          commissionByCollaborator[key].totalSales += t.amount;
+          commissionByCollaborator[key].count += 1;
+        }
+      });
+
+      const commissionEntries = Object.values(commissionByCollaborator);
+      if (commissionEntries.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Resumo de Comissões por Colaborador:', 14, yPos);
+        yPos += 4;
+
+        const totalCommission = commissionEntries.reduce((s, e) => s + e.totalCommission, 0);
+
+        const commTableData = commissionEntries.map(e => [
+          e.name,
+          String(e.count),
+          formatCurrency(e.totalSales),
+          formatCurrency(e.totalCommission),
+        ]);
+        commTableData.push(['TOTAL', '', '', formatCurrency(totalCommission)]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Colaborador', 'Qtd Vendas', 'Total Vendas', 'Total Comissão']],
+          body: commTableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 40, halign: 'right' },
+            3: { cellWidth: 40, halign: 'right' },
+          },
+          styles: { fontSize: 9, cellPadding: 3 },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.row.index === commTableData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+
+        yPos = (doc as any).lastAutoTable?.finalY + 10 || yPos + 20;
+      }
+    }
+
     doc.setFont('helvetica', 'bold');
     doc.text('Detalhamento por Lançamento:', 14, yPos);
     yPos += 4;
@@ -403,19 +583,19 @@ export const useTransactionPdfExport = () => {
     detailHead.push('Valor');
 
     const detailColumnStyles: any = {
-      0: { cellWidth: userSettings.enableCommission ? 20 : 25 }, // Data
-      1: { cellWidth: userSettings.enableCommission ? 18 : 22 }, // Tipo
-      2: { cellWidth: userSettings.enableCommission ? 35 : 55 }, // Descrição
-      3: { cellWidth: userSettings.enableCommission ? 35 : 55 }, // Categoria
-      4: { cellWidth: userSettings.enableCommission ? 30 : 30 }, // Observações
+      0: { cellWidth: userSettings.enableCommission ? 20 : 25 },
+      1: { cellWidth: userSettings.enableCommission ? 18 : 22 },
+      2: { cellWidth: userSettings.enableCommission ? 35 : 55 },
+      3: { cellWidth: userSettings.enableCommission ? 35 : 55 },
+      4: { cellWidth: userSettings.enableCommission ? 30 : 30 },
     };
 
     if (userSettings.enableCommission) {
-      detailColumnStyles[5] = { cellWidth: 30 }; // Colaborador
-      detailColumnStyles[6] = { cellWidth: 20, halign: 'right' }; // Comissão
-      detailColumnStyles[7] = { cellWidth: 22, halign: 'right' }; // Valor
+      detailColumnStyles[5] = { cellWidth: 30 };
+      detailColumnStyles[6] = { cellWidth: 20, halign: 'right' };
+      detailColumnStyles[7] = { cellWidth: 22, halign: 'right' };
     } else {
-      detailColumnStyles[5] = { cellWidth: 22, halign: 'right' }; // Valor
+      detailColumnStyles[5] = { cellWidth: 22, halign: 'right' };
     }
 
     autoTable(doc, {
@@ -452,7 +632,7 @@ export const useTransactionPdfExport = () => {
         }
       }
     });
-    
+
     // Footer with date
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {

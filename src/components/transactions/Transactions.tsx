@@ -3,15 +3,15 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { TransactionType, PaymentMethod } from '@/types/finance';
-import { Transaction, Category } from '@/contexts/FinanceContext';
+import { Transaction } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { CollaboratorSelect } from '@/components/transactions/CollaboratorSelect';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
@@ -101,6 +101,7 @@ export const Transactions: React.FC = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    addCollaborator,
     language,
     userSettings,
   } = useFinance();
@@ -522,6 +523,21 @@ export const Transactions: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Daily Filter */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              setFilterStartDate(today);
+              setFilterEndDate(today);
+            }}
+            className="gap-1"
+          >
+            <CalendarIcon className="h-4 w-4" />
+            Diário
+          </Button>
 
           {/* Clear Filters */}
           <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1">
@@ -1039,7 +1055,7 @@ export const Transactions: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Colaborador</Label>
-                  <Select
+                  <CollaboratorSelect
                     value={formData.collaboratorId}
                     onValueChange={(val) => updateFormField('collaboratorId', val)}
                   >

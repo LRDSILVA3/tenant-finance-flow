@@ -274,7 +274,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       return;
     }
 
-    const { data, error } = await supabase
+    // Cast to any until types.ts is regenerated
+    const { data, error } = await (supabase as any)
       .from('collaborators')
       .select('*')
       .eq('client_id', currentClient.id)
@@ -283,7 +284,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (error) {
       console.error('Error loading collaborators:', error);
     } else if (data) {
-      const mappedCollaborators: Collaborator[] = data.map((c: DbCollaborator) => ({
+      const mappedCollaborators: Collaborator[] = (data as DbCollaborator[]).map((c) => ({
         id: c.id,
         clientId: c.client_id,
         name: c.name,
@@ -372,7 +373,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setCurrentClient(null);
       setCategories([]);
       setTransactions([]);
-      setUserSettings({ enablePaymentMethods: false });
+      setCollaborators([]);
+      setUserSettings({ enablePaymentMethods: false, enableCommission: false });
     }
   }, [user, loadClients, loadUserSettings]);
 
@@ -541,7 +543,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const addCollaborator = async (name: string) => {
     if (!user || !currentClient) return;
 
-    const { error } = await supabase
+    // Cast to any until types.ts is regenerated
+    const { error } = await (supabase as any)
       .from('collaborators')
       .insert({
         user_id: user.id,
@@ -559,7 +562,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateCollaborator = async (id: string, name: string) => {
-    const { error } = await supabase
+    // Cast to any until types.ts is regenerated
+    const { error } = await (supabase as any)
       .from('collaborators')
       .update({ name })
       .eq('id', id);
@@ -574,7 +578,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const deleteCollaborator = async (id: string) => {
-    const { error } = await supabase
+    // Cast to any until types.ts is regenerated
+    const { error } = await (supabase as any)
       .from('collaborators')
       .delete()
       .eq('id', id);
