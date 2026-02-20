@@ -124,6 +124,7 @@ export const Transactions: React.FC = () => {
   const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(endOfMonth(now));
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
   
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
@@ -162,10 +163,13 @@ export const Transactions: React.FC = () => {
       
       // Type filter
       if (filterType !== 'all' && txn.type !== filterType) return false;
+
+      // Payment Method filter
+      if (filterPaymentMethod !== 'all' && txn.paymentMethod !== filterPaymentMethod) return false;
       
       return true;
     });
-  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType]);
+  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod]);
 
   const sortedTransactions = useMemo(() => {
     return [...filteredTransactions].sort((a, b) => 
@@ -252,6 +256,7 @@ export const Transactions: React.FC = () => {
     setFilterEndDate(endOfMonth(now));
     setFilterCategory('all');
     setFilterType('all');
+    setFilterPaymentMethod('all');
   };
 
   const handleExportPdf = () => {
@@ -505,6 +510,45 @@ export const Transactions: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Payment Method Filter */}
+          {userSettings.enablePaymentMethods && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t.paymentMethod}</Label>
+              <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Formas</SelectItem>
+                  <SelectItem value="cash">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4" />
+                      {t.cash}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="card">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      {t.card}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pix">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      {t.pix}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pending">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      {t.pending}
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Category Filter */}
           <div className="space-y-1">
