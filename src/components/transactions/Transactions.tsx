@@ -1057,19 +1057,15 @@ export const Transactions: React.FC = () => {
                   <Label>Colaborador</Label>
                   <CollaboratorSelect
                     value={formData.collaboratorId}
-                    onValueChange={(val) => updateFormField('collaboratorId', val)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {collaborators.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(val) => updateFormField('collaboratorId', val)}
+                    collaborators={collaborators}
+                    onAddNew={async (name) => {
+                      const newCollaborator = await addCollaborator(name);
+                      if (newCollaborator) {
+                        updateFormField('collaboratorId', newCollaborator.id);
+                      }
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="commissionAmount">Comissão (R$)</Label>

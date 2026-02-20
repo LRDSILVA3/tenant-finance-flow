@@ -130,7 +130,7 @@ interface FinanceContextType {
 
   // Categories
   categories: Category[];
-  addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Promise<void>;
+  addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Promise<Category | null>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   getCategoriesByType: (type: TransactionType) => Category[];
@@ -148,7 +148,7 @@ interface FinanceContextType {
 
   // Collaborators
   collaborators: Collaborator[];
-  addCollaborator: (name: string) => Promise<void>;
+  addCollaborator: (name: string) => Promise<Collaborator | null>;
   updateCollaborator: (id: string, name: string) => Promise<void>;
   deleteCollaborator: (id: string) => Promise<void>;
   getCollaboratorById: (id: string) => Collaborator | undefined;
@@ -475,9 +475,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Category operations
   const addCategory = async (category: Omit<Category, 'id' | 'createdAt'>) => {
-    if (!user) return;
+    if (!user) return null;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('categories')
       .insert({
         user_id: user.id,
@@ -487,14 +487,27 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         code: category.code,
         parent_id: category.parentId,
         sort_order: category.order,
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error('Error adding category:', error);
       toast({ title: t.error, variant: 'destructive' });
+      return null;
     } else {
       await loadCategories();
       toast({ title: t.saved });
+      return {
+        id: data.id,
+        clientId: data.client_id,
+        name: data.name,
+        type: data.type as TransactionType,
+        parentId: data.parent_id,
+        code: data.code,
+        order: data.sort_order,
+        createdAt: new Date(data.created_at),
+      };
     }
   };
 
@@ -541,23 +554,32 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Collaborator operations
   const addCollaborator = async (name: string) => {
-    if (!user || !currentClient) return;
+    if (!user || !currentClient) return null;
 
     // Cast to any until types.ts is regenerated
-    const { error } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from('collaborators')
       .insert({
         user_id: user.id,
         client_id: currentClient.id,
         name,
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error('Error adding collaborator:', error);
       toast({ title: t.error, variant: 'destructive' });
+      return null;
     } else {
       await loadCollaborators();
       toast({ title: t.saved });
+      return {
+        id: data.id,
+        clientId: data.client_id,
+        name: data.name,
+        createdAt: new Date(data.created_at),
+      };
     }
   };
 
