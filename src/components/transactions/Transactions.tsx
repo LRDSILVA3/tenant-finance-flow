@@ -1060,7 +1060,10 @@ export const Transactions: React.FC = () => {
                     onChange={(val) => updateFormField('collaboratorId', val)}
                     collaborators={collaborators}
                     onAddNew={async (name) => {
-                      await addCollaborator(name);
+                      const newCollaborator = await addCollaborator(name);
+                      if (newCollaborator) {
+                        updateFormField('collaboratorId', newCollaborator.id);
+                      }
                     }}
                   />
                 </div>
