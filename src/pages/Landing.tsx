@@ -10,9 +10,9 @@ export default function Landing() {
     <div className="min-h-screen bg-background flex flex-col font-sans">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Previna Logo" className="h-8 w-auto object-contain" />
+            <img src="/logo.png" alt="Previna Logo" className="h-12 sm:h-14 w-auto object-contain" />
             {/* Opcional: Se quiser o nome ao lado da logo, descomente a linha abaixo */}
             {/* <span className="font-bold text-xl hidden sm:inline-block">Previna</span> */}
           </div>
