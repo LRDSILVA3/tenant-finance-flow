@@ -12,10 +12,9 @@ export default function Landing() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-primary-foreground font-bold text-lg">T</span>
-            </div>
-            <span className="font-bold text-xl hidden sm:inline-block">Tenant Finance</span>
+            <img src="/logo.png" alt="Previna Logo" className="h-8 w-auto object-contain" />
+            {/* Opcional: Se quiser o nome ao lado da logo, descomente a linha abaixo */}
+            {/* <span className="font-bold text-xl hidden sm:inline-block">Previna</span> */}
           </div>
           <nav className="flex items-center gap-4">
             <div className="hidden md:flex gap-6 mr-6 text-sm font-medium text-muted-foreground">
@@ -141,7 +140,7 @@ export default function Landing() {
           <div className="container mx-auto px-4 sm:px-6">
             <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-24">
               <div className="flex-1 space-y-6">
-                <h2 className="text-3xl md:text-4xl font-bold">Por que escolher o Tenant Finance?</h2>
+                <h2 className="text-3xl md:text-4xl font-bold">Por que escolher o Previna?</h2>
                 <p className="text-lg text-muted-foreground">
                   Desenvolvido com tecnologia de ponta, focado na experiência do usuário e na segurança dos seus dados financeiros.
                 </p>
@@ -161,13 +160,13 @@ export default function Landing() {
               </div>
               <div className="flex-1 w-full max-w-md mx-auto relative">
                 <div className="absolute inset-0 bg-primary/20 blur-[80px] rounded-full -z-10" />
-                <div className="bg-gradient-to-br from-card to-muted p-1 rounded-2xl border shadow-xl">
+                <div className="bg-gradient-to-br from-card to-muted p-4 rounded-2xl border shadow-xl flex items-center justify-center aspect-square">
                   <img 
                     src="/logo.png" 
-                    alt="Tenant Finance" 
-                    className="w-full h-auto rounded-xl bg-white mix-blend-multiply"
+                    alt="Previna" 
+                    className="w-3/4 h-auto object-contain drop-shadow-md"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f8fafc/0f172a?text=Tenant+Finance';
+                      (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f8fafc/0f172a?text=Previna';
                     }}
                   />
                 </div>
@@ -194,14 +193,11 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t bg-card py-12">
         <div className="container mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 bg-primary rounded flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xs">T</span>
-            </div>
-            <span className="font-semibold text-foreground">Tenant Finance</span>
+          <div className="flex items-center gap-2 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
+            <img src="/logo.png" alt="Previna Logo" className="h-6 w-auto object-contain" />
           </div>
           <p className="text-sm">
-            © {new Date().getFullYear()} Tenant Finance. Todos os direitos reservados.
+            © {new Date().getFullYear()} Previna. Todos os direitos reservados.
           </p>
           <div className="flex gap-4 text-sm">
             <a href="#" className="hover:text-foreground transition-colors">Termos</a>
