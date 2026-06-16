@@ -136,15 +136,15 @@ const Auth: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
+          <div className="flex justify-center">
+            <div className="flex h-32 w-auto items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Previna Logo" className="h-full w-auto object-contain" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Gestão Financeira</CardTitle>
-          <CardDescription>
+          {/* <CardTitle className="text-3xl font-bold">Previna</CardTitle>
+          <CardDescription className="text-lg">
             Acesse sua conta para gerenciar suas finanças
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

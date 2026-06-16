@@ -1,0 +1,235 @@
+
+import React from 'react';
+import { useFinance } from '@/contexts/FinanceContext';
+import { Plan } from '@/types/finance';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Check, Loader2, Sparkles, ShieldCheck, XCircle, CreditCard } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { PaymentModal } from './PaymentModal';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+export const SubscriptionTab: React.FC = () => {
+  const { 
+    t, plans, currentPlan, currentSubscription, currentClient, 
+    changePlan, cancelSubscription, loadingSubscription 
+  } = useFinance();
+
+  const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
+
+  if (!currentClient) return null;
+
+  const getEndDate = () => {
+    if (!currentSubscription) return new Date();
+    return currentSubscription.status === 'trialing' 
+      ? currentSubscription.trialEnd 
+      : currentSubscription.currentPeriodEnd;
+  };
+
+  const isWithinRefundPeriod = () => {
+    if (!currentSubscription) return false;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return currentSubscription.createdAt > sevenDaysAgo;
+  };
+
+  const handleCancelAction = async () => {
+    if (currentSubscription) {
+      await cancelSubscription(currentSubscription.id);
+    }
+  };
+
+  const handlePlanChange = async (planId: string) => {
+    const targetPlan = plans.find(p => p.id === planId);
+    if (targetPlan && targetPlan.price === 0) {
+      await changePlan(currentClient.id, planId);
+    } else if (targetPlan) {
+      setSelectedPlan(targetPlan);
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
+  };
+
+  const isCanceled = currentSubscription?.status === 'canceled';
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {currentPlan && currentSubscription && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                {t.currentPlan}: {currentPlan.name}
+              </CardTitle>
+              <Badge variant={isCanceled ? 'destructive' : currentSubscription.status === 'trialing' ? 'secondary' : 'default'}>
+                {isCanceled ? 'Cancelado' : currentSubscription.status === 'trialing' ? t.trialPeriod : 'Ativo'}
+              </Badge>
+            </div>
+            <CardDescription>
+              {isCanceled 
+                ? `Sua assinatura foi cancelada. Você continuará tendo acesso aos recursos do plano ${currentPlan.name} até o final do período vigente.`
+                : currentPlan.description}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <p className="text-muted-foreground">
+                {isCanceled ? 'Acesso disponível até' : t.activeUntil}: <span className="font-semibold text-foreground">
+                  {format(getEndDate(), 'dd/MM/yyyy')}
+                </span>
+              </p>
+              
+              {isCanceled && (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-2 h-8"
+                    onClick={() => handlePlanChange(currentPlan.id)}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    Assinar Novamente
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="gap-2 h-8"
+                    onClick={() => {
+                      setSelectedPlan(currentPlan);
+                      setIsPaymentModalOpen(true);
+                    }}
+                  >
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Trocar Cartão
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {!isCanceled && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={loadingSubscription}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Cancelar Assinatura
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar cancelamento?</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-3">
+                      <p>
+                        Você continuará com acesso total aos recursos do plano <strong>{currentPlan.name}</strong> até o dia <strong>{format(getEndDate(), 'dd/MM/yyyy')}</strong>.
+                      </p>
+                      <p>
+                        Após esta data, sua conta será migrada para o plano gratuito e alguns recursos poderão ser bloqueados.
+                      </p>
+                      {isWithinRefundPeriod() && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs">
+                          <strong>Nota Legal:</strong> Você está dentro do prazo de 7 dias. O cancelamento agora processará o estorno integral do valor pago.
+                        </div>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Manter Assinatura</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleCancelAction}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Confirmar Cancelamento
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+        {plans.map((plan) => {
+          const isCurrent = currentPlan?.id === plan.id;
+          const showButton = !isCurrent || isCanceled;
+          
+          return (
+            <Card key={plan.id} className={cn(
+              "flex flex-col relative transition-all duration-200",
+              isCurrent && "border-primary shadow-md scale-[1.02]"
+            )}>
+              {plan.name === 'Avançado' && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-600 border-none">
+                    <Sparkles className="h-3 w-3 mr-1" /> Melhor Valor
+                  </Badge>
+                </div>
+              )}
+              <CardHeader>
+                <CardTitle>{plan.name}</CardTitle>
+                <CardDescription>{plan.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow space-y-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold">{formatPrice(plan.price)}</span>
+                  <span className="text-muted-foreground text-sm">/mês</span>
+                </div>
+                <div className="space-y-2 pt-4 border-t">
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>{t.chartOfAccounts}</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>{t.transactions}</span>
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button 
+                  className="w-full" 
+                  variant={isCurrent && !isCanceled ? "outline" : "default"}
+                  disabled={(isCurrent && !isCanceled) || loadingSubscription}
+                  onClick={() => handlePlanChange(plan.id)}
+                >
+                  {loadingSubscription ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isCurrent ? (
+                    isCanceled ? "Reativar Plano" : "Plano Atual"
+                  ) : (
+                    t.upgradePlan
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </div>
+
+      <PaymentModal plan={selectedPlan} isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+    </div>
+  );
+};

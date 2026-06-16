@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { Collaborator } from '@/types/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,7 +20,7 @@ import { Label } from '@/components/ui/label';
 export const Collaborators: React.FC = () => {
   const { collaborators, addCollaborator, updateCollaborator, deleteCollaborator } = useFinance();
   const [newCollaboratorName, setNewCollaboratorName] = useState('');
-  const [editingCollaborator, setEditingCollaborator] = useState<any | null>(null);
+  const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
 
   const handleAddCollaborator = async () => {
     if (newCollaboratorName.trim()) {

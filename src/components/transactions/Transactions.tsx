@@ -1,3 +1,4 @@
+
 // Transactions Component with Filters and Calendar View
 
 import React, { useState, useMemo } from 'react';
@@ -6,21 +7,28 @@ import { TransactionType, PaymentMethod } from '@/types/finance';
 import { Transaction } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CollaboratorSelect } from '@/components/transactions/CollaboratorSelect';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
+import { useTransactionCsvExport } from '@/hooks/useTransactionCsvExport';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { UpgradeBadge } from '@/components/ui/upgrade-badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -63,10 +71,15 @@ import {
   Banknote,
   CreditCard,
   Smartphone,
-  Clock
+  Clock,
+  Download,
+  Lock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
+import { toast } from '@/hooks/use-toast';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -106,14 +119,21 @@ export const Transactions: React.FC = () => {
     userSettings,
   } = useFinance();
 
-  const { descriptionGroups } = useTransactionDescriptions(currentClient?.id);
-  const { referenceGroups } = useTransactionReferences(currentClient?.id);
+  const { hasFeature } = useFeatureAccess();
+  const isPaymentMethodsLocked = !hasFeature('payment_methods');
+  const isCommissionsLocked = !hasFeature('commissions');
+  const isAdvancedReportsLocked = !hasFeature('advanced_reports');
+
+  const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
+  const { referenceGroups } = useTransactionReferences(transactions);
   const { exportListToPdf, exportCalendarToPdf } = useTransactionPdfExport();
+  const { exportToCsv } = useTransactionCsvExport();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpenState] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -140,6 +160,10 @@ export const Transactions: React.FC = () => {
     paymentMethod: '' as PaymentMethod | '',
     collaboratorId: '',
     commissionAmount: 0,
+    isRecurring: false,
+    recurrenceType: 'count' as 'count' | 'until',
+    repeatCount: 1,
+    repeatUntil: undefined as Date | undefined,
   });
 
   const locale = language === 'pt' ? ptBR : language === 'es' ? es : enUS;
@@ -259,6 +283,18 @@ export const Transactions: React.FC = () => {
     setFilterPaymentMethod('all');
   };
 
+  const handleExportCsv = () => {
+    if (isAdvancedReportsLocked) {
+      toast({
+        title: "Recurso Premium",
+        description: "A exportação CSV está disponível apenas nos planos Intermediário e Avançado.",
+        variant: 'destructive'
+      });
+      return;
+    }
+    exportToCsv(sortedTransactions);
+  };
+
   const handleExportPdf = () => {
     if (!currentClient) return;
     
@@ -316,6 +352,10 @@ export const Transactions: React.FC = () => {
       paymentMethod: '',
       collaboratorId: '',
       commissionAmount: 0,
+      isRecurring: false,
+      recurrenceType: 'count' as 'count' | 'until',
+      repeatCount: 1,
+      repeatUntil: undefined as Date | undefined,
     });
     setIsDialogOpen(true);
   };
@@ -334,6 +374,10 @@ export const Transactions: React.FC = () => {
       paymentMethod: transaction.paymentMethod || '',
       collaboratorId: transaction.collaboratorId || '',
       commissionAmount: transaction.commissionAmount || 0,
+      isRecurring: !!transaction.recurringId,
+      recurrenceType: 'count',
+      repeatCount: 1,
+      repeatUntil: undefined,
     });
     setIsDialogOpen(true);
   };
@@ -372,6 +416,11 @@ export const Transactions: React.FC = () => {
         commissionAmount,
       });
     } else {
+      const recurrence = formData.isRecurring ? {
+        count: formData.recurrenceType === 'count' ? formData.repeatCount : undefined,
+        until: formData.recurrenceType === 'until' ? formData.repeatUntil : undefined,
+      } : undefined;
+
       await addTransaction({
         clientId: currentClient.id,
         type: formData.type,
@@ -384,7 +433,7 @@ export const Transactions: React.FC = () => {
         paymentMethod,
         collaboratorId,
         commissionAmount,
-      });
+      }, recurrence);
     }
 
     setSaving(false);
@@ -393,10 +442,11 @@ export const Transactions: React.FC = () => {
 
   const handleDelete = async () => {
     if (deletingTransaction) {
-      await deleteTransaction(deletingTransaction.id);
+      await deleteTransaction(deletingTransaction.id, recurringDeleteOption);
     }
-    setIsDeleteDialogOpen(false);
+    setIsDeleteDialogOpenState(false);
     setDeletingTransaction(null);
+    setRecurringDeleteOption('single');
   };
 
   if (!currentClient) {
@@ -440,6 +490,15 @@ export const Transactions: React.FC = () => {
           <Button variant="outline" onClick={handleExportPdf} className="gap-2">
             <FileDown className="h-4 w-4" />
             <span className="hidden sm:inline">Exportar PDF</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExportCsv} 
+            className="gap-2 group"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Exportar CSV</span>
+            {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
           </Button>
           <Button onClick={handleOpenCreate}>
             <Plus className="h-4 w-4 mr-2" />
@@ -759,7 +818,7 @@ export const Transactions: React.FC = () => {
                             size="sm"
                             onClick={() => {
                               setDeletingTransaction(transaction);
-                              setIsDeleteDialogOpen(true);
+                              setIsDeleteDialogOpenState(true);
                             }}
                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                           >
@@ -914,6 +973,12 @@ export const Transactions: React.FC = () => {
             <DialogTitle>
               {editingTransaction ? t.editTransaction : t.addTransaction}
             </DialogTitle>
+            <DialogDescription>
+              {editingTransaction 
+                ? "Altere os detalhes do lançamento abaixo." 
+                : "Preencha as informações para registrar um novo lançamento financeiro."
+              }
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -1008,45 +1073,47 @@ export const Transactions: React.FC = () => {
                 </Popover>
                 {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
               </div>
-              {userSettings.enablePaymentMethods && formData.type === 'income' && (
-                <div className="space-y-2">
-                  <Label>{t.paymentMethod}</Label>
-                  <Select
-                    value={formData.paymentMethod}
-                    onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t.paymentMethod} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4" />
-                          {t.cash}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="card">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          {t.card}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="pix">
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4" />
-                          {t.pix}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="pending">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {t.pending}
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  {t.paymentMethod}
+                  <UpgradeBadge />
+                </Label>
+                <Select
+                  value={formData.paymentMethod}
+                  onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
+                  disabled={!hasFeature('payment_methods')}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : t.paymentMethod} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-4 w-4" />
+                        {t.cash}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="card">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        {t.card}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pix">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4" />
+                        {t.pix}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {t.pending}
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Description and Reference */}
@@ -1085,6 +1152,90 @@ export const Transactions: React.FC = () => {
               </div>
             </div>
 
+            {/* Recurrence Section - Only for new transactions or showing status for existing */}
+            {!editingTransaction && (
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="isRecurring" 
+                    checked={formData.isRecurring} 
+                    onCheckedChange={(checked) => updateFormField('isRecurring', !!checked)}
+                  />
+                  <Label htmlFor="isRecurring" className="cursor-pointer font-semibold">Repetir lançamento mensalmente</Label>
+                </div>
+
+                {formData.isRecurring && (
+                  <div className="pl-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <RadioGroup 
+                      value={formData.recurrenceType} 
+                      onValueChange={(val) => updateFormField('recurrenceType', val as 'count' | 'until')}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="count" id="type-count" />
+                        <Label htmlFor="type-count" className="cursor-pointer">Por quantidade</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="until" id="type-until" />
+                        <Label htmlFor="type-until" className="cursor-pointer">Até uma data</Label>
+                      </div>
+                    </RadioGroup>
+
+                    {formData.recurrenceType === 'count' ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">Repetir por</span>
+                        <Input 
+                          type="number" 
+                          className="w-20" 
+                          min={1} 
+                          max={60}
+                          value={formData.repeatCount}
+                          onChange={(e) => updateFormField('repeatCount', parseInt(e.target.value) || 1)}
+                        />
+                        <span className="text-sm">meses (além do atual)</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm whitespace-nowrap">Repetir até</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !formData.repeatUntil && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {formData.repeatUntil ? format(formData.repeatUntil, 'dd/MM/yyyy', { locale }) : "Selecionar data"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={formData.repeatUntil}
+                              onSelect={(date) => updateFormField('repeatUntil', date)}
+                              locale={locale}
+                              initialFocus
+                              disabled={(date) => date < formData.date}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editingTransaction && editingTransaction.recurringId && (
+              <div className="p-3 border border-amber-200 bg-amber-50 rounded-lg text-amber-800 text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" />
+                Este lançamento faz parte de uma recorrência mensal.
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="notes">{t.notes}</Label>
               <Textarea
@@ -1095,14 +1246,18 @@ export const Transactions: React.FC = () => {
               />
             </div>
 
-            {userSettings.enableCommission && formData.type === 'income' && (
+            {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Colaborador</Label>
+                  <Label className="flex items-center gap-1">
+                    Colaborador
+                    {isCommissionsLocked && <UpgradeBadge />}
+                  </Label>
                   <CollaboratorSelect
                     value={formData.collaboratorId}
                     onChange={(val) => updateFormField('collaboratorId', val)}
                     collaborators={collaborators}
+                    disabled={isCommissionsLocked}
                     onAddNew={async (name) => {
                       const newCollaborator = await addCollaborator(name);
                       if (newCollaborator) {
@@ -1112,11 +1267,15 @@ export const Transactions: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="commissionAmount">Comissão (R$)</Label>
+                  <Label htmlFor="commissionAmount" className="flex items-center gap-1">
+                    Comissão (R$)
+                    {isCommissionsLocked && <UpgradeBadge />}
+                  </Label>
                   <MoneyInput
                     id="commissionAmount"
                     value={formData.commissionAmount}
                     onChange={(value) => updateFormField('commissionAmount', value)}
+                    disabled={isCommissionsLocked}
                   />
                 </div>
               </div>
@@ -1142,14 +1301,40 @@ export const Transactions: React.FC = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpenState}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t.deleteTransaction}</AlertDialogTitle>
-            <AlertDialogDescription>{t.confirmDelete}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {deletingTransaction?.recurringId ? (
+                <div className="space-y-4">
+                  <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
+                  <RadioGroup 
+                    value={recurringDeleteOption} 
+                    onValueChange={(val) => setRecurringDeleteOption(val as any)}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="single" id="del-single" />
+                      <Label htmlFor="del-single" className="cursor-pointer">Excluir somente este lançamento</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="future" id="del-future" />
+                      <Label htmlFor="del-future" className="cursor-pointer">Excluir este e todos os próximos</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="all" id="del-all" />
+                      <Label htmlFor="del-all" className="cursor-pointer">Excluir todos os lançamentos desta série</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              ) : (
+                t.confirmDelete
+              )}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setRecurringDeleteOption('single')}>{t.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {t.delete}
             </AlertDialogAction>

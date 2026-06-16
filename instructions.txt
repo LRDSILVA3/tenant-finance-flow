@@ -1,0 +1,35 @@
+
+
+### Configuração da Integração Stone Pagamentos
+
+Para que a integração com a Stone Pagamentos funcione, siga os passos abaixo:
+
+**1. Implantar a Edge Function no Supabase:**
+A Edge Function `create-stone-subscription` precisa ser implantada no seu projeto Supabase. No terminal, na raiz do seu projeto, execute o seguinte comando:
+
+```bash
+supabase functions deploy create-stone-subscription --no-verify-jwt
+```
+A flag `--no-verify-jwt` é útil durante o desenvolvimento para simplificar, mas em produção você pode querer remover essa flag e adicionar lógica de autorização.
+
+**2. Aplicar a Nova Migração do Banco de Dados:**
+A nova coluna `provider_subscription_id` precisa ser adicionada à tabela `subscriptions`. Para aplicar a migração, execute o seguinte comando no terminal, na raiz do seu projeto:
+
+```bash
+supabase db push
+```
+
+**3. Configurar Variáveis de Ambiente Seguras:**
+Você precisará armazenar a API Key da Stone de forma segura no Supabase. Vá para o painel do seu projeto Supabase:
+*   `Project Settings` -> `Edge Functions` -> `Secrets`
+*   Adicione uma nova variável secreta com o nome `STONE_API_KEY` e o valor da sua chave de API da Stone.
+*   Você pode precisar adicionar outras variáveis, como `STONE_ENCRYPTION_KEY` ou `PAGARME_API_KEY`, dependendo da API exata da Stone/Pagar.me que você for usar.
+
+**4. Atualizar os Tipos do Supabase:**
+Após aplicar a migração, seus tipos locais do Supabase (`src/integrations/supabase/types.ts`) estarão desatualizados. Execute novamente o comando para gerar os tipos atualizados:
+
+```bash
+supabase gen types typescript --project-id <SEU_PROJECT_ID> --schema public > src/integrations/supabase/types.ts
+```
+
+Com esses passos concluídos, a estrutura básica para a integração com a Stone estará pronta. Você poderá então refinar a lógica dentro de `supabase/functions/create-stone-subscription/index.ts` para interagir com a API da Stone usando a `STONE_API_KEY` configurada.

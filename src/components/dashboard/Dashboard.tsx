@@ -1,6 +1,6 @@
 // Dashboard Component
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { StatCard } from './StatCard';
 import { MonthlyFlowChart } from './MonthlyFlowChart';
@@ -10,7 +10,10 @@ import { MonthlyFlowData, FinancialSummary, PaymentMethod } from '@/types/financ
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Banknote, CreditCard, Smartphone, Clock } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, Clock, Lock } from 'lucide-react';
+import { CategoryBreakdown } from './CategoryBreakdown';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   onNavigateToTransactions: () => void;
@@ -32,10 +35,13 @@ const paymentMethodConfig: Record<PaymentMethod, { icon: React.ReactNode; color:
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }) => {
   const { t, currentClient, transactions, language, userSettings } = useFinance();
+  const { hasFeature } = useFeatureAccess();
   const [isDailyView, setIsDailyView] = useState(false);
 
-  const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
-  const getMonthLabel = (monthIndex: number) => t[monthKeys[monthIndex]];
+  const isAdvancedReportsLocked = !hasFeature('advanced_reports');
+
+  const monthKeys = useMemo(() => ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const, []);
+  const getMonthLabel = useCallback((monthIndex: number) => t[monthKeys[monthIndex]], [t, monthKeys]);
 
   const filteredTransactionsForPeriod = useMemo(() => {
     const now = new Date();
@@ -120,7 +126,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
     }
 
     return data;
-  }, [transactions, language]);
+  }, [transactions, language, getMonthLabel]);
 
   if (!currentClient) {
     return (
@@ -203,11 +209,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
       {/* Charts and Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MonthlyFlowChart data={monthlyFlowData} />
-        <DateRangeTransactions
-          transactions={transactions}
-          onViewAll={onNavigateToTransactions}
-        />
+        
+        {isAdvancedReportsLocked ? (
+          <Card className="relative overflow-hidden group border-amber-100 bg-amber-50/10">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] transition-all group-hover:bg-background/40">
+              <div className="p-3 rounded-full bg-amber-100 text-amber-600 mb-3 shadow-sm">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">Relatórios Avançados</h3>
+              <p className="text-sm text-muted-foreground text-center px-8 mb-4">
+                Desbloqueie gráficos detalhados por categoria e análises profundas.
+              </p>
+              <Button size="sm" variant="default" onClick={() => {
+                // Navigate to settings subscription tab
+                const settingsTab = document.querySelector('[data-value="settings"]') as HTMLElement;
+                if (settingsTab) settingsTab.click();
+              }}>
+                Ver Planos
+              </Button>
+            </div>
+            <div className="opacity-20 grayscale pointer-events-none">
+              <CategoryBreakdown transactions={filteredTransactionsForPeriod} type="expense" />
+            </div>
+          </Card>
+        ) : (
+          <CategoryBreakdown transactions={filteredTransactionsForPeriod} type="expense" />
+        )}
       </div>
+
+      {!isAdvancedReportsLocked && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <CategoryBreakdown transactions={filteredTransactionsForPeriod} type="income" />
+          <DateRangeTransactions
+            transactions={transactions}
+            onViewAll={onNavigateToTransactions}
+          />
+        </div>
+      )}
+
+      {isAdvancedReportsLocked && (
+        <div className="grid grid-cols-1 gap-6">
+          <DateRangeTransactions
+            transactions={transactions}
+            onViewAll={onNavigateToTransactions}
+          />
+        </div>
+      )}
 
       {/* Recent Transactions */}
       <div className="grid grid-cols-1 gap-6">

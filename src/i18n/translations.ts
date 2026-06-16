@@ -83,6 +83,21 @@ export interface Translations {
   enablePaymentMethodsDescription: string;
   paymentMethodBreakdown: string;
 
+  // Subscription
+  subscription: string;
+  currentPlan: string;
+  planDetails: string;
+  choosePlan: string;
+  trialPeriod: string;
+  trialMonths: string;
+  activeUntil: string;
+  features: string;
+  paymentMethodsFeature: string;
+  commissionsFeature: string;
+  advancedReportsFeature: string;
+  startTrial: string;
+  upgradePlan: string;
+
   // Forms
   save: string;
   cancel: string;
@@ -113,7 +128,7 @@ export interface Translations {
 
 export const translations: Record<Language, Translations> = {
   pt: {
-    appName: 'Gestão Financeira',
+    appName: 'Previna',
     selectClient: 'Selecionar Empresa',
     selectLanguage: 'Idioma',
 
@@ -137,6 +152,8 @@ export const translations: Record<Language, Translations> = {
     to: 'até',
     noTransactions: 'Nenhum lançamento encontrado',
     viewAll: 'Ver Todos',
+    expensesByCategory: 'Saídas por Categoria',
+    incomesByCategory: 'Entradas por Categoria',
 
     chartOfAccountsTitle: 'Plano de Contas',
     chartOfAccountsSubtitle: 'Gerencie suas categorias e subcategorias',
@@ -185,6 +202,20 @@ export const translations: Record<Language, Translations> = {
     enablePaymentMethodsDescription: 'Permite informar como a receita foi recebida (Dinheiro, Cartão, PIX ou Pendente)',
     paymentMethodBreakdown: 'Por Forma de Recebimento',
 
+    subscription: 'Assinatura',
+    currentPlan: 'Plano Atual',
+    planDetails: 'Detalhes do Plano',
+    choosePlan: 'Escolha seu Plano',
+    trialPeriod: 'Período de Degustação',
+    trialMonths: 'meses grátis',
+    activeUntil: 'Ativo até',
+    features: 'Funcionalidades',
+    paymentMethodsFeature: 'Formas de Recebimento',
+    commissionsFeature: 'Controle de Comissões',
+    advancedReportsFeature: 'Relatórios Avançados',
+    startTrial: 'Iniciar Teste Grátis',
+    upgradePlan: 'Alterar Plano',
+
     save: 'Salvar',
     cancel: 'Cancelar',
     delete: 'Excluir',
@@ -201,7 +232,7 @@ export const translations: Record<Language, Translations> = {
     sep: 'Set', oct: 'Out', nov: 'Nov', dec: 'Dez',
   },
   en: {
-    appName: 'Financial Management',
+    appName: 'Previna',
     selectClient: 'Select Company',
     selectLanguage: 'Language',
 
@@ -272,6 +303,20 @@ export const translations: Record<Language, Translations> = {
     enablePaymentMethods: 'Enable Payment Methods',
     enablePaymentMethodsDescription: 'Allows specifying how income was received (Cash, Card, PIX or Pending)',
     paymentMethodBreakdown: 'By Payment Method',
+
+    subscription: 'Subscription',
+    currentPlan: 'Current Plan',
+    planDetails: 'Plan Details',
+    choosePlan: 'Choose Plan',
+    trialPeriod: 'Trial Period',
+    trialMonths: 'free months',
+    activeUntil: 'Active until',
+    features: 'Features',
+    paymentMethodsFeature: 'Payment Methods',
+    commissionsFeature: 'Commission Control',
+    advancedReportsFeature: 'Advanced Reports',
+    startTrial: 'Start Free Trial',
+    upgradePlan: 'Change Plan',
 
     save: 'Save',
     cancel: 'Cancel',
@@ -360,6 +405,20 @@ export const translations: Record<Language, Translations> = {
     enablePaymentMethods: 'Habilitar Formas de Pago',
     enablePaymentMethodsDescription: 'Permite especificar cómo se recibió el ingreso (Efectivo, Tarjeta, PIX o Pendiente)',
     paymentMethodBreakdown: 'Por Forma de Pago',
+
+    subscription: 'Suscripción',
+    currentPlan: 'Plan Actual',
+    planDetails: 'Detalles del Plan',
+    choosePlan: 'Elige tu Plan',
+    trialPeriod: 'Período de Prueba',
+    trialMonths: 'meses gratis',
+    activeUntil: 'Activo hasta',
+    features: 'Funcionalidades',
+    paymentMethodsFeature: 'Formas de Pago',
+    commissionsFeature: 'Control de Comisiones',
+    advancedReportsFeature: 'Informes Avanzados',
+    startTrial: 'Iniciar Prueba Gratis',
+    upgradePlan: 'Cambiar Plan',
 
     save: 'Guardar',
     cancel: 'Cancelar',

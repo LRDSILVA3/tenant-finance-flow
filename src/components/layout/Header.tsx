@@ -75,14 +75,11 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-16 items-center justify-between px-4 sm:px-6">
+      <div className="container flex h-24 items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-20 w-auto min-w-[80px] items-center justify-center rounded-lg overflow-hidden">
+            <img src="/logo.png" alt="Previna Logo" className="h-full w-auto object-contain" />
           </div>
-          <h1 className="text-lg font-semibold text-foreground hidden sm:block">
-            {t.appName}
-          </h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -184,7 +181,16 @@ export const Header: React.FC = () => {
               <Input
                 id="client-taxid"
                 value={newClientTaxId}
-                onChange={(e) => setNewClientTaxId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  let masked = val;
+                  if (val.length <= 11) {
+                    masked = val.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+                  } else {
+                    masked = val.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+                  }
+                  setNewClientTaxId(masked.substring(0, 18));
+                }}
                 placeholder="00.000.000/0001-00"
               />
             </div>
