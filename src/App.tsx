@@ -13,6 +13,9 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Cancellation from "./pages/Cancellation";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -33,6 +36,9 @@ const App = () => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/onboarding" element={<Onboarding />} />
+                  <Route path="/termos" element={<Terms />} />
+                  <Route path="/privacidade" element={<Privacy />} />
+                  <Route path="/cancelamento" element={<Cancellation />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
@@ -43,5 +49,6 @@ const App = () => {
     </QueryClientProvider>
   );
 };
+
 
 export default App;

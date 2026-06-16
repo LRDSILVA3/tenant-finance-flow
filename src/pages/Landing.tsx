@@ -200,9 +200,9 @@ export default function Landing() {
             © {new Date().getFullYear()} Previna. Todos os direitos reservados.
           </p>
           <div className="flex gap-4 text-sm">
-            <a href="#" className="hover:text-foreground transition-colors">Termos</a>
-            <a href="#" className="hover:text-foreground transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contato</a>
+            <a href="/termos" className="hover:text-foreground transition-colors">Termos de Uso</a>
+            <a href="/privacidade" className="hover:text-foreground transition-colors">Privacidade</a>
+            <a href="/cancelamento" className="hover:text-foreground transition-colors">Política de Cancelamento</a>
           </div>
         </div>
       </footer>
