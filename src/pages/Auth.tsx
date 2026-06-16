@@ -27,7 +27,7 @@ const Auth: React.FC = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate('/', { replace: true });
+        navigate('/app', { replace: true });
       }
       setCheckingAuth(false);
     };
@@ -36,7 +36,7 @@ const Auth: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate('/', { replace: true });
+        navigate('/app', { replace: true });
       }
     });
 

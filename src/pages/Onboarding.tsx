@@ -57,12 +57,12 @@ export default function Onboarding() {
     }
 
     if (userProfile?.isAdmin) {
-      navigate('/', { replace: true });
+      navigate('/app', { replace: true });
       return;
     }
 
     if (!loadingClients && !loadingSubscription && clients.length > 0 && currentSubscription) {
-      navigate('/', { replace: true });
+      navigate('/app', { replace: true });
     }
     
     if (!loadingClients && !loadingSubscription && clients.length > 0 && !currentSubscription) {
