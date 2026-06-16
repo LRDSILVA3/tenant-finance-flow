@@ -31,27 +31,87 @@ serve(async (req) => {
       const periodEnd = data.subscription.current_period_end;
 
       if (providerSubscriptionId) {
-        await supabase
+        const { data: subData } = await supabase
           .from('subscriptions')
           .update({
             status: 'active',
             current_period_end: new Date(periodEnd).toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('provider_subscription_id', providerSubscriptionId);
+          .eq('provider_subscription_id', providerSubscriptionId)
+          .select('client_id')
+          .single();
+
+        // Email Notification Logic
+        if (subData) {
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('user_id, name')
+            .eq('id', subData.client_id)
+            .single();
+
+          if (clientData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', clientData.user_id)
+              .single();
+
+            if (profile && profile.email) {
+              console.log(`[EMAIL MOCK] Sending SUCCESS email to ${profile.email} for client ${clientData.name}`);
+              // TODO: Integrate Resend or SendGrid here
+              // await resend.emails.send({
+              //   from: 'suporte@previna.com.br',
+              //   to: profile.email,
+              //   subject: 'Pagamento Confirmado - Previna',
+              //   html: '<p>Seu pagamento foi confirmado com sucesso. Sua assinatura está ativa!</p>'
+              // });
+            }
+          }
+        }
       }
     }
 
     if (eventType === "invoice.payment_failed") {
       const providerSubscriptionId = data.subscription_id;
       if (providerSubscriptionId) {
-        await supabase
+        const { data: subData } = await supabase
           .from('subscriptions')
           .update({
             status: 'past_due',
             updated_at: new Date().toISOString(),
           })
-          .eq('provider_subscription_id', providerSubscriptionId);
+          .eq('provider_subscription_id', providerSubscriptionId)
+          .select('client_id')
+          .single();
+
+        // Email Notification Logic
+        if (subData) {
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('user_id, name')
+            .eq('id', subData.client_id)
+            .single();
+
+          if (clientData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', clientData.user_id)
+              .single();
+
+            if (profile && profile.email) {
+              console.log(`[EMAIL MOCK] Sending FAILED email to ${profile.email} for client ${clientData.name}`);
+              // TODO: Integrate Resend or SendGrid here
+              // await resend.emails.send({
+              //   from: 'suporte@previna.com.br',
+              //   to: profile.email,
+              //   subject: 'Falha no Pagamento - Previna',
+              //   html: '<p>Houve um problema ao processar seu pagamento. Acesse o painel para atualizar seu cartão.</p>'
+              // });
+            }
+          }
+        }
       }
     }
 

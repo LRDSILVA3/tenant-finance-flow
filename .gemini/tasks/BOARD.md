@@ -1,6 +1,11 @@
 # Project Task Board
 
 ## ✅ Done
+- [x] Create public Landing Page for ad conversion and routing adjustments.
+- [x] Update platform branding to use "Previna" name and logo.
+- [x] Add standard SaaS legal pages (Terms of Use, Privacy Policy, Cancellation).
+- [x] Automated emails for successful/failed payments via Webhook.
+- [x] Implement notification system for plan expiration.
 - [x] Implement user roles and permissions within tenants (Owner vs Collaborator).
 - [x] Implement error validation for Transaction Form (6 mandatory fields).
 - [x] Fix CollaboratorSelect integration issues.
@@ -29,5 +34,4 @@
 
 
 ## 🔴 Backlog
-- [ ] Implement notification system for plan expiration.
-- [ ] Automated emails for successful/failed payments via Webhook.
+
