@@ -34,4 +34,10 @@
 
 
 ## 🔴 Backlog
+- [ ] **WhatsApp AI Assistant (OCR & NLP)**: Allow users to send receipt photos or audio messages to a WhatsApp bot. The AI extracts value, date, supplier, and auto-categorizes the transaction.
+- [ ] **Bank Reconciliation (OFX Import)**: Allow users to upload bank OFX files to cross-reference and auto-confirm transactions.
+- [ ] **Cash Flow Projection**: Predictive charts showing future balance based on recurring and pending transactions (30/60/90 days).
+- [ ] **Smart Budgets & Alerts**: Allow setting limits per category and trigger alerts when spending approaches the limit.
+- [ ] **Document Storage**: Allow attaching PDFs/Images (receipts) to transactions and exporting a ZIP for accountants.
+- [ ] Automated emails for successful/failed payments via Webhook.
 
