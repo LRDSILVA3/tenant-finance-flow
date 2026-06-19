@@ -1,6 +1,6 @@
 // Reports Component - Contains custom financial reports: DRE, Collaborator Commissions, Distribution Charts, Projection, Break-Even, Payables, and Margin Analysis
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Button } from '@/components/ui/button';
@@ -32,11 +32,15 @@ import {
   Layers,
   ArrowUpRight,
   ArrowDownRight,
-  Calculator
+  Calculator,
+  Package,
+  AlertTriangle,
+  Truck
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -50,6 +54,23 @@ const formatCurrency = (value: number) => {
 const formatDate = (date: Date) => {
   return new Intl.DateTimeFormat('pt-BR').format(new Date(date));
 };
+
+interface Supplier {
+  id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  client_id: string;
+  supplier_id: string | null;
+  name: string;
+  sku: string | null;
+  cost_price: number;
+  sale_price: number;
+  current_stock: number;
+  min_stock: number;
+}
 
 type PeriodType = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
 
@@ -77,6 +98,91 @@ export const Reports: React.FC = () => {
 
   // internal tabs state
   const [activeReportTab, setActiveReportTab] = useState<string>('dre');
+
+  // Inventory State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+
+  useEffect(() => {
+    const fetchInventoryData = async () => {
+      if (!currentClient) return;
+      setLoadingInventory(true);
+      try {
+        const { data: suppliersData } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .eq('client_id', currentClient.id);
+        
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('client_id', currentClient.id);
+        
+        if (suppliersData) setSuppliers(suppliersData as Supplier[]);
+        if (productsData) setProducts(productsData as Product[]);
+      } catch (err) {
+        console.error('Erro ao buscar dados de estoque:', err);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+
+    fetchInventoryData();
+  }, [currentClient, activeReportTab]); // Refresh when tab changes or client changes
+
+  const inventoryReportData = useMemo(() => {
+    let totalItems = 0;
+    let totalCostValuation = 0;
+    let totalSaleValuation = 0;
+    const criticalItems: Product[] = [];
+    const supplierTotals: Record<string, { name: string; itemsCount: number; costValuation: number; saleValuation: number }> = {};
+
+    // Initialize suppliers
+    suppliers.forEach(s => {
+      supplierTotals[s.id] = { name: s.name, itemsCount: 0, costValuation: 0, saleValuation: 0 };
+    });
+    // Add fallback for null supplier
+    supplierTotals['none'] = { name: 'Sem Fornecedor', itemsCount: 0, costValuation: 0, saleValuation: 0 };
+
+    products.forEach(p => {
+      totalItems += p.current_stock;
+      const costVal = p.current_stock * Number(p.cost_price);
+      const saleVal = p.current_stock * Number(p.sale_price);
+      totalCostValuation += costVal;
+      totalSaleValuation += saleVal;
+
+      if (p.current_stock <= p.min_stock) {
+        criticalItems.push(p);
+      }
+
+      const supplierId = p.supplier_id || 'none';
+      if (!supplierTotals[supplierId]) {
+        supplierTotals[supplierId] = { 
+          name: suppliers.find(s => s.id === supplierId)?.name || 'Desconhecido', 
+          itemsCount: 0, 
+          costValuation: 0, 
+          saleValuation: 0 
+        };
+      }
+      supplierTotals[supplierId].itemsCount += p.current_stock;
+      supplierTotals[supplierId].costValuation += costVal;
+      supplierTotals[supplierId].saleValuation += saleVal;
+    });
+
+    const supplierSummaries = Object.values(supplierTotals)
+      .filter(s => s.itemsCount > 0 || s.costValuation > 0)
+      .sort((a, b) => b.costValuation - a.costValuation);
+
+    return {
+      totalItems,
+      totalCostValuation,
+      totalSaleValuation,
+      totalMarkup: totalSaleValuation - totalCostValuation,
+      criticalItems: criticalItems.sort((a, b) => a.current_stock - b.current_stock),
+      supplierSummaries
+    };
+  }, [products, suppliers]);
 
   // Date period helper
   const handlePeriodTypeChange = (type: PeriodType) => {
@@ -271,7 +377,7 @@ export const Reports: React.FC = () => {
   const breakEvenData = useMemo(() => {
     let fixedCosts = 0;
     let variableCosts = 0;
-    let totalRevenue = dreData.grossRevenue || 1;
+    const totalRevenue = dreData.grossRevenue || 1;
 
     filteredTransactions.forEach(txn => {
       if (txn.type === 'expense') {
@@ -410,6 +516,8 @@ export const Reports: React.FC = () => {
       reportTitle = 'Contas a Pagar e a Receber (Provisoes)';
     } else if (activeReportTab === 'margins') {
       reportTitle = 'Analise de Margem por Categoria';
+    } else if (activeReportTab === 'inventory') {
+      reportTitle = 'Relatorio de Estoque e Inventario';
     } else {
       reportTitle = 'Distribuicao de Receitas e Despesas por Categoria';
     }
@@ -429,7 +537,7 @@ export const Reports: React.FC = () => {
     const yPos = 42;
 
     if (activeReportTab === 'dre') {
-      const tableRows: any[][] = [];
+      const tableRows: string[][] = [];
       tableRows.push(['1. RECEITA OPERACIONAL BRUTA', formatCurrency(dreData.grossRevenue), '100.0%']);
 
       categories.filter(c => c.parentId === null && c.type === 'income').forEach(rootCat => {
@@ -574,8 +682,50 @@ export const Reports: React.FC = () => {
         theme: 'striped',
         headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' }
       });
+    } else if (activeReportTab === 'inventory') {
+      const summaryRows = [
+        ['Itens Totais em Estoque', String(inventoryReportData.totalItems)],
+        ['Valoracao (Custo/Pago)', formatCurrency(inventoryReportData.totalCostValuation)],
+        ['Valoracao (Preco de Venda)', formatCurrency(inventoryReportData.totalSaleValuation)],
+        ['Lucro Estimado / Markup', formatCurrency(inventoryReportData.totalMarkup)]
+      ];
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Resumo do Inventario', 'Valor']],
+        body: summaryRows,
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' }
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      const nextY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      doc.text('Lista de Produtos em Estoque', 14, nextY);
+
+      const productRows = products.map(p => {
+        const supplierName = suppliers.find(s => s.id === p.supplier_id)?.name || 'Sem Fornecedor';
+        return [
+          p.sku || '-',
+          p.name,
+          supplierName,
+          formatCurrency(Number(p.cost_price)),
+          formatCurrency(Number(p.sale_price)),
+          String(p.current_stock),
+          formatCurrency(p.current_stock * Number(p.cost_price))
+        ];
+      });
+
+      autoTable(doc, {
+        startY: nextY + 4,
+        head: [['SKU', 'Produto', 'Fornecedor', 'Custo', 'Venda', 'Estoque', 'Total (Custo)']],
+        body: productRows,
+        theme: 'striped',
+        headStyles: { fillColor: [75, 85, 99], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 3 }
+      });
     } else {
-      const tableRows: any[][] = [];
+      const tableRows: string[][] = [];
       tableRows.push(['RECEITAS', '', '']);
       categoryDistributionData.income.forEach(item => {
         tableRows.push([`  ${item.name}`, formatCurrency(item.value), '']);
@@ -796,6 +946,10 @@ export const Reports: React.FC = () => {
             <TabsTrigger value="margins" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
               <Percent className="h-4 w-4" />
               Análise de Margem
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+              <Package className="h-4 w-4" />
+              Estoque e Inventário
             </TabsTrigger>
           </TabsList>
 
@@ -1305,6 +1459,181 @@ export const Reports: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Inventory Report Tab */}
+          <TabsContent value="inventory" className="space-y-6 print:block">
+            {/* Metric Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="border shadow-sm bg-muted/20">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Itens Totais em Estoque</p>
+                      <p className="text-2xl font-bold font-mono mt-1 text-foreground">{inventoryReportData.totalItems}</p>
+                    </div>
+                    <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                      <Package className="h-5 w-5" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border shadow-sm bg-muted/20">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Valoração (Custo/Pago)</p>
+                      <p className="text-2xl font-bold font-mono mt-1 text-expense">{formatCurrency(inventoryReportData.totalCostValuation)}</p>
+                    </div>
+                    <div className="p-2 bg-red-50 text-red-600 rounded-lg">
+                      <TrendingDown className="h-5 w-5" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border shadow-sm bg-muted/20">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Valoração (Preço de Venda)</p>
+                      <p className="text-2xl font-bold font-mono mt-1 text-income">{formatCurrency(inventoryReportData.totalSaleValuation)}</p>
+                    </div>
+                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border shadow-sm bg-muted/20">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider font-semibold">Lucro Estimado / Markup</p>
+                      <p className={cn("text-2xl font-bold font-mono mt-1", inventoryReportData.totalMarkup >= 0 ? "text-income" : "text-expense")}>
+                        {formatCurrency(inventoryReportData.totalMarkup)}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1">
+              {/* Critical stock items */}
+              <Card className="border shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    Produtos com Estoque Crítico (Reposição Necessária)
+                  </CardTitle>
+                  <CardDescription>
+                    Produtos cuja quantidade atual está abaixo ou igual ao estoque mínimo.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {inventoryReportData.criticalItems.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
+                      <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                        <Package className="h-5 w-5" />
+                      </div>
+                      Nenhum produto em nível crítico de estoque.
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden border rounded-lg max-h-[300px] overflow-y-auto">
+                      <Table>
+                        <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                          <TableRow>
+                            <TableHead>Produto</TableHead>
+                            <TableHead className="text-center">Estoque Mínimo</TableHead>
+                            <TableHead className="text-center">Estoque Atual</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {inventoryReportData.criticalItems.map((p) => (
+                            <TableRow key={p.id} className="hover:bg-red-50/10">
+                              <TableCell className="font-semibold text-sm">
+                                <div>{p.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{p.sku || 'Sem SKU'}</div>
+                              </TableCell>
+                              <TableCell className="text-center font-mono text-sm text-muted-foreground">{p.min_stock}</TableCell>
+                              <TableCell className="text-center">
+                                <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold font-mono bg-red-100 text-red-800">
+                                  {p.current_stock}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    // Trigger tab switch to main inventory view if possible
+                                    const mainInventoryTab = document.querySelector('[data-value="inventory"]') as HTMLElement;
+                                    if (mainInventoryTab) mainInventoryTab.click();
+                                  }}
+                                  className="h-7 text-xs"
+                                >
+                                  Repor
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Grouped by Supplier */}
+              <Card className="border shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-primary" />
+                    Valor de Estoque por Fornecedor
+                  </CardTitle>
+                  <CardDescription>
+                    Distribuição da quantidade de itens e valor investido por fornecedor.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {inventoryReportData.supplierSummaries.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Nenhum dado de estoque por fornecedor disponível.
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden border rounded-lg max-h-[300px] overflow-y-auto">
+                      <Table>
+                        <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                          <TableRow>
+                            <TableHead>Fornecedor</TableHead>
+                            <TableHead className="text-center">Itens</TableHead>
+                            <TableHead className="text-right">Custo Total</TableHead>
+                            <TableHead className="text-right">Venda Projetada</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {inventoryReportData.supplierSummaries.map((s, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/30">
+                              <TableCell className="font-semibold text-sm">{s.name}</TableCell>
+                              <TableCell className="text-center font-mono text-sm">{s.itemsCount}</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-expense">{formatCurrency(s.costValuation)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-income">{formatCurrency(s.saleValuation)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       )}

@@ -9,9 +9,10 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Settings } from '@/components/settings/Settings';
 import { Transactions } from '@/components/transactions/Transactions';
 import { Reports } from '@/components/reports/Reports';
+import { Inventory } from '@/components/inventory/Inventory';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'reports' | 'settings';
+type View = 'dashboard' | 'transactions' | 'inventory' | 'reports' | 'settings';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -63,6 +64,8 @@ const Index: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
+      case 'inventory':
+        return <Inventory />;
       case 'reports':
         return <Reports />;
       case 'settings':

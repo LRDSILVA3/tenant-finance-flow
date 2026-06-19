@@ -335,6 +335,55 @@ async function main() {
         ...tx
       });
     }
+
+    // G. Inventory (Suppliers & Products)
+    console.log(`📦 Seeding suppliers and products for client ${cid}...`);
+    const { data: defaultSup } = await userClient
+      .from('suppliers')
+      .select('id')
+      .eq('client_id', cid)
+      .eq('name', 'Fornecedor Padrão')
+      .single();
+
+    const { data: supplierA } = await userClient.from('suppliers').insert({
+      client_id: cid,
+      name: cid === client1.id ? 'Ambev Distribuidora' : 'Dental Cremer',
+      contact_info: 'contato@distribuidora.com.br'
+    }).select().single();
+
+    const productsToInsert = cid === client1.id ? [
+      { name: 'Coca-Cola Lata 350ml', sku: 'SODA-COCA-350', cost_price: 2.20, sale_price: 4.50, current_stock: 120, min_stock: 50, supplier_id: supplierA?.id },
+      { name: 'Cerveja Heineken Long Neck', sku: 'BEER-HEIN-LONG', cost_price: 4.50, sale_price: 8.50, current_stock: 80, min_stock: 40, supplier_id: supplierA?.id },
+      { name: 'Pão de Forma Tradicional', sku: 'BREAD-FORM-TRAD', cost_price: 3.80, sale_price: 6.90, current_stock: 15, min_stock: 20, supplier_id: defaultSup?.id },
+      { name: 'Arroz Integral 1kg', sku: 'RICE-INTEG-1K', cost_price: 4.20, sale_price: 7.50, current_stock: 8, min_stock: 10, supplier_id: defaultSup?.id }
+    ] : [
+      { name: 'Resina Composta A2', sku: 'DENT-RES-A2', cost_price: 45.00, sale_price: 120.00, current_stock: 12, min_stock: 5, supplier_id: supplierA?.id },
+      { name: 'Anestésico Lidocaína', sku: 'DENT-ANES-LIDO', cost_price: 35.00, sale_price: 80.00, current_stock: 4, min_stock: 10, supplier_id: supplierA?.id },
+      { name: 'Luvas de Procedimento Látex (M)', sku: 'DENT-GLOV-LAT-M', cost_price: 22.00, sale_price: 45.00, current_stock: 2, min_stock: 5, supplier_id: defaultSup?.id }
+    ];
+
+    for (const p of productsToInsert) {
+      const { data: newProd } = await userClient.from('products').insert({
+        client_id: cid,
+        name: p.name,
+        sku: p.sku,
+        cost_price: p.cost_price,
+        sale_price: p.sale_price,
+        current_stock: p.current_stock,
+        min_stock: p.min_stock,
+        supplier_id: p.supplier_id
+      }).select().single();
+
+      if (newProd && newProd.current_stock > 0) {
+        await userClient.from('stock_movements').insert({
+          client_id: cid,
+          product_id: newProd.id,
+          type: 'in',
+          quantity: newProd.current_stock,
+          notes: 'Carga inicial do sistema (Seed)'
+        });
+      }
+    }
   }
 
   console.log("\n✨ Database seeding completed successfully!");
