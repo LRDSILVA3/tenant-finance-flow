@@ -16,6 +16,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CollaboratorSelect } from '@/components/transactions/CollaboratorSelect';
+import { ImportDialog } from '@/components/transactions/ImportDialog';
+import { useTransactions } from '@/contexts/TransactionContext';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
@@ -75,7 +77,8 @@ import {
   Download,
   Lock,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Upload
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -118,6 +121,7 @@ export const Transactions: React.FC = () => {
     language,
     userSettings,
   } = useFinance();
+  const { loadTransactions } = useTransactions();
 
   const { hasFeature } = useFeatureAccess();
   const isPaymentMethodsLocked = !hasFeature('payment_methods');
@@ -131,6 +135,7 @@ export const Transactions: React.FC = () => {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpenState] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
@@ -499,6 +504,10 @@ export const Transactions: React.FC = () => {
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
             {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
+          </Button>
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Importar Extrato</span>
           </Button>
           <Button onClick={handleOpenCreate}>
             <Plus className="h-4 w-4 mr-2" />
@@ -1311,7 +1320,7 @@ export const Transactions: React.FC = () => {
                   <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
                   <RadioGroup 
                     value={recurringDeleteOption} 
-                    onValueChange={(val) => setRecurringDeleteOption(val as any)}
+                    onValueChange={(val) => setRecurringDeleteOption(val as 'single' | 'future' | 'all')}
                     className="space-y-2"
                   >
                     <div className="flex items-center space-x-2">
@@ -1341,6 +1350,12 @@ export const Transactions: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onImportSuccess={() => loadTransactions(currentClient.id)}
+      />
     </div>
   );
 };
