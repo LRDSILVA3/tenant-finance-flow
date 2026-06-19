@@ -43,26 +43,33 @@ export const Team: React.FC = () => {
     if (!currentClient) return;
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
+      const { data: membersData, error: membersError } = await (supabase as any)
         .from('client_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          profiles:user_id (email)
-        `)
+        .select('id, user_id, role')
         .eq('client_id', currentClient.id);
 
-      if (error) throw error;
+      if (membersError) throw membersError;
 
-      if (data) {
-        const mapped = data.map((m: any) => ({
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map((m: any) => m.user_id);
+        const { data: profilesData, error: profilesError } = await (supabase as any)
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p.email]) || []);
+
+        const mapped = membersData.map((m: any) => ({
           id: m.id,
           userId: m.user_id,
           role: m.role as UserRole,
-          email: m.profiles?.email || 'N/A',
+          email: profilesMap.get(m.user_id) || 'N/A',
         }));
         setMembers(mapped);
+      } else {
+        setMembers([]);
       }
     } catch (error) {
       console.error('Error loading members:', error);

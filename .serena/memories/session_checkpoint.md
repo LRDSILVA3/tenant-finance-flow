@@ -1,22 +1,26 @@
-# Session Context: 2026-02-20
+# Checkpoint da Sessão - Integração WhatsApp IA
 
-## Completed Tasks
-1. **Supabase RLS Fix**: Resolved infinite recursion in `profiles` table policies.
-   - Migration: `supabase/migrations/20260220110000_fix_profiles_recursion.sql`
-   - Solution: Created `is_admin()` helper function with `SECURITY DEFINER`.
-2. **Settings UI Fix**: Fixed `Uncaught ReferenceError: cn is not defined` in `src/components/settings/Settings.tsx`.
-3. **Plan Management Enhancement**: Switched standard price input to `MoneyInput` in `src/components/admin/PlanManagement.tsx`.
-4. **Onboarding System**:
-   - Updated `FinanceContext.tsx`: `addClient` now returns the new client ID.
-   - Created `src/pages/Onboarding.tsx`: A 3-step wizard (Company Info -> Plan Selection -> Payment Details).
-   - The onboarding captures payment info for future billing (post-trial) or immediate charging.
+## Mudanças Realizadas
+1. **Modelagem de Dados**:
+   - Adicionado `whatsapp_ia` como feature booleana nos planos (tabela `public.plans`).
+   - Apenas o plano **Avançado** possui `whatsapp_ia: true`.
+   - Adicionado `whatsapp_number` à tabela `public.profiles` via migração.
 
-## Pending Actions
-1. **Route Integration**: Add `<Route path="/onboarding" element={<Onboarding />} />` to `src/App.tsx`.
-2. **Redirect Logic**: Update `Auth.tsx` or `Index.tsx` to redirect users without clients to `/onboarding`.
-3. **Types**: Ensure `Collaborator` type is well integrated (added to `finance.ts` but check usage).
+2. **Backend (Edge Functions)**:
+   - Criada/Refinada a função `wa-webhook` para processar mensagens da Evolution API.
+   - Integração com Gemini 1.5 Flash para extração de dados (OCR e NLP).
+   - Validação de número de telefone vinculada ao perfil do usuário.
 
-## Project State
-- Tech Stack: React, Vite, TypeScript, Tailwind CSS, Supabase.
-- DB: Supabase with RLS enabled on all tables.
-- UI: shadcn/ui components used extensively.
+3. **Frontend**:
+   - Atualizado `types/finance.ts` com novos campos de perfil e plano.
+   - `FinanceContext.tsx`: Implementado `updateProfile` e lógica de permissão que desbloqueia recursos para Admin.
+   - `Header.tsx`: Interface "Meu Perfil" adicionada com máscara de telefone e feedback de restrição de plano.
+   - `Settings.tsx`: Card informativo sobre a funcionalidade de IA adicionado.
+
+## Próximos Passos Sugeridos
+- Implementar suporte a mensagens de áudio (Transcrição via Gemini/Whisper).
+- Implementar Reconciliação Bancária (OFX).
+- Refinar categorização automática via IA baseada no plano de contas do cliente.
+
+## Estado do Servidor
+- Servidor Vite rodando em http://localhost:8080/ (PID 7868).

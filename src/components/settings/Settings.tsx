@@ -114,6 +114,36 @@ export const Settings: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className={cn(!userSettings.enableWhatsappIA && "opacity-60")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Lançamento via WhatsApp (IA)
+                </CardTitle>
+                <CardDescription>
+                  Permite realizar lançamentos financeiros enviando mensagens de texto ou fotos de comprovantes pelo WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">
+                      Ativar Inteligência Artificial
+                    </Label>
+                    {!userSettings.enableWhatsappIA && currentPlan && (
+                      <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> Requer Plano Avançado
+                      </p>
+                    )}
+                  </div>
+                  <Switch
+                    checked={userSettings.enableWhatsappIA}
+                    disabled={true}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
           
           <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-dashed flex items-center justify-between">

@@ -46,7 +46,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         name: p.name,
         description: p.description,
         price: Number(p.price),
-        trialMonths: p.trial_months,
+        trialDays: p.trial_months,
         features: p.features,
         isActive: p.is_active,
         createdAt: new Date(p.created_at),
@@ -83,7 +83,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         name: planData.name,
         description: planData.description,
         price: Number(planData.price),
-        trialMonths: planData.trial_months,
+        trialDays: planData.trial_months,
         features: planData.features as any,
         isActive: planData.is_active,
         createdAt: new Date(planData.created_at),
@@ -108,7 +108,11 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     const now = new Date();
     const trialEndDate = new Date();
-    trialEndDate.setMonth(now.getMonth() + targetPlan.trialMonths);
+    if (targetPlan.trialDays > 0) {
+      trialEndDate.setDate(now.getDate() + targetPlan.trialDays);
+    } else {
+      trialEndDate.setTime(now.getTime());
+    }
     const periodEndDate = new Date();
     periodEndDate.setMonth(now.getMonth() + 1);
 
@@ -222,7 +226,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (updates.name) updateData.name = updates.name;
     if (updates.description) updateData.description = updates.description;
     if (updates.price !== undefined) updateData.price = updates.price;
-    if (updates.trialMonths !== undefined) updateData.trial_months = updates.trialMonths;
+    if (updates.trialDays !== undefined) updateData.trial_months = updates.trialDays;
     if (updates.features) updateData.features = updates.features;
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
@@ -242,8 +246,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [loadPlans]);
 
   useEffect(() => {
-    if (user) loadPlans();
-  }, [user, loadPlans]);
+    loadPlans();
+  }, [loadPlans]);
 
   const value = React.useMemo(() => ({
     plans, currentSubscription, currentPlan, billingMethods, loadingPlans, loadingSubscription,

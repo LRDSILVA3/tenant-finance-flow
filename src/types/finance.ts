@@ -80,6 +80,7 @@ export interface PlanFeatures {
   payment_methods: boolean;
   commissions: boolean;
   advanced_reports: boolean;
+  whatsapp_ia: boolean;
   max_collaborators?: number;
   max_recurring_transactions?: number;
 }
@@ -89,7 +90,7 @@ export interface Plan {
   name: string;
   description: string;
   price: number;
-  trialMonths: number;
+  trialDays: number;
   features: PlanFeatures;
   isActive: boolean;
   createdAt: Date;
@@ -121,6 +122,7 @@ export interface BillingMethod {
 export interface UserProfile {
   id: string;
   isAdmin: boolean;
+  whatsappNumber?: string;
   updatedAt: Date;
 }
 

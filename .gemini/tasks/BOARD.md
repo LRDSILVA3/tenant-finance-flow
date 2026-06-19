@@ -1,7 +1,7 @@
 # Project Task Board
 
 ## ✅ Done
-- [x] Create public Landing Page for ad conversion and routing adjustments.
+- [x] Create public Landing Page for ad conversion and routing adjustments (Refactored to premium version with Pricing, Testimonials, and FAQ).
 - [x] Update platform branding to use "Previna" name and logo.
 - [x] Add standard SaaS legal pages (Terms of Use, Privacy Policy, Cancellation).
 - [x] Automated emails for successful/failed payments via Webhook.
@@ -24,7 +24,8 @@
 - [x] Legal compliance for Cancellation (Clear dates, 7-day refund notice).
 - [x] Security Hardening (RLS reinforcement for multi-tenancy).
 - [x] Implementation of "Read-Only" mode for expired subscriptions.
-- [x] Add CSV export functionality for Transactions.
+- [x] **WhatsApp AI Assistant (OCR & NLP)**: Implementação da integração com Evolution API e Gemini 1.5 Flash. Suporte a texto e OCR de comprovantes. Configuração de perfil com máscara de telefone e restrição por plano (Avançado).
+- [x] CSV export functionality for Transactions.
 - [x] Create Dashboard widgets for "Expenses by Category".
 
 - [x] Fix 401 Unauthorized error in create-pagarme-subscription Edge Function (ES256 support).
@@ -34,7 +35,6 @@
 
 
 ## 🔴 Backlog
-- [ ] **WhatsApp AI Assistant (OCR & NLP)**: Allow users to send receipt photos or audio messages to a WhatsApp bot. The AI extracts value, date, supplier, and auto-categorizes the transaction.
 - [ ] **Bank Reconciliation (OFX Import)**: Allow users to upload bank OFX files to cross-reference and auto-confirm transactions.
 - [ ] **Cash Flow Projection**: Predictive charts showing future balance based on recurring and pending transactions (30/60/90 days).
 - [ ] **Smart Budgets & Alerts**: Allow setting limits per category and trigger alerts when spending approaches the limit.

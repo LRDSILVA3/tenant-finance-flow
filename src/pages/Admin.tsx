@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlanManagement } from '@/components/admin/PlanManagement';
 import { ClientOverview } from '@/components/admin/ClientOverview';
 import { BillingDashboard } from '@/components/admin/BillingDashboard';
+import { AdminSupport } from '@/components/admin/AdminSupport';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
-import { ShieldCheck, CreditCard, Users, Loader2, DollarSign } from 'lucide-react';
+import { ShieldCheck, CreditCard, Users, Loader2, DollarSign, Headset } from 'lucide-react';
 
 const Admin: React.FC = () => {
   const { userProfile, authLoading, isAuthenticated } = useFinance();
@@ -43,7 +44,7 @@ const Admin: React.FC = () => {
         </div>
 
         <Tabs defaultValue="billing" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
             <TabsTrigger value="billing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Faturamento
@@ -55,6 +56,10 @@ const Admin: React.FC = () => {
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
               Planos
+            </TabsTrigger>
+            <TabsTrigger value="support" className="flex items-center gap-2">
+              <Headset className="h-4 w-4" />
+              Suporte
             </TabsTrigger>
           </TabsList>
           
@@ -68,6 +73,10 @@ const Admin: React.FC = () => {
           
           <TabsContent value="plans" className="mt-6">
             <PlanManagement />
+          </TabsContent>
+
+          <TabsContent value="support" className="mt-6">
+            <AdminSupport />
           </TabsContent>
         </Tabs>
       </main>

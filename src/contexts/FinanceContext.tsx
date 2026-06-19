@@ -13,6 +13,7 @@ import { Plan, Subscription, Category, Transaction, Collaborator, TransactionTyp
 interface UserSettings {
   enablePaymentMethods: boolean;
   enableCommission: boolean;
+  enableWhatsappIA: boolean;
 }
 
 interface FinanceContextType {
@@ -22,6 +23,7 @@ interface FinanceContextType {
   signOut: () => Promise<void>;
   userProfile: UserProfile | null;
   userRole: UserRole | null;
+  updateProfile: (updates: { whatsappNumber?: string }) => Promise<void>;
 
   // Language
   language: Language;
@@ -184,8 +186,29 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     if (user) {
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle().then(({ data }) => {
-        if (data) setUserProfile({ id: data.id, isAdmin: data.is_admin, updatedAt: new Date(data.updated_at) });
+        if (data) setUserProfile({ 
+          id: data.id, 
+          isAdmin: data.is_admin, 
+          whatsappNumber: data.whatsapp_number,
+          updatedAt: new Date(data.updated_at) 
+        });
       });
+    }
+  }, [user]);
+
+  const updateProfile = useCallback(async (updates: { whatsappNumber?: string }) => {
+    if (!user) return;
+    
+    const dbUpdates: any = {};
+    if (updates.whatsappNumber !== undefined) dbUpdates.whatsapp_number = updates.whatsappNumber;
+    
+    const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id);
+    
+    if (error) {
+      toast({ title: "Erro ao atualizar perfil", description: error.message, variant: 'destructive' });
+    } else {
+      setUserProfile(prev => prev ? { ...prev, ...updates } : null);
+      toast({ title: "Perfil atualizado", description: "Suas alterações foram salvas." });
     }
   }, [user]);
 
@@ -228,11 +251,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Sync settings with plan and subscription status
   useEffect(() => {
     const active = isSubscriptionActive();
+    const isAdmin = userProfile?.isAdmin;
+    
     setUserSettings({
-      enablePaymentMethods: active ? currentPlan?.features.payment_methods : false,
-      enableCommission: active ? currentPlan?.features.commissions : false,
+      enablePaymentMethods: isAdmin || (active ? currentPlan?.features.payment_methods : false),
+      enableCommission: isAdmin || (active ? currentPlan?.features.commissions : false),
+      enableWhatsappIA: isAdmin || (active ? currentPlan?.features.whatsapp_ia : false),
     });
-  }, [currentPlan, isSubscriptionActive]);
+  }, [currentPlan, isSubscriptionActive, userProfile?.isAdmin]);
 
   const addClient = useCallback(async (client: { name: string; taxId?: string }) => {
     if (!user) return;
@@ -268,7 +294,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [isSubscriptionActive]);
 
   const value = React.useMemo(() => ({
-    isAuthenticated, authLoading, signOut, userProfile, userRole, language, setLanguage, t,
+    isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,
     currentAddress, loadAddress, saveAddress,
     userSettings, updateUserSettings,
@@ -295,7 +321,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     getCategoryById: (id: string) => tx.categories.find(c => c.id === id),
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
   }), [
-    isAuthenticated, authLoading, signOut, userProfile, userRole, language, setLanguage, t,
+    isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,
     userSettings, updateUserSettings,
     sub, tx, isSubscriptionActive, withSubscriptionCheck, currentPlan?.features.max_collaborators

@@ -19,6 +19,7 @@ const Index: React.FC = () => {
     authLoading, 
     userProfile,
     clients, 
+    loadingClients,
     currentSubscription, 
     loadingSubscription, 
     t 
@@ -26,7 +27,7 @@ const Index: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !loadingClients) {
       if (!isAuthenticated) {
         navigate('/auth', { replace: true });
       } else if (clients.length === 0 && !userProfile?.isAdmin) {
@@ -38,7 +39,7 @@ const Index: React.FC = () => {
         navigate('/onboarding', { replace: true });
       }
     }
-  }, [isAuthenticated, authLoading, userProfile, clients, currentSubscription, loadingSubscription, navigate]);
+  }, [isAuthenticated, authLoading, loadingClients, userProfile, clients, currentSubscription, loadingSubscription, navigate]);
 
   if (authLoading) {
     return (

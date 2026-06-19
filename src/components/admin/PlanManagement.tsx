@@ -32,7 +32,7 @@ export const PlanManagement: React.FC = () => {
         name: editingPlan.name,
         description: editingPlan.description,
         price: editingPlan.price,
-        trialMonths: editingPlan.trialMonths,
+        trialDays: editingPlan.trialDays,
         features: editingPlan.features,
       });
       setEditingPlan(null);
@@ -62,7 +62,7 @@ export const PlanManagement: React.FC = () => {
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead>Preço (R$)</TableHead>
-              <TableHead>Trial (Meses)</TableHead>
+              <TableHead>Trial (Dias)</TableHead>
               <TableHead>Funcionalidades</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -90,10 +90,10 @@ export const PlanManagement: React.FC = () => {
                   {editingPlan?.id === plan.id ? (
                     <Input 
                       type="number"
-                      value={editingPlan.trialMonths} 
-                      onChange={e => setEditingPlan({...editingPlan, trialMonths: Number(e.target.value)})}
+                      value={editingPlan.trialDays} 
+                      onChange={e => setEditingPlan({...editingPlan, trialDays: Number(e.target.value)})}
                     />
-                  ) : `${plan.trialMonths} meses`}
+                  ) : `${plan.trialDays} dias`}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">

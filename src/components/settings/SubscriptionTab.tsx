@@ -199,12 +199,23 @@ export const SubscriptionTab: React.FC = () => {
                   <ul className="space-y-2">
                     <li className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      <span>{t.chartOfAccounts}</span>
+                      <span>{t.chartOfAccounts} & Lançamentos</span>
                     </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      <span>{t.transactions}</span>
+                    <li className={cn("flex items-center gap-2 text-sm", !plan.features.payment_methods && "text-muted-foreground opacity-50")}>
+                      <Check className={cn("h-4 w-4 text-emerald-500 shrink-0", !plan.features.payment_methods && "text-muted-foreground/30")} />
+                      <span>Formas de Pagamento Avançadas</span>
                     </li>
+                    <li className={cn("flex items-center gap-2 text-sm", !plan.features.commissions && "text-muted-foreground opacity-50")}>
+                      <Check className={cn("h-4 w-4 text-emerald-500 shrink-0", !plan.features.commissions && "text-muted-foreground/30")} />
+                      <span>Gestão de Comissões e Equipe</span>
+                    </li>
+                    {/* <li className={cn("flex items-center gap-2 text-sm", !plan.features.whatsapp_ia && "text-muted-foreground opacity-50")}>
+                      <Check className={cn("h-4 w-4 text-emerald-500 shrink-0", !plan.features.whatsapp_ia && "text-muted-foreground/30")} />
+                      <span className="flex items-center gap-1 font-medium">
+                        Lançamento Inteligente via WhatsApp (IA)
+                        {plan.features.whatsapp_ia && <Sparkles className="h-3 w-3 text-amber-500 animate-pulse" />}
+                      </span>
+                    </li> */}
                   </ul>
                 </div>
               </CardContent>

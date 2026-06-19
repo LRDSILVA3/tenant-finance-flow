@@ -76,7 +76,7 @@ serve(async (req) => {
     }
 
     const trialMonths = plan.trial_months || 0;
-    const trialDays = trialMonths * 30; // Approximation for Pagar.me
+    const trialDays = trialMonths > 0 ? 7 : 0; // Trial de 7 dias fixos para os planos que oferecem degustação
 
     let pagarmeData;
 

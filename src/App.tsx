@@ -8,6 +8,7 @@ import { FinanceProvider } from "@/contexts/FinanceContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { TransactionProvider } from "@/contexts/TransactionContext";
 import Landing from "./pages/Landing";
+import { SupportWidget } from "@/components/layout/SupportWidget";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -41,6 +42,7 @@ const App = () => {
                   <Route path="/cancelamento" element={<Cancellation />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                <SupportWidget />
               </BrowserRouter>
             </FinanceProvider>
           </TransactionProvider>
