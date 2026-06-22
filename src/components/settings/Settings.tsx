@@ -115,7 +115,7 @@ export const Settings: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className={cn(!userSettings.enableWhatsappIA && "opacity-60")}>
+            {/* <Card className={cn(!userSettings.enableWhatsappIA && "opacity-60")}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
@@ -143,7 +143,7 @@ export const Settings: React.FC = () => {
                   />
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
           
           <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-dashed flex items-center justify-between">

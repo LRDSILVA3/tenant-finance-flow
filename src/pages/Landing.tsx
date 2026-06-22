@@ -21,23 +21,29 @@ import {
   CheckCircle2, 
   ChevronDown, 
   Check, 
+  X,
   Star, 
   HelpCircle,
   MessageSquare,
   Users,
-  TrendingUp
+  TrendingUp,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // Mapeamento de detalhes visuais e de exibição dos planos
-const planDisplayMetadata: Record<string, { description: string, features: string[], cta: string, popular: boolean }> = {
+const planDisplayMetadata: Record<string, { description: string, features: { text: string, included: boolean }[], cta: string, popular: boolean }> = {
   "Básico": {
     description: "Ideal para autônomos e microempresas começando a organizar suas finanças.",
     features: [
-      "1 Usuário (Dono)",
-      "Fluxo de caixa básico",
-      "Relatórios de receitas e despesas",
-      "Sem colaboradores",
-      "Suporte por e-mail",
+      { text: "1 Usuário (Dono)", included: true },
+      { text: "Fluxo de caixa básico", included: true },
+      { text: "Relatórios de receitas e despesas", included: true },
+      { text: "Sem colaboradores", included: true },
+      { text: "Suporte por e-mail", included: true },
+      { text: "Controle de Múltiplas Empresas", included: false },
+      { text: "Gestão avançada de comissões", included: false },
+      { text: "Exportação de relatórios em CSV", included: false },
+      { text: "Dashboards e projeções avançadas", included: false },
     ],
     cta: "Começar Teste Grátis",
     popular: false,
@@ -45,25 +51,28 @@ const planDisplayMetadata: Record<string, { description: string, features: strin
   "Intermediário": {
     description: "Perfeito para pequenas empresas com equipes em crescimento e fluxo constante.",
     features: [
-      "Até 1 Colaborador",
-      "Controle de Múltiplas Empresas",
-      "Gestão avançada de comissões",
-      "Integração Pagar.me v5",
-      "Exportação de relatórios em CSV",
-      "Suporte prioritário",
+      { text: "Até 1 Colaborador", included: true },
+      { text: "Controle de Múltiplas Empresas", included: true },
+      { text: "Gestão avançada de comissões", included: true },
+      { text: "Exportação de relatórios em CSV", included: true },
+      { text: "Suporte prioritário", included: true },
+      { text: "Dashboards e projeções avançadas", included: false },
+      { text: "Gerente de contas dedicado", included: false },
     ],
     cta: "Começar Teste Grátis",
     popular: false,
   },
   "Avançado": {
-    description: "Para empresas que necessitam de automação inteligente e recursos sem limites.",
+    description: "Para empresas que necessitam de automação robusta e recursos sem limites.",
     features: [
-      "Até 10 Colaboradores",
-      "Assistente WhatsApp com IA (OCR de comprovantes)",
-      "Dashboards e projeções avançadas",
-      "Regras de segurança RLS reforçadas",
-      "Gerente de contas dedicado",
-      "Suporte 24/7 via WhatsApp",
+      { text: "Até 10 Colaboradores", included: true },
+      { text: "Controle de Múltiplas Empresas", included: true },
+      { text: "Gestão avançada de comissões", included: true },
+      { text: "Exportação de relatórios em CSV", included: true },
+      { text: "Dashboards e projeções avançadas", included: true },
+      { text: "Regras de segurança RLS reforçadas", included: true },
+      { text: "Gerente de contas dedicado", included: true },
+      { text: "Suporte 24/7 prioritário", included: true },
     ],
     cta: "Experimentar Plano Recomendado",
     popular: true,
@@ -122,7 +131,7 @@ export default function Landing() {
     return dbPlans.map(dbPlan => {
       const meta = planDisplayMetadata[dbPlan.name] || {
         description: dbPlan.description || "",
-        features: Object.entries(dbPlan.features).map(([k, v]) => `${k}: ${v}`),
+        features: Object.entries(dbPlan.features).map(([k, v]) => ({ text: `${k}: ${v}`, included: true })),
         cta: "Começar Agora",
         popular: false
       };
@@ -149,14 +158,14 @@ export default function Landing() {
       name: "Rodrigo Almeida",
       role: "Diretor Financeiro no Grupo TechHub",
       avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80",
-      content: "A integração com o Pagar.me v5 e o controle automatizado de comissões de colaboradores nos poupa pelo menos 15 horas de trabalho administrative por semana.",
+      content: "O gerenciamento automático e o controle de comissões de colaboradores nos poupa pelo menos 15 horas de trabalho administrativo por semana.",
       stars: 5,
     },
     {
       name: "Gabriela Fernandes",
       role: "Sócia-Fundadora da Florescer Consultoria",
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
-      content: "O assistente de WhatsApp com inteligência artificial é incrível! Nós apenas enviamos a foto do comprovante e ele faz o lançamento sozinho no sistema.",
+      content: "O sistema é incrível! O controle de lançamentos e o plano de contas facilitaram demais a nossa rotina diária, poupando muito tempo.",
       stars: 5,
     },
   ];
@@ -172,11 +181,7 @@ export default function Landing() {
     },
     {
       question: "Meus dados de pagamento estão seguros?",
-      answer: "Absolutamente. Nossa integração de pagamentos utiliza a tecnologia de tokenização do Pagar.me v5, garantindo total conformidade com os padrões de segurança PCI Compliance. Suas informações de cartão nunca tocam nossos servidores diretamente.",
-    },
-    {
-      question: "O que é o Assistente WhatsApp com IA?",
-      answer: "É uma ferramenta exclusiva do plano Avançado. Você recebe um número de WhatsApp dedicado integrado ao sistema, onde pode enviar mensagens de texto ou fotos de comprovantes de despesas/receitas. Nossa IA (Gemini) processa a imagem ou texto via OCR/NLP e realiza o lançamento financeiro de forma 100% automática.",
+      answer: "Absolutamente. Nossa integração de pagamentos utiliza tecnologia de tokenização segura, garantindo total conformidade com os padrões de segurança PCI Compliance. Suas informações de cartão nunca tocam nossos servidores diretamente.",
     },
     {
       question: "Como funciona a política de cancelamento?",
@@ -238,7 +243,7 @@ export default function Landing() {
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-              Simplifique o fluxo de caixa, organize comissões de colaboradores, receba pagamentos recorrentes e automatize lançamentos com o poder da Inteligência Artificial.
+              Simplifique o fluxo de caixa, organize comissões de colaboradores, receba pagamentos recorrentes e automatize lançamentos de forma simples e rápida.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -368,13 +373,13 @@ export default function Landing() {
                   </div>
                   <div className="bg-card border rounded-xl p-4 bg-gradient-to-r from-primary/5 to-indigo-500/5 border-primary/20">
                     <h4 className="font-bold mb-1 text-sm flex items-center gap-1.5 text-primary">
-                      <MessageSquare className="h-4 w-4" /> Inteligência WhatsApp
+                      <FileSpreadsheet className="h-4 w-4" /> Relatórios Exportáveis
                     </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      "Comprovante de energia no valor de R$ 340,00 pago em 18/06."
+                      "Gere e exporte relatórios completos do fluxo de caixa em formato PDF e CSV."
                     </p>
                     <div className="mt-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full inline-block font-semibold">
-                      ✓ Lançamento Agendado
+                      ✓ Download Disponível
                     </div>
                   </div>
                 </div>
@@ -438,9 +443,9 @@ export default function Landing() {
                 </p>
                 <ul className="space-y-4 pt-4">
                   {[
-                    "Tokenização PCI Compliance via Pagar.me v5 para transações de cartão super seguras.",
+                    "Tokenização PCI Compliance e criptografia para transações de cartão super seguras.",
                     "Divisão automática e precisa de comissões por colaborador.",
-                    "Lançamentos rápidos usando nossa inteligência de OCR por foto no WhatsApp.",
+                    "Exportação rápida de relatórios completos em formatos PDF e CSV.",
                     "Conformidade total RLS (Row Level Security) garantindo o sigilo das suas informações.",
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-4">
@@ -463,7 +468,7 @@ export default function Landing() {
                   />
                   <div className="mt-6 text-center">
                     <p className="text-sm font-bold text-foreground">Previna Finanças</p>
-                    <p className="text-xs text-muted-foreground">Segurança, Simplicidade e IA</p>
+                    <p className="text-xs text-muted-foreground">Segurança, Simplicidade e Controle</p>
                   </div>
                 </div>
               </div>
@@ -506,8 +511,14 @@ export default function Landing() {
                     <ul className="space-y-4 mb-8">
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm">
-                          <Check className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                          <span className="text-foreground/90">{feature}</span>
+                          {feature.included ? (
+                            <Check className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                          ) : (
+                            <X className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                          )}
+                          <span className={feature.included ? "text-foreground/90" : "text-muted-foreground/60 line-through"}>
+                            {feature.text}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -642,7 +653,7 @@ export default function Landing() {
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
             <p>
-              © {new Date().getFullYear()} Previna. Todos os direitos reservados. CNPJ: 00.000.000/0000-00.
+              © {new Date().getFullYear()} Previna por NEWFEEL TEC. Todos os direitos reservados. CNPJ: 43.186.726/0001-73.
             </p>
             <p className="text-muted-foreground/60">
               Desenvolvido em conformidade com as regras de PCI Compliance e RLS do banco de dados.

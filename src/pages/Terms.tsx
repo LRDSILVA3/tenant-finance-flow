@@ -25,7 +25,7 @@ export default function Terms() {
         <p><strong>Última atualização:</strong> 16 de Junho de 2026</p>
 
         <p>
-          Bem-vindo ao Previna. Estes Termos de Uso regulam a utilização do software de gestão financeira ("Sistema") oferecido pela Previna ("Nós", "Nossa", "Empresa"). Ao criar uma conta e utilizar o Sistema, você ("Usuário", "Cliente") concorda expressamente com todas as regras aqui descritas.
+          Bem-vindo ao Previna. Estes Termos de Uso regulam a utilização do software de gestão financeira ("Sistema") oferecido pela NEWFEEL TEC, sob o CNPJ 43.186.726/0001-73 ("Nós", "Nossa", "Empresa"). Ao criar uma conta e utilizar o Sistema, você ("Usuário", "Cliente") concorda expressamente com todas as regras aqui descritas.
         </p>
 
         <h2>1. Objeto</h2>
@@ -40,9 +40,9 @@ export default function Terms() {
           <li><strong>Segurança da Conta:</strong> O Usuário é responsável por manter a confidencialidade de suas credenciais de acesso (e-mail e senha) e pelas ações realizadas por colaboradores convidados para o seu ambiente.</li>
         </ul>
 
-        <h2>3. Isenção de Responsabilidade</h2>
+        <h2>3. Isenção de Responsabilidade e Ausência de Garantia de Resultados</h2>
         <p>
-          O Previna atua exclusivamente como uma ferramenta de registro e organização de dados. Nós <strong>não</strong> prestamos serviços de contabilidade, auditoria ou consultoria financeira. Decisões de negócios tomadas com base nos relatórios gerados pelo Sistema são de inteira responsabilidade do Usuário.
+          O Previna atua exclusivamente como uma plataforma de registro de lançamentos e cálculo de métricas financeiras. Nós <strong>não</strong> entregamos, prometemos ou garantimos quaisquer resultados financeiros, lucros, melhorias de performance ou sucesso empresarial. O Sistema é uma ferramenta de meio para organização de dados inseridos pelo próprio Usuário, e <strong>não</strong> presta serviços de contabilidade, auditoria, assessoria jurídica ou consultoria financeira. Qualquer decisão de negócios ou financeira tomada com base nas métricas e relatórios gerados pelo Sistema é de responsabilidade única e exclusiva do Usuário.
         </p>
         <p>
           Embora nos esforcemos para manter o Sistema operando 24/7, não garantimos a disponibilidade ininterrupta do serviço, podendo ocorrer paradas para manutenção programada ou falhas de provedores de infraestrutura (nuvem). Não nos responsabilizamos por perdas de lucro cessante decorrentes de indisponibilidade temporária.
@@ -56,6 +56,9 @@ export default function Terms() {
         <h2>5. Pagamentos e Assinaturas</h2>
         <p>
           Os valores dos planos, periodicidade e métodos de pagamento estão descritos na plataforma e na página de contratação. O processamento dos pagamentos é realizado por empresas terceiras (gateways de pagamento), sendo o Usuário submetido também aos termos destas intermediadoras.
+        </p>
+        <p>
+          Caso o plano contratado inclua um período de testes gratuito (Free Trial), a cobrança recorrente será iniciada automaticamente após o término do referido período, a menos que o Usuário solicite o cancelamento da assinatura através da plataforma antes do encerramento do prazo de testes.
         </p>
 
         <h2>6. Cancelamento e Encerramento</h2>

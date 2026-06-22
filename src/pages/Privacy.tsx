@@ -25,7 +25,7 @@ export default function Privacy() {
         <p><strong>Última atualização:</strong> 16 de Junho de 2026</p>
 
         <p>
-          A Previna ("Nós") valoriza a sua privacidade. Esta Política de Privacidade descreve como coletamos, usamos, armazenamos e compartilhamos os seus dados pessoais e empresariais, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).
+          A NEWFEEL TEC, sob o CNPJ 43.186.726/0001-73 ("Nós"), proprietária do Previna, valoriza a sua privacidade. Esta Política de Privacidade descreve como coletamos, usamos, armazenamos e compartilhamos os seus dados pessoais e empresariais, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).
         </p>
 
         <h2>1. Dados que Coletamos</h2>

@@ -179,14 +179,14 @@ export const Header: React.FC = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => {
+              {/* <DropdownMenuItem onClick={() => {
                 setWhatsappNumber(userProfile?.whatsappNumber || '');
                 setIsProfileOpen(true);
               }}>
                 <User className="mr-2 h-4 w-4" />
                 Meu Perfil
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator /> */}
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
@@ -196,8 +196,8 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Profile Dialog */}
-      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+      {/* Profile Dialog (Commented out because WhatsApp IA is not ready to sell yet) */}
+      {/* <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Meu Perfil</DialogTitle>
@@ -247,7 +247,7 @@ export const Header: React.FC = () => {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Add Client Dialog */}
       <Dialog open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
