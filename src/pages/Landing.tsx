@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Users,
   TrendingUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Upload
 } from 'lucide-react';
 
 // Mapeamento de detalhes visuais e de exibição dos planos
@@ -37,6 +38,7 @@ const planDisplayMetadata: Record<string, { description: string, features: { tex
     features: [
       { text: "1 Usuário (Dono)", included: true },
       { text: "Fluxo de caixa básico", included: true },
+      { text: "Importação de extratos (OFX/CSV)", included: true },
       { text: "Relatórios de receitas e despesas", included: true },
       { text: "Sem colaboradores", included: true },
       { text: "Suporte por e-mail", included: true },
@@ -52,6 +54,7 @@ const planDisplayMetadata: Record<string, { description: string, features: { tex
     description: "Perfeito para pequenas empresas com equipes em crescimento e fluxo constante.",
     features: [
       { text: "Até 1 Colaborador", included: true },
+      { text: "Importação de extratos (OFX/CSV)", included: true },
       { text: "Controle de Múltiplas Empresas", included: true },
       { text: "Gestão avançada de comissões", included: true },
       { text: "Exportação de relatórios em CSV", included: true },
@@ -66,6 +69,7 @@ const planDisplayMetadata: Record<string, { description: string, features: { tex
     description: "Para empresas que necessitam de automação robusta e recursos sem limites.",
     features: [
       { text: "Até 10 Colaboradores", included: true },
+      { text: "Importação de extratos (OFX/CSV)", included: true },
       { text: "Controle de Múltiplas Empresas", included: true },
       { text: "Gestão avançada de comissões", included: true },
       { text: "Exportação de relatórios em CSV", included: true },
@@ -398,7 +402,7 @@ export default function Landing() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
               <div className="bg-card p-8 rounded-2xl shadow-sm border border-border/80 transition-all hover:shadow-md hover:border-primary/20 group">
                 <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
                   <BarChart3 className="h-7 w-7" />
@@ -406,6 +410,16 @@ export default function Landing() {
                 <h3 className="text-xl font-bold mb-3">Fluxo de Caixa Simples</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   Gerencie lançamentos recorrentes, visualize saldos futuros e filtre receitas e despesas por categorias e formas de pagamento em tempo real.
+                </p>
+              </div>
+
+              <div className="bg-card p-8 rounded-2xl shadow-sm border border-border/80 transition-all hover:shadow-md hover:border-primary/20 group">
+                <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+                  <Upload className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Importação de Extrato</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Suba arquivos de extratos bancários nos formatos OFX e CSV diretamente no sistema para agilizar e facilitar seus lançamentos diários.
                 </p>
               </div>
 
