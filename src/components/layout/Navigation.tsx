@@ -86,27 +86,30 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
   return (
     <div className="flex flex-col">
       {expirationAlert && !isAdminView && (
-        <Alert 
-          variant={expirationAlert.variant} 
+        <div
           className={cn(
-            "rounded-none border-x-0 border-t-0 text-center flex items-center justify-center py-2",
-            expirationAlert.type === 'warning' ? "bg-amber-50 text-amber-900 border-amber-200" : ""
+            "border-b px-4 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-center gap-1 sm:gap-3",
+            expirationAlert.type === 'warning'
+              ? "bg-amber-50 border-amber-200 text-amber-900"
+              : "bg-destructive/10 border-destructive/30 text-destructive"
           )}
         >
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <AlertTitle className="mr-2 mb-0 inline-block font-semibold">{expirationAlert.title}:</AlertTitle>
-          <AlertDescription className="inline-block mr-4">
-            {expirationAlert.message}
-          </AlertDescription>
-          <Button 
-            variant={expirationAlert.type === 'warning' ? "outline" : "default"} 
-            size="sm" 
-            className="h-7 text-xs"
+          <div className="flex items-start sm:items-center gap-1.5 min-w-0">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 sm:mt-0" />
+            <p className="text-xs leading-snug">
+              <span className="font-semibold">{expirationAlert.title}:</span>{" "}
+              {expirationAlert.message}
+            </p>
+          </div>
+          <Button
+            variant={expirationAlert.type === 'warning' ? "outline" : "default"}
+            size="sm"
+            className="h-6 text-xs px-3 self-start sm:self-auto shrink-0"
             onClick={() => handleNavClick(navItems.find(i => i.id === 'settings')!)}
           >
             Renovar Agora
           </Button>
-        </Alert>
+        </div>
       )}
       <nav className="border-b border-border bg-card">
         <div className="container px-4 sm:px-6">

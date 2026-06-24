@@ -34,6 +34,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -78,7 +84,8 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
-  Upload
+  Upload,
+  MoreHorizontal
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -142,6 +149,35 @@ export const Transactions: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
+  const lastScrollY = React.useRef(0);
+  React.useEffect(() => {
+    if (isDialogOpen) {
+      const scrollY = window.scrollY;
+      lastScrollY.current = scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      const scrollY = lastScrollY.current;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      if (scrollY > 0) {
+        window.scrollTo(0, scrollY);
+        lastScrollY.current = 0;
+      }
+    }
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, [isDialogOpen]);
   
   // Filter states
   const now = new Date();
@@ -470,7 +506,7 @@ export const Transactions: React.FC = () => {
           <h2 className="page-title">{t.transactionsTitle}</h2>
           <p className="page-subtitle">{t.transactionsSubtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button
@@ -492,33 +528,80 @@ export const Transactions: React.FC = () => {
               <span className="hidden sm:inline">{t.calendarView}</span>
             </Button>
           </div>
-          <Button variant="outline" onClick={handleExportPdf} className="gap-2">
-            <FileDown className="h-4 w-4" />
-            <span className="hidden sm:inline">Exportar PDF</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportCsv} 
-            className="gap-2 group"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Exportar CSV</span>
-            {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
-          </Button>
-          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Importar Extrato</span>
-          </Button>
-          <Button onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t.addTransaction}
+
+          {/* Mobile dropdown actions */}
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreHorizontal className="h-4 w-4" />
+                  Ações
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleExportPdf} className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                  {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500 ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importar Extrato
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop buttons */}
+          <div className="hidden md:flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPdf} className="gap-2">
+              <FileDown className="h-4 w-4" />
+              <span>Exportar PDF</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleExportCsv} 
+              className="gap-2 group"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exportar CSV</span>
+              {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
+            </Button>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              <span>Importar Extrato</span>
+            </Button>
+          </div>
+
+          <Button onClick={handleOpenCreate} className="px-3 sm:px-4">
+            <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">{t.addTransaction}</span>
+            <span className="inline sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
 
       {/* Filters */}
       <div className="finance-card p-4">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex items-center justify-between md:hidden mb-4">
+          <span className="text-sm font-semibold">Filtros</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+          >
+            {showMobileFilters ? "Ocultar Filtros" : "Exibir Filtros"}
+          </Button>
+        </div>
+
+        <div className={cn(
+          "grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-end gap-4",
+          !showMobileFilters && "hidden md:flex"
+        )}>
           {/* Date Range */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="space-y-1">
@@ -721,127 +804,229 @@ export const Transactions: React.FC = () => {
 
       {/* List View */}
       {viewMode === 'list' && (
-        <div className="finance-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">{t.date}</TableHead>
-                <TableHead>{t.description}</TableHead>
-                <TableHead>{t.reference}</TableHead>
-                <TableHead>{t.category}</TableHead>
-                {userSettings.enablePaymentMethods && (
-                  <TableHead>{t.paymentMethod}</TableHead>
-                )}
-                {userSettings.enableCommission && (
-                  <>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead>Comissão</TableHead>
-                  </>
-                )}
-                <TableHead className="text-right">{t.amount}</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedTransactions.length === 0 ? (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block finance-card overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                    {t.noTransactions}
-                  </TableCell>
+                  <TableHead className="w-[100px]">{t.date}</TableHead>
+                  <TableHead>{t.description}</TableHead>
+                  <TableHead>{t.reference}</TableHead>
+                  <TableHead>{t.category}</TableHead>
+                  {userSettings.enablePaymentMethods && (
+                    <TableHead>{t.paymentMethod}</TableHead>
+                  )}
+                  {userSettings.enableCommission && (
+                    <>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead>Comissão</TableHead>
+                    </>
+                  )}
+                  <TableHead className="text-right">{t.amount}</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
                 </TableRow>
-              ) : (
-                sortedTransactions.map((transaction) => {
-                  const category = getCategoryById(transaction.categoryId);
-                  const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
-                  return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        {formatDate(transaction.date)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={cn(
-                              'p-1.5 rounded-full',
-                              transaction.type === 'income'
-                                ? 'bg-income-muted text-income'
-                                : 'bg-expense-muted text-expense'
-                            )}
-                          >
-                            {transaction.type === 'income' ? (
-                              <ArrowUpRight className="h-3 w-3" />
-                            ) : (
-                              <ArrowDownRight className="h-3 w-3" />
-                            )}
-                          </div>
-                          <span className="font-medium">{transaction.description}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {transaction.reference || '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {category?.name || '-'}
-                      </TableCell>
-                      {userSettings.enablePaymentMethods && (
-                        <TableCell>
-                          {transaction.type === 'income' && transaction.paymentMethod ? (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              {paymentMethodIcons[transaction.paymentMethod]}
-                              <span className="text-sm">{t[transaction.paymentMethod]}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+              </TableHeader>
+              <TableBody>
+                {sortedTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                      {t.noTransactions}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedTransactions.map((transaction) => {
+                    const category = getCategoryById(transaction.categoryId);
+                    const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
+                    return (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {formatDate(transaction.date)}
                         </TableCell>
-                      )}
-                      {userSettings.enableCommission && (
-                        <>
-                          <TableCell className="text-muted-foreground">{collaborator?.name || '-'}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={cn(
+                                'p-1.5 rounded-full',
+                                transaction.type === 'income'
+                                  ? 'bg-income-muted text-income'
+                                  : 'bg-expense-muted text-expense'
+                              )}
+                            >
+                              {transaction.type === 'income' ? (
+                                <ArrowUpRight className="h-3 w-3" />
+                              ) : (
+                                <ArrowDownRight className="h-3 w-3" />
+                              )}
+                            </div>
+                            <span className="font-medium">{transaction.description}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {transaction.reference || '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {category?.name || '-'}
+                        </TableCell>
+                        {userSettings.enablePaymentMethods && (
+                          <TableCell>
+                            {transaction.type === 'income' && transaction.paymentMethod ? (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                {paymentMethodIcons[transaction.paymentMethod]}
+                                <span className="text-sm">{t[transaction.paymentMethod]}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
-                        </>
-                      )}
-                      <TableCell
+                        )}
+                        {userSettings.enableCommission && (
+                          <>
+                            <TableCell className="text-muted-foreground">{collaborator?.name || '-'}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell
+                          className={cn(
+                            'text-right font-semibold money-font',
+                            transaction.type === 'income' ? 'money-positive' : 'money-negative'
+                          )}
+                        >
+                          {transaction.type === 'income' ? '+' : '-'}
+                          {formatCurrency(transaction.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEdit(transaction)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletingTransaction(transaction);
+                                setIsDeleteDialogOpenState(true);
+                              }}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Cards View */}
+          <div className="block md:hidden space-y-4">
+            {sortedTransactions.length === 0 ? (
+              <div className="finance-card p-8 text-center text-muted-foreground">
+                {t.noTransactions}
+              </div>
+            ) : (
+              sortedTransactions.map((transaction) => {
+                const category = getCategoryById(transaction.categoryId);
+                const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
+                return (
+                  <div key={transaction.id} className="finance-card p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          className={cn(
+                            'p-2 rounded-full shrink-0',
+                            transaction.type === 'income'
+                              ? 'bg-income-muted text-income'
+                              : 'bg-expense-muted text-expense'
+                          )}
+                        >
+                          {transaction.type === 'income' ? (
+                            <ArrowUpRight className="h-4 w-4" />
+                          ) : (
+                            <ArrowDownRight className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-sm block truncate">{transaction.description}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{formatDate(transaction.date)}</span>
+                        </div>
+                      </div>
+                      <span
                         className={cn(
-                          'text-right font-semibold money-font',
+                          'font-semibold money-font text-sm shrink-0',
                           transaction.type === 'income' ? 'money-positive' : 'money-negative'
                         )}
                       >
                         {transaction.type === 'income' ? '+' : '-'}
                         {formatCurrency(transaction.amount)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEdit(transaction)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setDeletingTransaction(transaction);
-                              setIsDeleteDialogOpenState(true);
-                            }}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t text-muted-foreground">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Categoria</span>
+                        <span className="font-medium text-foreground">{category?.name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Referência</span>
+                        <span className="font-medium text-foreground">{transaction.reference || '-'}</span>
+                      </div>
+                      {userSettings.enablePaymentMethods && transaction.type === 'income' && transaction.paymentMethod && (
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Forma de Pagamento</span>
+                          <div className="flex items-center gap-1 mt-0.5 text-foreground">
+                            {paymentMethodIcons[transaction.paymentMethod]}
+                            <span>{t[transaction.paymentMethod]}</span>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                      )}
+                      {userSettings.enableCommission && collaborator && (
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Comissão ({collaborator.name})</span>
+                          <span className="text-foreground">{transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(transaction)}
+                        className="h-8 gap-1"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDeletingTransaction(transaction);
+                          setIsDeleteDialogOpenState(true);
+                        }}
+                        className="h-8 gap-1 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
       )}
 
       {/* Calendar View */}
@@ -977,8 +1162,8 @@ export const Transactions: React.FC = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl w-[95vw]">
-          <DialogHeader>
+        <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-none !top-0 !left-0 !right-0 !bottom-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-4xl sm:h-[95vh] sm:max-h-[95vh] sm:rounded-lg rounded-none !flex !flex-col !p-0 !gap-0 overflow-hidden">
+          <DialogHeader className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:pt-6 pb-2 border-b">
             <DialogTitle>
               {editingTransaction ? t.editTransaction : t.addTransaction}
             </DialogTitle>
@@ -990,9 +1175,9 @@ export const Transactions: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* Type and Category */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className={cn(errors.type && "text-destructive")}>{t.type}</Label>
                 <Select
@@ -1041,8 +1226,8 @@ export const Transactions: React.FC = () => {
             <div className={cn(
               "grid gap-4",
               userSettings.enablePaymentMethods && formData.type === 'income' 
-                ? "grid-cols-3" 
-                : "grid-cols-2"
+                ? "grid-cols-1 sm:grid-cols-3" 
+                : "grid-cols-1 sm:grid-cols-2"
             )}>
               <div className="space-y-2">
                 <Label htmlFor="amount" className={cn(errors.amount && "text-destructive")}>{t.amount}</Label>
@@ -1082,51 +1267,53 @@ export const Transactions: React.FC = () => {
                 </Popover>
                 {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
               </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  {t.paymentMethod}
-                  <UpgradeBadge />
-                </Label>
-                <Select
-                  value={formData.paymentMethod}
-                  onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
-                  disabled={!hasFeature('payment_methods')}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : t.paymentMethod} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4" />
-                        {t.cash}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="card">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        {t.card}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pix">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="h-4 w-4" />
-                        {t.pix}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {t.pending}
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {userSettings.enablePaymentMethods && formData.type === 'income' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    {t.paymentMethod}
+                    <UpgradeBadge />
+                  </Label>
+                  <Select
+                    value={formData.paymentMethod}
+                    onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
+                    disabled={!hasFeature('payment_methods')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : t.paymentMethod} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-4 w-4" />
+                          {t.cash}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="card">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          {t.card}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="pix">
+                        <div className="flex items-center gap-2">
+                          <Smartphone className="h-4 w-4" />
+                          {t.pix}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="pending">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {t.pending}
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {/* Description and Reference */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="description" className={cn(errors.description && "text-destructive")}>{t.description}</Label>
                 <SearchableSelect
@@ -1178,7 +1365,7 @@ export const Transactions: React.FC = () => {
                     <RadioGroup 
                       value={formData.recurrenceType} 
                       onValueChange={(val) => updateFormField('recurrenceType', val as 'count' | 'until')}
-                      className="flex gap-4"
+                      className="flex flex-col sm:flex-row gap-4"
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="count" id="type-count" />
@@ -1191,7 +1378,7 @@ export const Transactions: React.FC = () => {
                     </RadioGroup>
 
                     {formData.recurrenceType === 'count' ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm">Repetir por</span>
                         <Input 
                           type="number" 
@@ -1204,7 +1391,7 @@ export const Transactions: React.FC = () => {
                         <span className="text-sm">meses (além do atual)</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm whitespace-nowrap">Repetir até</span>
                         <Popover>
                           <PopoverTrigger asChild>
@@ -1212,7 +1399,7 @@ export const Transactions: React.FC = () => {
                               variant="outline"
                               size="sm"
                               className={cn(
-                                "w-full justify-start text-left font-normal",
+                                "w-[160px] justify-start text-left font-normal",
                                 !formData.repeatUntil && "text-muted-foreground"
                               )}
                             >
@@ -1256,7 +1443,7 @@ export const Transactions: React.FC = () => {
             </div>
 
             {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     Colaborador
@@ -1291,7 +1478,7 @@ export const Transactions: React.FC = () => {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-3 border-t bg-muted/30">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               {t.cancel}
             </Button>

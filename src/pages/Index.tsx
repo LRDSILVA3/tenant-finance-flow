@@ -78,10 +78,10 @@ const Index: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-background">
       <Header />
       <Navigation currentView={currentView} onViewChange={setCurrentView} />
-      <main className="container px-4 sm:px-6 py-6">{renderView()}</main>
+      <main className="flex-1 overflow-y-auto container px-4 sm:px-6 py-6">{renderView()}</main>
     </div>
   );
 };
