@@ -10,9 +10,11 @@ import { Settings } from '@/components/settings/Settings';
 import { Transactions } from '@/components/transactions/Transactions';
 import { Reports } from '@/components/reports/Reports';
 import { Inventory } from '@/components/inventory/Inventory';
+import { Customers } from '@/components/customers/Customers';
+import { Schedule } from '@/components/schedule/Schedule';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'inventory' | 'reports' | 'settings';
+type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +29,7 @@ const Index: React.FC = () => {
     t 
   } = useFinance();
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [scheduleCustomerId, setScheduleCustomerId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!authLoading && !loadingClients) {
@@ -72,6 +75,21 @@ const Index: React.FC = () => {
         return <Settings />;
       case 'transactions':
         return <Transactions />;
+      case 'customers':
+        return (
+          <Customers
+            onNavigateToSchedule={(customerId) => {
+              setScheduleCustomerId(customerId);
+              setCurrentView('schedule');
+            }}
+          />
+        );
+      case 'schedule':
+        return (
+          <Schedule
+            initialCustomerId={scheduleCustomerId}
+          />
+        );
       default:
         return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
     }

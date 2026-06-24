@@ -4,11 +4,11 @@ import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, ArrowRightLeft, BarChart3, Package, Settings, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, BarChart3, Package, Settings, ShieldCheck, AlertTriangle, Users, CalendarDays } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
-type View = 'dashboard' | 'transactions' | 'inventory' | 'reports' | 'settings' | 'admin';
+type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin';
 
 interface NavigationProps {
   currentView?: View;
@@ -25,6 +25,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
   const navItems: { id: View; label: string; icon: React.ReactNode; isPage?: boolean }[] = [
     { id: 'dashboard', label: t.dashboard, icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'transactions', label: t.transactions, icon: <ArrowRightLeft className="h-4 w-4" /> },
+    { id: 'customers', label: 'Clientes', icon: <Users className="h-4 w-4" /> },
+    { id: 'schedule', label: 'Agenda', icon: <CalendarDays className="h-4 w-4" /> },
     { id: 'inventory', label: 'Estoque', icon: <Package className="h-4 w-4" /> },
     { id: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
     { id: 'settings', label: t.settings, icon: <Settings className="h-4 w-4" /> },

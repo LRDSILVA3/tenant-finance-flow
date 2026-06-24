@@ -146,3 +146,54 @@ export interface FinancialSummary {
   totalExpense: number;
   balance: number;
 }
+
+// ─── Clientes (CRM Leve) ──────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string;
+  clientId: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  document?: string; // CPF ou CNPJ
+  notes?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Agenda de Serviços ───────────────────────────────────────────────────────
+
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+export interface ServiceType {
+  id: string;
+  clientId: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface Appointment {
+  id: string;
+  clientId: string;
+  customerId?: string;
+  serviceTypeId?: string;
+  collaboratorId?: string;
+  title: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  price: number;
+  status: AppointmentStatus;
+  notes?: string;
+  transactionId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
