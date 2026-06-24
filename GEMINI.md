@@ -1,48 +1,33 @@
-# GEMINI.md
+# GEMINI.md - Tenant Finance Flow
 
-## Project Overview
+## 📋 Project Status & Tasks
+- **Current Board**: [.gemini/tasks/BOARD.md](.gemini/tasks/BOARD.md)
+- **Architecture Context**: [.gemini/context/ARCHITECTURE.md](.gemini/context/ARCHITECTURE.md)
 
-This is a financial management application built with React, Vite, TypeScript, and Tailwind CSS. It uses Supabase for the backend and provides features for managing clients, categories, and transactions. The application is designed to be a single-page application with routing handled by `react-router-dom`. The UI is built using `shadcn-ui` and the application state is managed through a combination of React's Context API and `@tanstack/react-query`.
+## 🛠️ Engineering Rules & Mandates
+- **Core Rules**: [.gemini/rules/ENGINEERING.md](.gemini/rules/ENGINEERING.md)
+- **Tech Stack**: React, Vite, TypeScript, Tailwind CSS, Supabase.
 
-## Building and Running
+## ⚙️ Development Workflows
 
-### Prerequisites
+### 1. Research & Strategy
+- Search the codebase using `grep_search` and `glob`.
+- Check `ENGINEERING.md` for style guides before proposing changes.
 
-*   Node.js and npm (or a compatible package manager)
+### 2. Execution & Validation
+- Implement surgical changes.
+- Always add/update tests (if applicable).
+- Run `npm run lint` and `npm run test` before committing.
 
-### Development
+### 3. Reporting
+- Update `BOARD.md` after completing a task.
+- Document architectural shifts in `ARCHITECTURE.md`.
 
-To run the application in development mode, use the following command:
+## 📂 Structure Overview
+- `.gemini/tasks/`: Granular task tracking.
+- `.gemini/rules/`: Engineering and security mandates.
+- `.gemini/context/`: Decisions and snapshots.
+- `.gemini/skills/`: Project-specific AI skills.
 
-```bash
-npm run dev
-```
-
-This will start a development server on `http://localhost:8080`.
-
-### Building
-
-To create a production build of the application, use the following command:
-
-```bash
-npm run build
-```
-
-This will create a `dist` directory with the optimized and minified application code.
-
-### Testing
-
-To run the tests, use the following command:
-
-```bash
-npm run test
-```
-
-## Development Conventions
-
-*   **Styling**: The project uses Tailwind CSS for styling, with `shadcn-ui` for UI components.
-*   **State Management**: Global application state is managed using React's Context API, specifically in the `FinanceContext`. Server state and caching are handled by `@tanstack/react-query`.
-*   **Routing**: The application uses `react-router-dom` for client-side routing.
-*   **Linting**: The project uses ESLint for code linting. To run the linter, use `npm run lint`.
-*   **Backend**: The application uses Supabase for its backend, including authentication and database services. The Supabase client is configured in `src/integrations/supabase/client.ts`.
-*   **Path Aliases**: The project uses the `@` alias for the `src` directory, which is configured in `vite.config.ts`.
+---
+*This file is a foundational mandate for Gemini CLI and takes precedence over general defaults.*

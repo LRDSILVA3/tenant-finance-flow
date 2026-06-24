@@ -27,7 +27,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Building2, Globe, Plus, LogOut, User, Loader2 } from 'lucide-react';
+import { Building2, Globe, Plus, LogOut, User, Loader2, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const languageLabels: Record<Language, string> = {
   pt: 'Português',
@@ -51,13 +53,22 @@ export const Header: React.FC = () => {
     addClient,
     loadingClients,
     signOut,
+    updateProfile,
+    userProfile,
+    userSettings,
+    currentPlan,
     t 
   } = useFinance();
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientTaxId, setNewClientTaxId] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState(userProfile?.whatsappNumber || '');
   const [addingClient, setAddingClient] = useState(false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+
+  const canUseIA = userSettings.enableWhatsappIA || userProfile?.isAdmin;
 
   const handleAddClient = async () => {
     if (!newClientName.trim()) return;
@@ -73,16 +84,31 @@ export const Header: React.FC = () => {
     setIsAddClientOpen(false);
   };
 
+  const handleUpdateProfile = async () => {
+    if (!canUseIA) return;
+    setUpdatingProfile(true);
+    // Remove tudo que não for número antes de salvar
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    await updateProfile({ whatsappNumber: cleanNumber || undefined });
+    setUpdatingProfile(false);
+    setIsProfileOpen(false);
+  };
+
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 4) return `+${numbers.slice(0, 2)} (${numbers.slice(2)}`;
+    if (numbers.length <= 9) return `+${numbers.slice(0, 2)} (${numbers.slice(2, 4)}) ${numbers.slice(4)}`;
+    return `+${numbers.slice(0, 2)} (${numbers.slice(2, 4)}) ${numbers.slice(4, 9)}-${numbers.slice(9, 13)}`;
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-16 items-center justify-between px-4 sm:px-6">
+      <div className="container flex h-24 items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-20 w-auto min-w-[80px] items-center justify-center rounded-lg overflow-hidden">
+            <img src="/logo.png" alt="Previna Logo" className="h-full w-auto object-contain" />
           </div>
-          <h1 className="text-lg font-semibold text-foreground hidden sm:block">
-            {t.appName}
-          </h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -153,7 +179,14 @@ export const Header: React.FC = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuItem onClick={() => {
+                setWhatsappNumber(userProfile?.whatsappNumber || '');
+                setIsProfileOpen(true);
+              }}>
+                <User className="mr-2 h-4 w-4" />
+                Meu Perfil
+              </DropdownMenuItem>
+              <DropdownMenuSeparator /> */}
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
@@ -162,6 +195,59 @@ export const Header: React.FC = () => {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Profile Dialog (Commented out because WhatsApp IA is not ready to sell yet) */}
+      {/* <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Meu Perfil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className={cn("space-y-2", !canUseIA && "opacity-60")}>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="whatsapp">Número de WhatsApp (IA)</Label>
+                {!canUseIA && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 gap-1">
+                    <Sparkles className="h-3 w-3" /> Requer Plano Avançado
+                  </Badge>
+                )}
+              </div>
+              <Input
+                id="whatsapp"
+                value={formatPhoneNumber(whatsappNumber)}
+                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="+55 (11) 99999-9999"
+                disabled={!canUseIA}
+              />
+              <p className="text-xs text-muted-foreground">
+                Informe seu número com DDI e DDD (somente números) para testar a integração com a IA via WhatsApp.
+              </p>
+              {!canUseIA && (
+                <div className="mt-2 p-3 bg-amber-50 rounded border border-amber-100">
+                  <p className="text-xs text-amber-700 font-medium">
+                    Funcionalidade exclusiva do plano Avançado. Faça um upgrade para habilitar o lançamento automático via WhatsApp.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsProfileOpen(false)}>
+              {t.cancel}
+            </Button>
+            <Button onClick={handleUpdateProfile} disabled={updatingProfile || !canUseIA}>
+              {updatingProfile ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                t.save
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
 
       {/* Add Client Dialog */}
       <Dialog open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
@@ -184,7 +270,16 @@ export const Header: React.FC = () => {
               <Input
                 id="client-taxid"
                 value={newClientTaxId}
-                onChange={(e) => setNewClientTaxId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  let masked = val;
+                  if (val.length <= 11) {
+                    masked = val.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+                  } else {
+                    masked = val.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+                  }
+                  setNewClientTaxId(masked.substring(0, 18));
+                }}
                 placeholder="00.000.000/0001-00"
               />
             </div>

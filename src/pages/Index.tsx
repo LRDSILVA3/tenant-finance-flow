@@ -8,20 +8,40 @@ import { Navigation } from '@/components/layout/Navigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Settings } from '@/components/settings/Settings';
 import { Transactions } from '@/components/transactions/Transactions';
+import { Reports } from '@/components/reports/Reports';
+import { Inventory } from '@/components/inventory/Inventory';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'settings';
+type View = 'dashboard' | 'transactions' | 'inventory' | 'reports' | 'settings';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, authLoading, clients, t } = useFinance();
+  const { 
+    isAuthenticated, 
+    authLoading, 
+    userProfile,
+    clients, 
+    loadingClients,
+    currentSubscription, 
+    loadingSubscription, 
+    t 
+  } = useFinance();
   const [currentView, setCurrentView] = useState<View>('dashboard');
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth', { replace: true });
+    if (!authLoading && !loadingClients) {
+      if (!isAuthenticated) {
+        navigate('/auth', { replace: true });
+      } else if (clients.length === 0 && !userProfile?.isAdmin) {
+        navigate('/onboarding', { replace: true });
+      } else if (!loadingSubscription && !currentSubscription && !userProfile?.isAdmin) {
+        // If they have a client but no active subscription/plan
+        // Redirect back to onboarding to complete the process
+        // Admin doesn't need a plan
+        navigate('/onboarding', { replace: true });
+      }
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, authLoading, loadingClients, userProfile, clients, currentSubscription, loadingSubscription, navigate]);
 
   if (authLoading) {
     return (
@@ -39,25 +59,15 @@ const Index: React.FC = () => {
   }
 
   const renderView = () => {
-    // Show welcome message if no clients exist
-    if (clients.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
-          <div className="text-center max-w-md">
-            <h2 className="text-2xl font-bold text-foreground mb-2">
-              Bem-vindo ao {t.appName}!
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Para começar, adicione sua primeira empresa clicando no botão "+" no topo da página.
-            </p>
-          </div>
-        </div>
-      );
-    }
+    if (clients.length === 0) return null;
 
     switch (currentView) {
       case 'dashboard':
         return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
+      case 'inventory':
+        return <Inventory />;
+      case 'reports':
+        return <Reports />;
       case 'settings':
         return <Settings />;
       case 'transactions':
