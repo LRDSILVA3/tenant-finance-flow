@@ -12,11 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Banknote, CreditCard, Smartphone, Clock, Lock } from 'lucide-react';
 import { CategoryBreakdown } from './CategoryBreakdown';
+import { TodayScheduleWidget } from './TodayScheduleWidget';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   onNavigateToTransactions: () => void;
+  onNavigateToSchedule?: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -33,7 +35,7 @@ const paymentMethodConfig: Record<PaymentMethod, { icon: React.ReactNode; color:
   pending: { icon: <Clock className="h-4 w-4" />, color: 'text-amber-600' },
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, onNavigateToSchedule }) => {
   const { t, currentClient, transactions, language, userSettings } = useFinance();
   const { hasFeature } = useFeatureAccess();
   const [isDailyView, setIsDailyView] = useState(false);
@@ -256,11 +258,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
         </div>
       )}
 
-      {/* Recent Transactions */}
-      <div className="grid grid-cols-1 gap-6">
+      {/* Recent Transactions + Agenda do Dia */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RecentTransactions
           transactions={transactions}
           onViewAll={onNavigateToTransactions}
+        />
+        <TodayScheduleWidget
+          onNavigateToSchedule={onNavigateToSchedule ?? (() => {})}
         />
       </div>
     </div>

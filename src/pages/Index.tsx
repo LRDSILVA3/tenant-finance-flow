@@ -66,7 +66,12 @@ const Index: React.FC = () => {
 
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
+        return (
+          <Dashboard
+            onNavigateToTransactions={() => setCurrentView('transactions')}
+            onNavigateToSchedule={() => setCurrentView('schedule')}
+          />
+        );
       case 'inventory':
         return <Inventory />;
       case 'reports':
