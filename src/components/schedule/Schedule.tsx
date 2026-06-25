@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useTransactions } from '@/contexts/TransactionContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Customer, Appointment, AppointmentStatus, ServiceType } from '@/types/finance';
+import { Customer, Appointment, AppointmentStatus, ServiceType, PaymentMethod } from '@/types/finance';
 import { format, startOfDay, endOfDay, addDays, subDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -107,7 +109,9 @@ interface ScheduleProps {
 }
 
 export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
-  const { currentClient, collaborators } = useFinance();
+  const { currentClient, collaborators, categories, userSettings } = useFinance();
+  const { user } = useAuth();
+  const { loadTransactions } = useTransactions();
 
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -119,6 +123,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
+  const [isRevenueDialogOpen, setIsRevenueDialogOpen] = useState(false);
   const [isStOpen, setIsStOpen] = useState(false); // service type modal
 
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
@@ -129,6 +134,31 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
   const [stForm, setStForm] = useState(emptyServiceTypeForm);
   const [apptErrors, setApptErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  // Form de receita vinculada ao agendamento
+  const [revenueFormData, setRevenueFormData] = useState({
+    amount: 0,
+    description: '',
+    categoryId: '',
+    date: new Date(),
+    reference: '',
+    paymentMethod: '' as PaymentMethod | '',
+  });
+
+  // Busca de categoria padrão de receita
+  const defaultCategory = useMemo(() => {
+    if (!categories || categories.length === 0) return null;
+    const incomeSubcategories = categories.filter(c => c.type === 'income' && c.parentId !== null);
+    if (incomeSubcategories.length === 0) {
+      const incomeCategories = categories.filter(c => c.type === 'income');
+      return incomeCategories[0] || categories[0] || null;
+    }
+    const serviceCat = incomeSubcategories.find(c => 
+      c.name.toLowerCase().includes('serviço') || 
+      c.name.toLowerCase().includes('venda')
+    );
+    return serviceCat || incomeSubcategories[0];
+  }, [categories]);
 
   // History filters
   const [histSearch, setHistSearch] = useState('');
@@ -294,36 +324,13 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
     }
   };
 
-  const handleComplete = async (generateTransaction: boolean) => {
+  const handleCompleteWithoutRevenue = async () => {
     if (!selectedAppt || !currentClient) return;
     setSaving(true);
     try {
-      let transactionId: string | null = null;
-
-      if (generateTransaction) {
-        const customer = customers.find(c => c.id === selectedAppt.customerId);
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .insert({
-            client_id: currentClient.id,
-            type: 'income',
-            amount: selectedAppt.price,
-            description: `Serviço - ${selectedAppt.title}`,
-            reference: customer?.name ?? null,
-            date: format(new Date(), 'yyyy-MM-dd'),
-            category_id: null, // usuário poderá editar depois
-          })
-          .select('id')
-          .single();
-
-        if (txError) throw txError;
-        transactionId = txData.id;
-        toast({ title: 'Lançamento gerado!', description: `R$ ${selectedAppt.price.toFixed(2)} registrado nas receitas.` });
-      }
-
       const { error } = await supabase.from('appointments').update({
         status: 'completed',
-        transaction_id: transactionId,
+        transaction_id: null,
       }).eq('id', selectedAppt.id);
       if (error) throw error;
 
@@ -333,6 +340,99 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
       loadAll();
     } catch (err) {
       toast({ title: 'Erro ao concluir serviço', description: err instanceof Error ? err.message : '', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCompleteWithRevenue = () => {
+    if (!selectedAppt) return;
+    openRegisterRevenue(selectedAppt);
+  };
+
+  const openRegisterRevenue = (appt: Appointment) => {
+    setSelectedAppt(appt);
+    const customer = customers.find(c => c.id === appt.customerId);
+    
+    // Buscar categoria padrão
+    const incomeSubcategories = categories.filter(c => c.type === 'income' && c.parentId !== null);
+    let defaultCatId = '';
+    if (incomeSubcategories.length > 0) {
+      const serviceCat = incomeSubcategories.find(c => 
+        c.name.toLowerCase().includes('serviço') || 
+        c.name.toLowerCase().includes('venda')
+      );
+      defaultCatId = serviceCat ? serviceCat.id : incomeSubcategories[0].id;
+    }
+
+    setRevenueFormData({
+      amount: appt.price,
+      description: `Serviço - ${appt.title}`,
+      categoryId: defaultCatId,
+      date: new Date(appt.scheduledAt),
+      reference: customer?.name ?? '',
+      paymentMethod: '',
+    });
+    
+    setIsRevenueDialogOpen(true);
+  };
+
+  const handleSaveRevenueTransaction = async () => {
+    if (!selectedAppt || !currentClient || !user) return;
+    if (!revenueFormData.categoryId) {
+      toast({ title: 'Categoria obrigatória', description: 'Selecione uma categoria para a receita.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      // 1. Inserir transação
+      const { data: txData, error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          client_id: currentClient.id,
+          type: 'income',
+          amount: revenueFormData.amount,
+          description: revenueFormData.description.trim(),
+          reference: revenueFormData.reference.trim() || null,
+          date: format(revenueFormData.date, 'yyyy-MM-dd'),
+          category_id: revenueFormData.categoryId,
+          payment_method: revenueFormData.paymentMethod || null,
+        })
+        .select('id')
+        .single();
+
+      if (txError) throw txError;
+
+      // 2. Atualizar agendamento
+      const { error: apptError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'completed',
+          transaction_id: txData.id,
+        })
+        .eq('id', selectedAppt.id);
+
+      if (apptError) throw apptError;
+
+      // Recarregar os lançamentos locais no contexto de transações
+      await loadTransactions(currentClient.id);
+
+      toast({ 
+        title: 'Receita registrada!', 
+        description: `Serviço concluído e receita de R$ ${revenueFormData.amount.toFixed(2)} lançada com sucesso.` 
+      });
+      
+      setIsRevenueDialogOpen(false);
+      setIsCompleteOpen(false);
+      setSelectedAppt(null);
+      loadAll();
+    } catch (err) {
+      toast({ 
+        title: 'Erro ao registrar receita', 
+        description: err instanceof Error ? err.message : 'Erro desconhecido', 
+        variant: 'destructive' 
+      });
     } finally {
       setSaving(false);
     }
@@ -450,6 +550,16 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
             {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
               <Button variant="outline" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => handleStatusChange(appt, 'cancelled')}>
                 <XCircle className="h-3 w-3" /> Cancelar
+              </Button>
+            )}
+            {appt.status === 'completed' && !appt.transactionId && appt.price > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1 text-income hover:text-income border-income/40 hover:border-income"
+                onClick={() => openRegisterRevenue(appt)}
+              >
+                <DollarSign className="h-3 w-3" /> Registrar Receita
               </Button>
             )}
           </div>
@@ -852,12 +962,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
-            <Button variant="outline" onClick={() => handleComplete(false)} disabled={saving}>
+            <Button variant="outline" onClick={handleCompleteWithoutRevenue} disabled={saving}>
               Apenas concluir
             </Button>
             {selectedAppt && selectedAppt.price > 0 && (
-              <Button onClick={() => handleComplete(true)} disabled={saving} className="bg-income hover:bg-income/90">
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button onClick={handleCompleteWithRevenue} disabled={saving} className="bg-income hover:bg-income/90">
                 Concluir e registrar receita
               </Button>
             )}
@@ -919,6 +1028,126 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
             <Button variant="outline" onClick={() => setIsStOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveSt} disabled={saving}>
               {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Registrar Receita do Agendamento ──────────────────────────── */}
+      <Dialog open={isRevenueDialogOpen} onOpenChange={setIsRevenueDialogOpen}>
+        <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-none !top-0 !left-0 !right-0 !bottom-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-4xl sm:h-[95vh] sm:max-h-[95vh] sm:rounded-lg rounded-none !flex !flex-col !p-0 !gap-0 overflow-hidden">
+          <DialogHeader className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:pt-6 pb-2 border-b">
+            <DialogTitle>Registrar Receita</DialogTitle>
+            <DialogDescription>
+              Configure os detalhes do lançamento financeiro correspondente a este serviço.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {/* Valor */}
+            <div className="space-y-1.5">
+              <Label htmlFor="rev-amount">Valor (R$) *</Label>
+              <MoneyInput
+                id="rev-amount"
+                value={revenueFormData.amount}
+                onChange={(v) => setRevenueFormData(f => ({ ...f, amount: v }))}
+              />
+            </div>
+            
+            {/* Categoria */}
+            <div className="space-y-1.5">
+              <Label>Categoria *</Label>
+              <Select
+                value={revenueFormData.categoryId}
+                onValueChange={(v) => setRevenueFormData(f => ({ ...f, categoryId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories
+                    .filter(c => c.type === 'income' && c.parentId !== null)
+                    .map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.code} - {cat.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Forma de Pagamento */}
+            {userSettings.enablePaymentMethods && (
+              <div className="space-y-1.5">
+                <Label>Forma de Pagamento</Label>
+                <Select
+                  value={revenueFormData.paymentMethod}
+                  onValueChange={(v) => setRevenueFormData(f => ({ ...f, paymentMethod: v as PaymentMethod }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="card">Cartão</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Descrição */}
+            <div className="space-y-1.5">
+              <Label htmlFor="rev-desc">Descrição *</Label>
+              <Input
+                id="rev-desc"
+                value={revenueFormData.description}
+                onChange={(e) => setRevenueFormData(f => ({ ...f, description: e.target.value }))}
+                placeholder="Descrição do lançamento"
+              />
+            </div>
+
+            {/* Referência */}
+            <div className="space-y-1.5">
+              <Label htmlFor="rev-ref">Referência</Label>
+              <Input
+                id="rev-ref"
+                value={revenueFormData.reference}
+                onChange={(e) => setRevenueFormData(f => ({ ...f, reference: e.target.value }))}
+                placeholder="Ex: Nome do cliente"
+              />
+            </div>
+
+            {/* Data */}
+            <div className="space-y-1.5">
+              <Label>Data do Lançamento</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start gap-2 font-normal">
+                    <CalendarIcon className="h-4 w-4" />
+                    {format(revenueFormData.date, 'dd/MM/yyyy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={revenueFormData.date}
+                    onSelect={(d) => d && setRevenueFormData(f => ({ ...f, date: d }))}
+                    locale={ptBR}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-3 border-t bg-muted/30">
+            <Button variant="outline" onClick={() => { setIsRevenueDialogOpen(false); setSelectedAppt(null); }}>Cancelar</Button>
+            <Button 
+              onClick={handleSaveRevenueTransaction} 
+              disabled={saving || !revenueFormData.categoryId || !revenueFormData.description.trim() || revenueFormData.amount <= 0}
+              className="bg-income hover:bg-income/90"
+            >
+              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar Receita'}
             </Button>
           </DialogFooter>
         </DialogContent>
