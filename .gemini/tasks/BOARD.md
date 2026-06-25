@@ -29,6 +29,7 @@
 - [x] Create Dashboard widgets for "Expenses by Category".
 
 - [x] Fix 401 Unauthorized error in create-pagarme-subscription Edge Function (ES256 support).
+- [x] Fix revenue registration error on Schedule screen with interactive dialog, mobile/desktop layouts, and context state synchronization.
 
 ## 🟡 In Progress
 - [ ] Refine Gemini CLI Context and Rules.
