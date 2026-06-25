@@ -41,4 +41,6 @@
 - [ ] **Smart Budgets & Alerts**: Allow setting limits per category and trigger alerts when spending approaches the limit.
 - [ ] **Document Storage**: Allow attaching PDFs/Images (receipts) to transactions and exporting a ZIP for accountants.
 - [ ] Automated emails for successful/failed payments via Webhook.
+- [ ] **Schedule Alerts & Reminders**: Remind clients and collaborators about upcoming service appointments.
+- [ ] **Minimum Stock Alerts**: Visual/notification warnings when product inventory levels fall below the minimum threshold.
 
