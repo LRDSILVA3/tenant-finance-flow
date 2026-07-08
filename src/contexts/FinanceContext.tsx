@@ -51,7 +51,7 @@ interface FinanceContextType {
   currentSubscription: Subscription | null;
   currentPlan: Plan | null;
   loadingSubscription: boolean;
-  subscribeWithPagarme: (clientId: string, planId: string, cardToken: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>) => Promise<boolean>;
+  subscribeWithPagarme: (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod?: 'credit_card' | 'pix') => Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }>;
   cancelSubscription: (subscriptionId: string) => Promise<boolean>;
   changePlan: (clientId: string, planId: string) => Promise<void>;
   updatePlan: (planId: string, updates: Partial<Plan>) => Promise<void>;

@@ -18,6 +18,7 @@ serve(async (req) => {
       planName, 
       amount, 
       cardToken, 
+      paymentMethod = 'credit_card',
       customer 
     } = await req.json();
 
@@ -79,38 +80,38 @@ serve(async (req) => {
     const trialDays = trialMonths > 0 ? 7 : 0; // Trial de 7 dias fixos para os planos que oferecem degustação
 
     let pagarmeData;
+    let endpoint = "https://api.pagar.me/core/v5/subscriptions";
 
-    // --- MOCK/TEST MODE ---
-    if (cardToken.startsWith('card_token_mock_')) {
-      console.log(`Mock token detected, simulating success with ${trialDays} trial days...`);
-      pagarmeData = {
-        id: `sub_test_${Math.random().toString(36).substr(2, 9)}`,
-        status: trialDays > 0 ? 'trialing' : 'active',
-      };
-    } else {
-      // 1. Create Subscription in Pagar.me
-      const phoneDigits = customer.phone.replace(/\D/g, '');
-      const areaCode = phoneDigits.substring(0, 2);
-      const phoneNumber = phoneDigits.substring(2);
+    // 1. Prepare Customer and Address
+    const phoneDigits = customer.phone.replace(/\D/g, '');
+    const areaCode = phoneDigits.substring(0, 2);
+    const phoneNumber = phoneDigits.substring(2);
 
-      const customerAddress = customer.address || {
-        zipCode: "01001000",
-        street: "Endereço não informado",
-        number: "S/N",
-        city: "Sao Paulo",
-        state: "SP"
-      };
+    const customerAddress = customer.address || {
+      zipCode: "01001000",
+      street: "Endereço não informado",
+      number: "S/N",
+      city: "Sao Paulo",
+      state: "SP",
+    };
 
-      const pagarmeAddress = {
-        line_1: `${customerAddress.number},${customerAddress.street}${customerAddress.neighborhood ? ','+customerAddress.neighborhood : ''}`,
-        line_2: customerAddress.complement || '',
-        zip_code: customerAddress.zipCode.replace(/\D/g, ''),
-        city: customerAddress.city,
-        state: customerAddress.state,
-        country: "BR",
-      };
+    const pagarmeAddress = {
+      zip_code: customerAddress.zipCode.replace(/\D/g, ''),
+      street: customerAddress.street,
+      number: customerAddress.number,
+      complement: customerAddress.complement || '',
+      neighborhood: customerAddress.neighborhood || '',
+      city: customerAddress.city,
+      state: customerAddress.state,
+      country: "BR",
+    };
 
-      const body: Record<string, unknown> = {
+    // 2. Build Request Body based on Payment Method
+    let body: Record<string, unknown> = {};
+
+    if (paymentMethod === 'credit_card') {
+      endpoint = "https://api.pagar.me/core/v5/subscriptions";
+      body = {
         payment_method: "credit_card",
         card: {
           token: cardToken,
@@ -169,28 +170,66 @@ serve(async (req) => {
         startDate.setDate(startDate.getDate() + trialDays);
         body.start_at = startDate.toISOString();
       }
-
-      const pagarmeResponse = await fetch("https://api.pagar.me/core/v5/subscriptions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${auth}`,
+    } else if (paymentMethod === 'pix') {
+      endpoint = "https://api.pagar.me/core/v5/orders";
+      body = {
+        customer: {
+          name: customer.name,
+          email: customer.email,
+          document: customer.document,
+          type: "individual",
+          phones: {
+            mobile_phone: {
+              country_code: "55",
+              area_code: areaCode || "11",
+              number: phoneNumber || "999999999",
+            }
+          },
+          address: pagarmeAddress
         },
-        body: JSON.stringify(body),
-      });
+        items: [
+          {
+            amount: amount,
+            description: `Plano ${planName}`,
+            quantity: 1,
+            code: planId
+          }
+        ],
+        payments: [
+          {
+            payment_method: "pix",
+            pix: {
+              expires_in: 86400, // 24 hours
+            }
+          }
+        ],
+        metadata: {
+          clientId,
+          planId
+        }
+      };
+    }
 
-      pagarmeData = await pagarmeResponse.json();
+    const pagarmeResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${auth}`,
+      },
+      body: JSON.stringify(body),
+    });
 
-      if (!pagarmeResponse.ok) {
-        console.error("Pagar.me Error Details:", JSON.stringify(pagarmeData, null, 2));
+    pagarmeData = await pagarmeResponse.json();
+
+    if (!pagarmeResponse.ok) {
+      console.error("Pagar.me Error Details:", JSON.stringify(pagarmeData, null, 2));
+      
+      // If Pagar.me returns specific validation errors, join them
+      const errorDetails = pagarmeData.errors 
+        ? Object.entries(pagarmeData.errors).map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`).join('; ')
+        : '';
         
-        // If Pagar.me returns specific validation errors, join them
-        const errorDetails = pagarmeData.errors 
-          ? Object.entries(pagarmeData.errors).map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`).join('; ')
-          : '';
-          
-        throw new Error(errorDetails || pagarmeData.message || "Pagar.me API error");
-      }
+      throw new Error(errorDetails || pagarmeData.message || "Pagar.me API error");
     }
 
     // 2. Update Supabase Database using Service Role
@@ -210,7 +249,7 @@ serve(async (req) => {
     const subData = {
       client_id: clientId,
       plan_id: planId,
-      status: pagarmeData.status, // active or trialing
+      status: paymentMethod === 'pix' ? 'pending' : pagarmeData.status, // active/trialing for card, pending for pix
       provider_subscription_id: pagarmeData.id,
       trial_start: now.toISOString(),
       trial_end: trialEndDate.toISOString(),
@@ -237,11 +276,16 @@ serve(async (req) => {
       console.error("Database Error:", dbError);
     }
 
+    const qrCode = pagarmeData.charges?.[0]?.last_transaction?.qr_code || pagarmeData.charges?.[0]?.last_transaction?.pix_qr_code;
+    const qrCodeUrl = pagarmeData.charges?.[0]?.last_transaction?.qr_code_url || pagarmeData.charges?.[0]?.last_transaction?.pix_qr_code_url;
+
     return new Response(
       JSON.stringify({
         success: true,
         pagarmeSubscriptionId: pagarmeData.id,
         status: pagarmeData.status,
+        qrCode,
+        qrCodeUrl,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );

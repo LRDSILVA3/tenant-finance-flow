@@ -30,6 +30,7 @@
 
 - [x] Fix 401 Unauthorized error in create-pagarme-subscription Edge Function (ES256 support).
 - [x] Fix revenue registration error on Schedule screen with interactive dialog, mobile/desktop layouts, and context state synchronization.
+- [x] **PIX Payment Integration (Pagar.me v5)**: Implementação de assinatura via PIX, com geração de QR Code dinâmico e código copia e cola no Onboarding e painel de faturamento das configurações, e modificação correspondente na Edge Function `create-pagarme-subscription`.
 
 ## 🟡 In Progress
 - [ ] Refine Gemini CLI Context and Rules.

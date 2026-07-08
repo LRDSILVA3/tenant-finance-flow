@@ -5,7 +5,8 @@ interface PagarmeSubscriptionPayload {
   planId: string;
   planName: string;
   amount: number; // in cents
-  cardToken: string;
+  cardToken?: string;
+  paymentMethod?: 'credit_card' | 'pix';
   customer: {
     name: string;
     email: string;
@@ -27,6 +28,8 @@ interface PagarmeSubscriptionResponse {
   success: boolean;
   pagarmeSubscriptionId: string;
   status: string;
+  qrCode?: string;
+  qrCodeUrl?: string;
   error?: string;
 }
 

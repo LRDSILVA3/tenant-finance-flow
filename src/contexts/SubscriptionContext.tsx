@@ -15,7 +15,7 @@ interface SubscriptionContextType {
   loadingSubscription: boolean;
   loadSubscription: (clientId: string) => Promise<void>;
   changePlan: (clientId: string, planId: string) => Promise<void>;
-  subscribeWithPagarme: (clientId: string, planId: string, cardToken: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>) => Promise<boolean>;
+  subscribeWithPagarme: (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod?: 'credit_card' | 'pix') => Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }>;
   cancelSubscription: (subscriptionId: string) => Promise<boolean>;
   saveBillingMethod: (clientId: string, method: Omit<BillingMethod, 'id' | 'clientId' | 'createdAt'>) => Promise<void>;
   updatePlan: (planId: string, updates: Partial<Plan>) => Promise<void>;
@@ -139,10 +139,10 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     toast({ title: "Plano atualizado com sucesso" });
   }, [plans, loadSubscription]);
 
-  const subscribeWithPagarme = useCallback(async (clientId: string, planId: string, cardToken: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>): Promise<boolean> => {
+  const subscribeWithPagarme = useCallback(async (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod: 'credit_card' | 'pix' = 'credit_card'): Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }> => {
     setLoadingSubscription(true);
     const targetPlan = plans.find(p => p.id === planId);
-    if (!targetPlan || !user) return false;
+    if (!targetPlan || !user) return { success: false, error: "Plano ou usuário inválido" };
 
     try {
       // Sanitize payload to avoid circular structures
@@ -152,6 +152,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         planName: targetPlan.name,
         amount: Math.round(targetPlan.price * 100),
         cardToken,
+        paymentMethod,
         customer: {
           name: String(customerName || user.user_metadata?.full_name || user.email || "Cliente").trim(),
           email: String(user.email),
@@ -179,14 +180,18 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       if (response.success) {
         await loadSubscription(clientId);
-        toast({ title: "Assinatura ativada com sucesso!" });
-        return true;
+        toast({ title: "Assinatura processada com sucesso!" });
+        return {
+          success: true,
+          qrCode: response.qrCode,
+          qrCodeUrl: response.qrCodeUrl
+        };
       }
       throw new Error(response.error || "Erro no pagamento");
     } catch (error: any) {
       console.error("Subscription Error Details:", error);
       toast({ title: "Erro no pagamento", description: error.message, variant: 'destructive' });
-      return false;
+      return { success: false, error: error.message };
     } finally {
       setLoadingSubscription(false);
     }

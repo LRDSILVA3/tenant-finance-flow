@@ -72,6 +72,43 @@ serve(async (req) => {
       }
     }
 
+    if (eventType === "order.paid") {
+      const providerOrderId = data.id;
+      if (providerOrderId) {
+        const { data: subData } = await supabase
+          .from('subscriptions')
+          .update({
+            status: 'active',
+            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('provider_subscription_id', providerOrderId)
+          .select('client_id')
+          .single();
+
+        // Email Notification Logic
+        if (subData) {
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('user_id, name')
+            .eq('id', subData.client_id)
+            .single();
+
+          if (clientData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', clientData.user_id)
+              .single();
+
+            if (profile && profile.email) {
+              console.log(`[EMAIL MOCK] Sending SUCCESS email to ${profile.email} for client ${clientData.name}`);
+            }
+          }
+        }
+      }
+    }
+
     if (eventType === "invoice.payment_failed") {
       const providerSubscriptionId = data.subscription_id;
       if (providerSubscriptionId) {
