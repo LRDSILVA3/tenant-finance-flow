@@ -75,13 +75,13 @@ BEGIN
   ON CONFLICT DO NOTHING RETURNING id INTO v_supp_unilever;
   IF v_supp_unilever IS NULL THEN SELECT id INTO v_supp_unilever FROM public.suppliers WHERE client_id = v_client_id AND name ILIKE '%Unilever%' LIMIT 1; END IF;
 
-  -- 5. Clientes (CRM Expandido)
+  -- 5. Clientes (CRM Expandido com 13 colunas consistentes em cada INSERT)
   INSERT INTO public.customers (client_id, name, document, phone, email, person_type, birth_date, cep, street, number, neighborhood, city, state)
   VALUES (v_client_id, 'Carlos Eduardo da Silva', '123.456.789-00', '(11) 98765-4321', 'carlos.edu@gmail.com', 'PF', '1988-05-14', '01310-100', 'Av. Paulista', '1000', 'Bela Vista', 'São Paulo', 'SP')
   RETURNING id INTO v_cust_carlos;
 
-  INSERT INTO public.customers (client_id, name, document, phone, email, person_type, cep, street, number, neighborhood, city, state)
-  VALUES (v_client_id, 'Restaurante Sabor & Arte Ltda', '12.345.678/0001-90', '(11) 3214-5678', 'contato@saborearte.com.br', 'PJ', '01305-000', 'Rua Augusta', '500', 'Consolação', 'São Paulo', 'SP')
+  INSERT INTO public.customers (client_id, name, document, phone, email, person_type, birth_date, cep, street, number, neighborhood, city, state)
+  VALUES (v_client_id, 'Restaurante Sabor & Arte Ltda', '12.345.678/0001-90', '(11) 3214-5678', 'contato@saborearte.com.br', 'PJ', NULL, '01305-000', 'Rua Augusta', '500', 'Consolação', 'São Paulo', 'SP')
   RETURNING id INTO v_cust_restaurante;
 
   INSERT INTO public.customers (client_id, name, document, phone, email, person_type, birth_date, cep, street, number, neighborhood, city, state)
@@ -109,13 +109,13 @@ BEGIN
   VALUES (v_client_id, v_supp_unilever, 'Sabão em Pó OMO Lavagem Perfeita 1kg', '7891030001010', 14.50, 22.90, 15, 5, 'Limpeza', 'CX', 'Prateleira D4', 'Detergente em pó Omo 1kg caixa')
   RETURNING id INTO v_prod_omo;
 
-  -- 7. Lancamentos Financeiros (Vendas e Custos)
-  INSERT INTO public.transactions (client_id, type, category_id, amount, description, date, reference, payment_method, customer_id, notes)
+  -- 7. Lancamentos Financeiros (11 colunas e 11 valores exatos em todas as linhas)
+  INSERT INTO public.transactions (user_id, client_id, type, category_id, amount, description, date, reference, payment_method, customer_id, notes)
   VALUES 
-    (v_client_id, 'income', v_cat_vendas, 15480.00, 'Vendas Totais do Mês - Mercado Ponto Certo', CURRENT_DATE - INTERVAL '2 days', 'Venda #1001', 'pix', v_cust_restaurante, 'Vendas de bebidas e mantimentos no atacado'),
-    (v_client_id, 'income', v_cat_vendas, 3250.50, 'Venda Balcão e Delivery', CURRENT_DATE - INTERVAL '1 day', 'Venda #1002', 'card', v_cust_carlos, 'Itens variados de mercearia'),
-    (v_client_id, 'income', v_cat_vendas, 1890.00, 'Venda Conveniência Fim de Semana', CURRENT_DATE, 'Venda #1003', 'cash', v_cust_maria, 'Bebidas e carvão'),
-    (v_client_id, 'expense', v_cat_mercadorias, 6420.00, 'Reposição de Estoque Coca-Cola e Ambev', CURRENT_DATE - INTERVAL '5 days', 'NF-e #45210', NULL, 'Boleto faturado para 30 dias'),
-    (v_client_id, 'expense', v_cat_aluguel, 2800.00, 'Aluguel Comercial do Galpão', CURRENT_DATE - INTERVAL '10 days', 'Recibo #07/2026', NULL, 'Pago via Pix');
+    (v_user_id, v_client_id, 'income', v_cat_vendas, 15480.00, 'Vendas Totais do Mês - Mercado Ponto Certo', CURRENT_DATE - INTERVAL '2 days', 'Venda #1001', 'pix', v_cust_restaurante, 'Vendas de bebidas e mantimentos no atacado'),
+    (v_user_id, v_client_id, 'income', v_cat_vendas, 3250.50, 'Venda Balcão e Delivery', CURRENT_DATE - INTERVAL '1 day', 'Venda #1002', 'card', v_cust_carlos, 'Itens variados de mercearia'),
+    (v_user_id, v_client_id, 'income', v_cat_vendas, 1890.00, 'Venda Conveniência Fim de Semana', CURRENT_DATE, 'Venda #1003', 'cash', v_cust_maria, 'Bebidas e carvão'),
+    (v_user_id, v_client_id, 'expense', v_cat_mercadorias, 6420.00, 'Reposição de Estoque Coca-Cola e Ambev', CURRENT_DATE - INTERVAL '5 days', 'NF-e #45210', 'pix', NULL, 'Boleto faturado para 30 dias'),
+    (v_user_id, v_client_id, 'expense', v_cat_aluguel, 2800.00, 'Aluguel Comercial do Galpão', CURRENT_DATE - INTERVAL '10 days', 'Recibo #07/2026', 'pix', NULL, 'Pago via Pix');
 
 END $$;
