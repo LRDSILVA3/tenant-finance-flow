@@ -272,19 +272,39 @@ export const Reports: React.FC = () => {
     });
 
     filteredTransactions.forEach(txn => {
-      if (txn.collaboratorId && txn.type === 'income') {
-        if (!report[txn.collaboratorId]) {
-          const col = getCollaboratorById(txn.collaboratorId);
-          report[txn.collaboratorId] = { 
-            name: col?.name || 'Desconhecido', 
-            totalSales: 0, 
-            totalCommissions: 0, 
-            txCount: 0 
-          };
+      if (txn.type === 'income') {
+        const commissionsList = txn.commissions || [];
+        if (commissionsList.length > 0) {
+          commissionsList.forEach(comm => {
+            const collabId = comm.collaboratorId;
+            if (!report[collabId]) {
+              const col = getCollaboratorById(collabId);
+              report[collabId] = { 
+                name: col?.name || 'Desconhecido', 
+                totalSales: 0, 
+                totalCommissions: 0, 
+                txCount: 0 
+              };
+            }
+            report[collabId].totalSales += txn.amount;
+            report[collabId].totalCommissions += comm.commissionAmount;
+            report[collabId].txCount += 1;
+          });
+        } else if (txn.collaboratorId) {
+          const collabId = txn.collaboratorId;
+          if (!report[collabId]) {
+            const col = getCollaboratorById(collabId);
+            report[collabId] = { 
+              name: col?.name || 'Desconhecido', 
+              totalSales: 0, 
+              totalCommissions: 0, 
+              txCount: 0 
+            };
+          }
+          report[collabId].totalSales += txn.amount;
+          report[collabId].totalCommissions += txn.commissionAmount || 0;
+          report[collabId].txCount += 1;
         }
-        report[txn.collaboratorId].totalSales += txn.amount;
-        report[txn.collaboratorId].totalCommissions += txn.commissionAmount || 0;
-        report[txn.collaboratorId].txCount += 1;
       }
     });
 

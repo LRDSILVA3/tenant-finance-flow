@@ -30,6 +30,14 @@ const mapRow = (r: Record<string, unknown>): Customer => ({
   phone: r.phone as string | undefined,
   email: r.email as string | undefined,
   document: r.document as string | undefined,
+  personType: (r.person_type as 'individual' | 'legal') || 'individual',
+  birthDate: r.birth_date as string | undefined,
+  cep: r.cep as string | undefined,
+  street: r.street as string | undefined,
+  number: r.number as string | undefined,
+  neighborhood: r.neighborhood as string | undefined,
+  city: r.city as string | undefined,
+  state: r.state as string | undefined,
   notes: r.notes as string | undefined,
   isActive: r.is_active as boolean,
   createdAt: new Date(r.created_at as string),
@@ -41,6 +49,14 @@ const emptyForm = {
   phone: '',
   email: '',
   document: '',
+  personType: 'individual' as 'individual' | 'legal',
+  birthDate: '',
+  cep: '',
+  street: '',
+  number: '',
+  neighborhood: '',
+  city: '',
+  state: '',
   notes: '',
 };
 
@@ -123,6 +139,14 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
       phone: c.phone ?? '',
       email: c.email ?? '',
       document: c.document ?? '',
+      personType: c.personType ?? 'individual',
+      birthDate: c.birthDate ?? '',
+      cep: c.cep ?? '',
+      street: c.street ?? '',
+      number: c.number ?? '',
+      neighborhood: c.neighborhood ?? '',
+      city: c.city ?? '',
+      state: c.state ?? '',
       notes: c.notes ?? '',
     });
     setErrors({});
@@ -150,6 +174,14 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         document: form.document.trim() || null,
+        person_type: form.personType,
+        birth_date: form.birthDate || null,
+        cep: form.cep.trim() || null,
+        street: form.street.trim() || null,
+        number: form.number.trim() || null,
+        neighborhood: form.neighborhood.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
         notes: form.notes.trim() || null,
       };
 
@@ -325,7 +357,24 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                   <TableBody>
                     {filtered.map((c) => (
                       <TableRow key={c.id} className={cn(!c.isActive && 'opacity-60')}>
-                        <TableCell className="font-semibold">{c.name}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold">{c.name}</span>
+                              <Badge variant={c.personType === 'legal' ? 'outline' : 'secondary'} className={cn(
+                                "text-[9px] px-1 py-0 h-4 font-bold shrink-0",
+                                c.personType === 'legal' ? "border-purple-300 text-purple-700 bg-purple-50" : "bg-blue-50 text-blue-700 border-blue-200"
+                              )}>
+                                {c.personType === 'legal' ? 'PJ' : 'PF'}
+                              </Badge>
+                            </div>
+                            {c.city && c.state && (
+                              <span className="text-[10px] text-muted-foreground mt-0.5">
+                                {c.city} - {c.state}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {c.phone ? (
                             <span className="flex items-center gap-1">
@@ -439,8 +488,8 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
 
       {/* Create / Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-3 border-b shrink-0">
             <DialogTitle>{selectedCustomer ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             <DialogDescription>
               {selectedCustomer
@@ -449,7 +498,7 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[60vh]">
             <div className="space-y-1.5">
               <Label htmlFor="cust-name" className={cn(errors.name && 'text-destructive')}>
                 Nome *
@@ -466,21 +515,48 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="cust-phone">Telefone</Label>
+                <Label htmlFor="cust-ptype">Tipo de Pessoa</Label>
+                <Select
+                  value={form.personType}
+                  onValueChange={(val) => setForm(f => ({ ...f, personType: val as 'individual' | 'legal' }))}
+                >
+                  <SelectTrigger id="cust-ptype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Pessoa Física (PF)</SelectItem>
+                    <SelectItem value="legal">Pessoa Jurídica (PJ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cust-bday">Data de Nascimento</Label>
+                <Input
+                  id="cust-bday"
+                  type="date"
+                  value={form.birthDate}
+                  onChange={(e) => setForm(f => ({ ...f, birthDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="cust-doc">{form.personType === 'legal' ? 'CNPJ' : 'CPF'}</Label>
+                <Input
+                  id="cust-doc"
+                  value={form.document}
+                  onChange={(e) => setForm(f => ({ ...f, document: e.target.value }))}
+                  placeholder={form.personType === 'legal' ? '00.000.000/0000-00' : '000.000.000-00'}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cust-phone">Telefone / WhatsApp</Label>
                 <Input
                   id="cust-phone"
                   value={form.phone}
                   onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
                   placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cust-doc">CPF / CNPJ</Label>
-                <Input
-                  id="cust-doc"
-                  value={form.document}
-                  onChange={(e) => setForm(f => ({ ...f, document: e.target.value }))}
-                  placeholder="000.000.000-00"
                 />
               </div>
             </div>
@@ -500,7 +576,81 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
               {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
 
-            <div className="space-y-1.5">
+            {/* Endereço Completo */}
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Endereço Completo</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1 col-span-1">
+                  <Label htmlFor="cust-cep" className="text-xs">CEP</Label>
+                  <Input
+                    id="cust-cep"
+                    value={form.cep}
+                    onChange={(e) => setForm(f => ({ ...f, cep: e.target.value }))}
+                    placeholder="00000-000"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="cust-street" className="text-xs">Rua / Logradouro</Label>
+                  <Input
+                    id="cust-street"
+                    value={form.street}
+                    onChange={(e) => setForm(f => ({ ...f, street: e.target.value }))}
+                    placeholder="Av. Paulista"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1 col-span-1">
+                  <Label htmlFor="cust-num" className="text-xs">Número</Label>
+                  <Input
+                    id="cust-num"
+                    value={form.number}
+                    onChange={(e) => setForm(f => ({ ...f, number: e.target.value }))}
+                    placeholder="1000"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="cust-neigh" className="text-xs">Bairro</Label>
+                  <Input
+                    id="cust-neigh"
+                    value={form.neighborhood}
+                    onChange={(e) => setForm(f => ({ ...f, neighborhood: e.target.value }))}
+                    placeholder="Bela Vista"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="cust-city" className="text-xs">Cidade</Label>
+                  <Input
+                    id="cust-city"
+                    value={form.city}
+                    onChange={(e) => setForm(f => ({ ...f, city: e.target.value }))}
+                    placeholder="São Paulo"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1 col-span-1">
+                  <Label htmlFor="cust-state" className="text-xs">Estado / UF</Label>
+                  <Input
+                    id="cust-state"
+                    value={form.state}
+                    onChange={(e) => setForm(f => ({ ...f, state: e.target.value.toUpperCase() }))}
+                    placeholder="SP"
+                    maxLength={2}
+                    className="h-8 text-xs uppercase"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t">
               <Label htmlFor="cust-notes">Observações</Label>
               <Textarea
                 id="cust-notes"
@@ -512,7 +662,7 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-4 bg-muted/30 border-t shrink-0">
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar Cliente'}

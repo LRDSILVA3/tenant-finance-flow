@@ -50,6 +50,13 @@ export interface Category {
   createdAt: Date;
 }
 
+export interface TransactionCommission {
+  id: string;
+  transactionId: string;
+  collaboratorId: string;
+  commissionAmount: number;
+}
+
 export interface Transaction {
   id: string;
   clientId: string;
@@ -61,8 +68,10 @@ export interface Transaction {
   reference?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
-  collaboratorId?: string;
-  commissionAmount?: number;
+  collaboratorId?: string; // Legado
+  commissionAmount?: number; // Legado
+  commissions?: TransactionCommission[];
+  customerId?: string;
   recurringId?: string;
   createdAt: Date;
 }
@@ -156,6 +165,14 @@ export interface Customer {
   phone?: string;
   email?: string;
   document?: string; // CPF ou CNPJ
+  personType?: 'individual' | 'legal';
+  birthDate?: string;
+  cep?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
   notes?: string;
   isActive: boolean;
   createdAt: Date;

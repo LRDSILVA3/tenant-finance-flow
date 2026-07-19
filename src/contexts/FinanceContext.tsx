@@ -8,7 +8,7 @@ import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 
-import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType } from '@/types/finance';
+import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer } from '@/types/finance';
 
 interface UserSettings {
   enablePaymentMethods: boolean;
@@ -60,6 +60,7 @@ interface FinanceContextType {
   categories: Category[];
   transactions: Transaction[];
   collaborators: Collaborator[];
+  customers: Customer[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
@@ -72,6 +73,8 @@ interface FinanceContextType {
   getCategoriesByType: (type: TransactionType) => Category[];
   getCategoryById: (id: string) => Category | undefined;
   getCollaboratorById: (id: string) => Collaborator | undefined;
+  getCustomerById: (id: string) => Customer | undefined;
+  loadCustomers: (clientId: string) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -90,7 +93,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const { 
     loadCategories, 
     loadTransactions, 
-    loadCollaborators 
+    loadCollaborators,
+    loadCustomers
   } = tx;
 
   const [language, setLanguage] = useState<Language>('pt');
@@ -245,8 +249,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadCategories(currentClient.id);
       loadTransactions(currentClient.id);
       loadCollaborators(currentClient.id);
+      loadCustomers(currentClient.id);
     }
-  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators]);
+  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers]);
 
   // Sync settings with plan and subscription status
   useEffect(() => {
@@ -320,6 +325,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     getCategoriesByType: (type: TransactionType) => tx.categories.filter(c => c.type === type),
     getCategoryById: (id: string) => tx.categories.find(c => c.id === id),
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
+    getCustomerById: (id: string) => tx.customers.find(c => c.id === id),
   }), [
     isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,

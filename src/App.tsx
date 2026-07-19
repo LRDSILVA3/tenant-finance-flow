@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Cancellation from "./pages/Cancellation";
+import Scan from "./pages/Scan";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => {
                   <Route path="/termos" element={<Terms />} />
                   <Route path="/privacidade" element={<Privacy />} />
                   <Route path="/cancelamento" element={<Cancellation />} />
+                  <Route path="/scan" element={<Scan />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 <SupportWidget />

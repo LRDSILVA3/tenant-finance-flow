@@ -2,16 +2,18 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Category, Transaction, Collaborator, TransactionType, PaymentMethod } from '@/types/finance';
+import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 
 interface TransactionContextType {
   categories: Category[];
   transactions: Transaction[];
   collaborators: Collaborator[];
+  customers: Customer[];
   loadCategories: (clientId: string) => Promise<void>;
   loadTransactions: (clientId: string) => Promise<void>;
   loadCollaborators: (clientId: string) => Promise<void>;
+  loadCustomers: (clientId: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
@@ -30,6 +32,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   const loadCategories = useCallback(async (clientId: string) => {
     const { data, error } = await supabase.from('categories').select('*').eq('client_id', clientId).order('sort_order');
@@ -40,13 +43,22 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const loadTransactions = useCallback(async (clientId: string) => {
-    const { data, error } = await supabase.from('transactions').select('*').eq('client_id', clientId).order('date', { ascending: false });
+    const { data, error } = await supabase.from('transactions').select('*, transaction_commissions(*)').eq('client_id', clientId).order('date', { ascending: false });
     if (!error && data) setTransactions(data.map((t: any) => ({
       id: t.id, clientId: t.client_id, categoryId: t.category_id, type: t.type as TransactionType,
       amount: Number(t.amount), description: t.description, date: new Date(`${t.date}T00:00:00`),
       reference: t.reference || undefined, notes: t.notes || undefined,
-      paymentMethod: t.payment_method as PaymentMethod, collaboratorId: t.collaborator_id || undefined,
-      commissionAmount: t.commission_amount || undefined, recurringId: t.recurring_id || undefined,
+      paymentMethod: t.payment_method as PaymentMethod,
+      collaboratorId: t.transaction_commissions?.[0]?.collaborator_id || undefined,
+      commissionAmount: t.transaction_commissions?.[0]?.commission_amount ? Number(t.transaction_commissions[0].commission_amount) : undefined,
+      commissions: t.transaction_commissions ? t.transaction_commissions.map((tc: any) => ({
+        id: tc.id,
+        transactionId: tc.transaction_id,
+        collaboratorId: tc.collaborator_id,
+        commissionAmount: Number(tc.commission_amount)
+      })) : [],
+      customerId: t.customer_id || undefined,
+      recurringId: t.recurring_id || undefined,
       createdAt: new Date(t.created_at)
     })));
   }, []);
@@ -58,22 +70,62 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     })));
   }, []);
 
+  const loadCustomers = useCallback(async (clientId: string) => {
+    const { data, error } = await supabase.from('customers').select('*').eq('client_id', clientId).eq('is_active', true).order('name');
+    if (!error && data) setCustomers(data.map((c: any) => ({
+      id: c.id, clientId: c.client_id, name: c.name, phone: c.phone || undefined,
+      email: c.email || undefined, document: c.document || undefined, notes: c.notes || undefined,
+      isActive: c.is_active, createdAt: new Date(c.created_at)
+    })));
+  }, []);
+
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => {
     if (!user) return;
     const recurringId = recurrence ? crypto.randomUUID() : null;
-    const toInsert = [{
-      user_id: user.id, client_id: transaction.clientId, category_id: transaction.categoryId,
-      type: transaction.type, amount: transaction.amount, description: transaction.description,
-      date: transaction.date.toISOString().split('T')[0], reference: transaction.reference || null,
-      notes: transaction.notes || null, payment_method: transaction.paymentMethod || null,
-      collaborator_id: transaction.collaboratorId || null, commission_amount: transaction.commissionAmount || null,
+    const transactionData = {
+      user_id: user.id,
+      client_id: transaction.clientId,
+      category_id: transaction.categoryId,
+      type: transaction.type,
+      amount: transaction.amount,
+      description: transaction.description,
+      date: transaction.date.toISOString().split('T')[0],
+      reference: transaction.reference || null,
+      notes: transaction.notes || null,
+      payment_method: transaction.paymentMethod || null,
+      customer_id: transaction.customerId || null,
       recurring_id: recurringId
-    }];
+    };
 
-    const { error } = await supabase.from('transactions').insert(toInsert);
-    if (!error) {
+    const { data: insertedTx, error: txError } = await supabase
+      .from('transactions')
+      .insert([transactionData])
+      .select()
+      .single();
+
+    if (!txError && insertedTx) {
+      if (transaction.commissions && transaction.commissions.length > 0) {
+        const commissionsData = transaction.commissions.map((comm) => ({
+          user_id: user.id,
+          client_id: transaction.clientId,
+          transaction_id: insertedTx.id,
+          collaborator_id: comm.collaboratorId,
+          commission_amount: comm.commissionAmount
+        }));
+
+        const { error: commError } = await supabase
+          .from('transaction_commissions')
+          .insert(commissionsData);
+
+        if (commError) {
+          console.error("Erro ao salvar comissões:", commError);
+          toast({ title: "Erro ao salvar comissões", variant: "destructive" });
+        }
+      }
       await loadTransactions(transaction.clientId);
       toast({ title: "Lançamento salvo" });
+    } else if (txError) {
+      toast({ title: "Erro ao salvar lançamento", variant: "destructive" });
     }
   }, [user, loadTransactions]);
 
@@ -87,15 +139,49 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
-    if (updates.collaboratorId !== undefined) updateData.collaborator_id = updates.collaboratorId || null;
-    if (updates.commissionAmount !== undefined) updateData.commission_amount = updates.commissionAmount || null;
+    if (updates.customerId !== undefined) updateData.customer_id = updates.customerId || null;
 
-    const { error, data } = await supabase.from('transactions').update(updateData).eq('id', id).select().single();
-    if (!error && data) {
+    const { error: txError, data } = await supabase.from('transactions').update(updateData).eq('id', id).select().single();
+    
+    if (!txError && data) {
+      if (updates.commissions !== undefined) {
+        if (!user) return;
+        
+        const { error: deleteError } = await supabase
+          .from('transaction_commissions')
+          .delete()
+          .eq('transaction_id', id);
+
+        if (deleteError) {
+          console.error("Erro ao remover comissões antigas:", deleteError);
+        }
+
+        if (updates.commissions.length > 0) {
+          const commissionsData = updates.commissions.map((comm) => ({
+            user_id: user.id,
+            client_id: data.client_id,
+            transaction_id: id,
+            collaborator_id: comm.collaboratorId,
+            commission_amount: comm.commissionAmount
+          }));
+
+          const { error: insertError } = await supabase
+            .from('transaction_commissions')
+            .insert(commissionsData);
+
+          if (insertError) {
+            console.error("Erro ao inserir novas comissões:", insertError);
+            toast({ title: "Erro ao atualizar comissões", variant: "destructive" });
+          }
+        }
+      }
+
       await loadTransactions(data.client_id);
       toast({ title: "Lançamento atualizado" });
+    } else if (txError) {
+      toast({ title: "Erro ao atualizar lançamento", variant: "destructive" });
     }
-  }, [loadTransactions]);
+  }, [user, loadTransactions]);
 
   const deleteTransaction = useCallback(async (id: string, recurringOption: 'single' | 'future' | 'all' = 'single') => {
     const transactionToDelete = transactions.find(t => t.id === id);
@@ -185,12 +271,12 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [collaborators, loadCollaborators]);
 
   const value = React.useMemo(() => ({
-    categories, transactions, collaborators, loadCategories, loadTransactions, loadCollaborators,
+    categories, transactions, collaborators, customers, loadCategories, loadTransactions, loadCollaborators, loadCustomers,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator
   }), [
-    categories, transactions, collaborators, loadCategories, loadTransactions, loadCollaborators,
+    categories, transactions, collaborators, customers, loadCategories, loadTransactions, loadCollaborators, loadCustomers,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator

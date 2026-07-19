@@ -165,15 +165,29 @@ export const useTransactionPdfExport = () => {
     if (userSettings.enableCommission) {
       const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
       transactions.forEach(t => {
-        if (t.collaboratorId && t.commissionAmount) {
-          const collab = getCollaboratorById(t.collaboratorId);
-          const key = t.collaboratorId;
-          if (!commissionByCollaborator[key]) {
-            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+        if (t.type === 'income') {
+          const commissionsList = t.commissions || [];
+          if (commissionsList.length > 0) {
+            commissionsList.forEach(comm => {
+              const collab = getCollaboratorById(comm.collaboratorId);
+              const key = comm.collaboratorId;
+              if (!commissionByCollaborator[key]) {
+                commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+              }
+              commissionByCollaborator[key].totalCommission += comm.commissionAmount;
+              commissionByCollaborator[key].totalSales += t.amount;
+              commissionByCollaborator[key].count += 1;
+            });
+          } else if (t.collaboratorId && t.commissionAmount) {
+            const collab = getCollaboratorById(t.collaboratorId);
+            const key = t.collaboratorId;
+            if (!commissionByCollaborator[key]) {
+              commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+            }
+            commissionByCollaborator[key].totalCommission += t.commissionAmount;
+            commissionByCollaborator[key].totalSales += t.amount;
+            commissionByCollaborator[key].count += 1;
           }
-          commissionByCollaborator[key].totalCommission += t.commissionAmount;
-          commissionByCollaborator[key].totalSales += t.amount;
-          commissionByCollaborator[key].count += 1;
         }
       });
 
@@ -231,9 +245,23 @@ export const useTransactionPdfExport = () => {
         t.notes || '-',
       ];
       if (userSettings.enableCommission) {
-        const collaborator = t.collaboratorId ? getCollaboratorById(t.collaboratorId) : null;
-        row.push(collaborator ? collaborator.name : '-');
-        row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+        const commissionsList = t.commissions || [];
+        if (commissionsList.length > 0) {
+          const collabsNames = commissionsList
+            .map(c => getCollaboratorById(c.collaboratorId)?.name)
+            .filter(Boolean)
+            .join(', ');
+          const totalComm = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
+          row.push(collabsNames || '-');
+          row.push(totalComm > 0 ? formatCurrency(totalComm) : '-');
+        } else if (t.collaboratorId) {
+          const collaborator = getCollaboratorById(t.collaboratorId);
+          row.push(collaborator ? collaborator.name : '-');
+          row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+        } else {
+          row.push('-');
+          row.push('-');
+        }
       }
       row.push(formatCurrency(t.amount));
       return row;
@@ -500,15 +528,29 @@ export const useTransactionPdfExport = () => {
     if (userSettings.enableCommission) {
       const commissionByCollaborator: Record<string, { name: string; totalCommission: number; totalSales: number; count: number }> = {};
       transactions.forEach(t => {
-        if (t.collaboratorId && t.commissionAmount) {
-          const collab = getCollaboratorById(t.collaboratorId);
-          const key = t.collaboratorId;
-          if (!commissionByCollaborator[key]) {
-            commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+        if (t.type === 'income') {
+          const commissionsList = t.commissions || [];
+          if (commissionsList.length > 0) {
+            commissionsList.forEach(comm => {
+              const collab = getCollaboratorById(comm.collaboratorId);
+              const key = comm.collaboratorId;
+              if (!commissionByCollaborator[key]) {
+                commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+              }
+              commissionByCollaborator[key].totalCommission += comm.commissionAmount;
+              commissionByCollaborator[key].totalSales += t.amount;
+              commissionByCollaborator[key].count += 1;
+            });
+          } else if (t.collaboratorId && t.commissionAmount) {
+            const collab = getCollaboratorById(t.collaboratorId);
+            const key = t.collaboratorId;
+            if (!commissionByCollaborator[key]) {
+              commissionByCollaborator[key] = { name: collab?.name || '-', totalCommission: 0, totalSales: 0, count: 0 };
+            }
+            commissionByCollaborator[key].totalCommission += t.commissionAmount;
+            commissionByCollaborator[key].totalSales += t.amount;
+            commissionByCollaborator[key].count += 1;
           }
-          commissionByCollaborator[key].totalCommission += t.commissionAmount;
-          commissionByCollaborator[key].totalSales += t.amount;
-          commissionByCollaborator[key].count += 1;
         }
       });
 
@@ -568,9 +610,23 @@ export const useTransactionPdfExport = () => {
         t.notes || '-',
       ];
       if (userSettings.enableCommission) {
-        const collaborator = t.collaboratorId ? getCollaboratorById(t.collaboratorId) : null;
-        row.push(collaborator ? collaborator.name : '-');
-        row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+        const commissionsList = t.commissions || [];
+        if (commissionsList.length > 0) {
+          const collabsNames = commissionsList
+            .map(c => getCollaboratorById(c.collaboratorId)?.name)
+            .filter(Boolean)
+            .join(', ');
+          const totalComm = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
+          row.push(collabsNames || '-');
+          row.push(totalComm > 0 ? formatCurrency(totalComm) : '-');
+        } else if (t.collaboratorId) {
+          const collaborator = getCollaboratorById(t.collaboratorId);
+          row.push(collaborator ? collaborator.name : '-');
+          row.push(t.commissionAmount ? formatCurrency(t.commissionAmount) : '-');
+        } else {
+          row.push('-');
+          row.push('-');
+        }
       }
       row.push(formatCurrency(t.amount));
       return row;

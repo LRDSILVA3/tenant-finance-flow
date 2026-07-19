@@ -118,9 +118,11 @@ export const Transactions: React.FC = () => {
     transactions,
     categories,
     collaborators,
+    customers,
     getCategoriesByType,
     getCategoryById,
     getCollaboratorById,
+    getCustomerById,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -201,6 +203,8 @@ export const Transactions: React.FC = () => {
     paymentMethod: '' as PaymentMethod | '',
     collaboratorId: '',
     commissionAmount: 0,
+    commissions: [] as Array<{ collaboratorId: string; commissionAmount: number }>,
+    customerId: '',
     isRecurring: false,
     recurrenceType: 'count' as 'count' | 'until',
     repeatCount: 1,
@@ -393,6 +397,8 @@ export const Transactions: React.FC = () => {
       paymentMethod: '',
       collaboratorId: '',
       commissionAmount: 0,
+      commissions: [],
+      customerId: '',
       isRecurring: false,
       recurrenceType: 'count' as 'count' | 'until',
       repeatCount: 1,
@@ -415,6 +421,11 @@ export const Transactions: React.FC = () => {
       paymentMethod: transaction.paymentMethod || '',
       collaboratorId: transaction.collaboratorId || '',
       commissionAmount: transaction.commissionAmount || 0,
+      commissions: transaction.commissions ? transaction.commissions.map(c => ({
+        collaboratorId: c.collaboratorId,
+        commissionAmount: c.commissionAmount
+      })) : [],
+      customerId: transaction.customerId || '',
       isRecurring: !!transaction.recurringId,
       recurrenceType: 'count',
       repeatCount: 1,
@@ -430,7 +441,15 @@ export const Transactions: React.FC = () => {
     if (formData.amount <= 0) newErrors.amount = t.required;
     if (!formData.description) newErrors.description = t.required;
     if (!formData.date) newErrors.date = t.required;
-    if (!formData.reference) newErrors.reference = t.required;
+
+    // Validar se há comissões sem colaborador selecionado
+    if (formData.commissions && formData.commissions.length > 0) {
+      const hasInvalidComm = formData.commissions.some(c => !c.collaboratorId || c.commissionAmount <= 0);
+      if (hasInvalidComm) {
+        toast({ title: "Verifique as comissões", description: "Todos os colaboradores de comissão devem ser selecionados com valores maiores que zero.", variant: "destructive" });
+        return;
+      }
+    }
 
     if (Object.keys(newErrors).length > 0 || !currentClient) {
       setErrors(newErrors);
@@ -440,8 +459,8 @@ export const Transactions: React.FC = () => {
     setSaving(true);
 
     const paymentMethod = formData.paymentMethod || undefined;
-    const collaboratorId = formData.collaboratorId || undefined;
-    const commissionAmount = formData.commissionAmount || undefined;
+    const commissions = formData.commissions || [];
+    const customerId = formData.customerId && formData.customerId !== 'none' ? formData.customerId : undefined;
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, {
@@ -453,8 +472,8 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
         paymentMethod,
-        collaboratorId,
-        commissionAmount,
+        commissions,
+        customerId,
       });
     } else {
       const recurrence = formData.isRecurring ? {
@@ -472,8 +491,8 @@ export const Transactions: React.FC = () => {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
         paymentMethod,
-        collaboratorId,
-        commissionAmount,
+        commissions,
+        customerId,
       }, recurrence);
     }
 
@@ -837,7 +856,16 @@ export const Transactions: React.FC = () => {
                 ) : (
                   sortedTransactions.map((transaction) => {
                     const category = getCategoryById(transaction.categoryId);
-                    const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
+                    const commissionsList = transaction.commissions || [];
+                    const totalCommission = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
+                    const collaboratorsNames = commissionsList
+                      .map(c => getCollaboratorById(c.collaboratorId)?.name)
+                      .filter(Boolean)
+                      .join(', ');
+                    const commissionTooltip = commissionsList
+                      .map(c => `${getCollaboratorById(c.collaboratorId)?.name || '?'}: ${formatCurrency(c.commissionAmount)}`)
+                      .join(' | ');
+
                     return (
                       <TableRow key={transaction.id}>
                         <TableCell className="font-mono text-sm text-muted-foreground">
@@ -847,7 +875,7 @@ export const Transactions: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <div
                               className={cn(
-                                'p-1.5 rounded-full',
+                                'p-1.5 rounded-full shrink-0',
                                 transaction.type === 'income'
                                   ? 'bg-income-muted text-income'
                                   : 'bg-expense-muted text-expense'
@@ -859,7 +887,14 @@ export const Transactions: React.FC = () => {
                                 <ArrowDownRight className="h-3 w-3" />
                               )}
                             </div>
-                            <span className="font-medium">{transaction.description}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{transaction.description}</span>
+                              {transaction.customerId && (
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded mt-0.5 font-medium">
+                                  Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -882,9 +917,11 @@ export const Transactions: React.FC = () => {
                         )}
                         {userSettings.enableCommission && (
                           <>
-                            <TableCell className="text-muted-foreground">{collaborator?.name || '-'}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}
+                            <TableCell className="text-muted-foreground truncate max-w-[150px]" title={collaboratorsNames}>
+                              {collaboratorsNames || '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" title={commissionTooltip}>
+                              {totalCommission > 0 ? formatCurrency(totalCommission) : '-'}
                             </TableCell>
                           </>
                         )}
@@ -937,7 +974,7 @@ export const Transactions: React.FC = () => {
             ) : (
               sortedTransactions.map((transaction) => {
                 const category = getCategoryById(transaction.categoryId);
-                const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
+                const commissionsList = transaction.commissions || [];
                 return (
                   <div key={transaction.id} className="finance-card p-4 flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2 min-w-0">
@@ -958,7 +995,14 @@ export const Transactions: React.FC = () => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="font-semibold text-sm block truncate">{transaction.description}</span>
-                          <span className="text-xs text-muted-foreground font-mono">{formatDate(transaction.date)}</span>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground font-mono">{formatDate(transaction.date)}</span>
+                            {transaction.customerId && (
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
+                                Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span
@@ -990,10 +1034,20 @@ export const Transactions: React.FC = () => {
                           </div>
                         </div>
                       )}
-                      {userSettings.enableCommission && collaborator && (
-                        <div>
-                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Comissão ({collaborator.name})</span>
-                          <span className="text-foreground">{transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}</span>
+                      {userSettings.enableCommission && commissionsList.length > 0 && (
+                        <div className="col-span-2 mt-1 border-t pt-1">
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider mb-1">Comissões</span>
+                          <div className="space-y-1 bg-muted/30 p-2 rounded">
+                            {commissionsList.map((comm, idx) => {
+                              const name = getCollaboratorById(comm.collaboratorId)?.name || '-';
+                              return (
+                                <div key={idx} className="flex justify-between text-foreground">
+                                  <span>{name}</span>
+                                  <span className="font-medium">{formatCurrency(comm.commissionAmount)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1312,6 +1366,26 @@ export const Transactions: React.FC = () => {
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="customerId">Cliente (Opcional)</Label>
+              <Select
+                value={formData.customerId || 'none'}
+                onValueChange={(val) => updateFormField('customerId', val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum cliente</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} {c.document ? `(${c.document})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Description and Reference */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1333,7 +1407,7 @@ export const Transactions: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reference" className={cn(errors.reference && "text-destructive")}>{t.reference}</Label>
+                <Label htmlFor="reference">{t.reference} (Opcional)</Label>
                 <SearchableSelect
                   value={formData.reference}
                   onChange={(value) => updateFormField('reference', value)}
@@ -1342,9 +1416,8 @@ export const Transactions: React.FC = () => {
                   searchPlaceholder="Buscar referência..."
                   emptyMessage="Nenhuma referência encontrada."
                   addNewLabel="Adicionar"
-                  className={cn(errors.reference && "border-destructive")}
+                  className=""
                 />
-                {errors.reference && <p className="text-xs text-destructive">{errors.reference}</p>}
               </div>
             </div>
 
@@ -1432,6 +1505,7 @@ export const Transactions: React.FC = () => {
               </div>
             )}
 
+
             <div className="space-y-2">
               <Label htmlFor="notes">{t.notes}</Label>
               <Textarea
@@ -1443,37 +1517,84 @@ export const Transactions: React.FC = () => {
             </div>
 
             {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    Colaborador
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-1 font-semibold text-sm">
+                    Comissões de Colaboradores
                     {isCommissionsLocked && <UpgradeBadge />}
                   </Label>
-                  <CollaboratorSelect
-                    value={formData.collaboratorId}
-                    onChange={(val) => updateFormField('collaboratorId', val)}
-                    collaborators={collaborators}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1"
                     disabled={isCommissionsLocked}
-                    onAddNew={async (name) => {
-                      const newCollaborator = await addCollaborator(name);
-                      if (newCollaborator) {
-                        updateFormField('collaboratorId', newCollaborator.id);
-                      }
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        commissions: [...(prev.commissions || []), { collaboratorId: '', commissionAmount: 0 }]
+                      }));
                     }}
-                  />
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="commissionAmount" className="flex items-center gap-1">
-                    Comissão (R$)
-                    {isCommissionsLocked && <UpgradeBadge />}
-                  </Label>
-                  <MoneyInput
-                    id="commissionAmount"
-                    value={formData.commissionAmount}
-                    onChange={(value) => updateFormField('commissionAmount', value)}
-                    disabled={isCommissionsLocked}
-                  />
-                </div>
+
+                {(!formData.commissions || formData.commissions.length === 0) && (
+                  <p className="text-xs text-muted-foreground italic">Nenhuma comissão adicionada a este lançamento.</p>
+                )}
+
+                {(formData.commissions || []).map((comm, idx) => (
+                  <div key={idx} className="flex flex-col sm:flex-row gap-3 items-end border p-3 rounded-lg relative bg-muted/20">
+                    <div className="flex-1 space-y-2 w-full">
+                      <Label className="text-xs">Colaborador</Label>
+                      <CollaboratorSelect
+                        value={comm.collaboratorId}
+                        onChange={(val) => {
+                          const updated = [...(formData.commissions || [])];
+                          updated[idx].collaboratorId = val;
+                          setFormData(prev => ({ ...prev, commissions: updated }));
+                        }}
+                        collaborators={collaborators}
+                        disabled={isCommissionsLocked}
+                        onAddNew={async (name) => {
+                          const newCollaborator = await addCollaborator(name);
+                          if (newCollaborator) {
+                            const updated = [...(formData.commissions || [])];
+                            updated[idx].collaboratorId = newCollaborator.id;
+                            setFormData(prev => ({ ...prev, commissions: updated }));
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2 w-full sm:w-[150px]">
+                      <Label className="text-xs">Valor (R$)</Label>
+                      <MoneyInput
+                        value={comm.commissionAmount}
+                        onChange={(val) => {
+                          const updated = [...(formData.commissions || [])];
+                          updated[idx].commissionAmount = val;
+                          setFormData(prev => ({ ...prev, commissions: updated }));
+                        }}
+                        disabled={isCommissionsLocked}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 h-10 w-10 shrink-0"
+                      disabled={isCommissionsLocked}
+                      onClick={() => {
+                        const updated = (formData.commissions || []).filter((_, i) => i !== idx);
+                        setFormData(prev => ({ ...prev, commissions: updated }));
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
