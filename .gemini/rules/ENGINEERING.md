@@ -15,6 +15,12 @@
   - Global UI State: React Context API (`FinanceContext`).
   - Local State: `useState` / `useMemo` / `useCallback`.
 
+## Component Reuse & UI Mandates
+- **Component Reuse**: NEVER reinvent or duplicate components. Always reuse established UI components (e.g. `SearchableSelect`, `MoneyInput`) and hooks (`useTransactionDescriptions`, `useTransactionReferences`).
+- **Modal Design**: Modals with extensive forms/content MUST use `max-h-[90vh]`, `flex flex-col`, fixed Header/Footer, and internal scroll `overflow-y-auto` to prevent viewport clipping.
+- **Hardware & Multi-Input Support**: Always provide clear visual labels and badges for hardware scanners (USB/Bluetooth barcode guns) alongside camera scanning and manual fallback.
+- **SPA Routing**: Maintain SPA routing rewrite files (`vercel.json`, `public/_redirects`, `public/.htaccess`) to prevent 404 errors on direct URL accesses.
+
 ## Form Validation
 - **Mandatory Fields**: Always show visual feedback (red borders/labels) and error messages.
 - **Resetting**: Clear field-specific errors immediately upon user interaction.
@@ -34,6 +40,9 @@
 - **Operations**: Centralize database logic in `FinanceContext`.
 - **Formatting**: Always use `formatDateForDB` (YYYY-MM-DD) when persisting dates to Supabase.
 
-## Git Workflow
-- **Commit Style**: Use conventional commits (feat:, fix:, chore:, refactor:).
-- **Atomic Commits**: Keep commits focused on a single logical change.
+## Git Workflow & Commits
+- **Language**: Commit messages MUST ALWAYS be written in **English**.
+- **Format**: Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
+- **Author Identity**: Always commit as `Lucas Silva <rm.pessoal13@gmail.com>`.
+- **No Signatures**: NEVER include `Co-authored-by` lines or AI assistant signatures in commits.
+- **Message Style**: Concise, minimal necessary description.
