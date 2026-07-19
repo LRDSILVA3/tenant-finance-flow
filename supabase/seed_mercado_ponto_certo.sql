@@ -1,9 +1,5 @@
--- ==============================================================================
--- SCRIPT DE POPULAÇÃO DE DADOS (SEED) - MERCADO PONTO CERTO
--- ==============================================================================
--- Execute este script no SQL Editor do painel do Supabase para preencher
--- o Mercado Ponto Certo com dados ricos de Produtos, Clientes, Estoque e Vendas.
--- ==============================================================================
+-- Migration: 20260719030000_seed_mercado_ponto_certo_data.sql
+-- Description: Preenche o cliente Mercado Ponto Certo com produtos EAN, clientes expandidos, movimentacoes e transacoes financeiras.
 
 DO $$
 DECLARE
@@ -15,26 +11,24 @@ DECLARE
   v_cat_vendas UUID;
   v_cat_mercadorias UUID;
   v_cat_aluguel UUID;
-  v_cat_salarios UUID;
   v_prod_coca UUID;
   v_prod_guarana UUID;
   v_prod_heineken UUID;
   v_prod_arroz UUID;
-  v_prod_feijao UUID;
   v_prod_omo UUID;
   v_cust_carlos UUID;
   v_cust_restaurante UUID;
   v_cust_maria UUID;
 BEGIN
-  -- 1. Obter a ID do usuário logado ou o primeiro usuário da tabela auth.users
+  -- 1. Obter a ID do primeiro usuario cadastrado no auth.users
   SELECT id INTO v_user_id FROM auth.users ORDER BY created_at ASC LIMIT 1;
 
   IF v_user_id IS NULL THEN
-    RAISE NOTICE 'Nenhum usuário encontrado na tabela auth.users. Crie uma conta no sistema primeiro.';
+    RAISE NOTICE 'Nenhum usuario em auth.users. A migracao sera executada assim que um usuario for criado.';
     RETURN;
   END IF;
 
-  -- 2. Garantir a existência do Cliente/Tenant "Mercado Ponto Certo"
+  -- 2. Garantir a existencia do Cliente/Tenant "Mercado Ponto Certo"
   SELECT id INTO v_client_id FROM public.clients WHERE user_id = v_user_id AND name ILIKE '%Mercado Ponto Certo%' LIMIT 1;
 
   IF v_client_id IS NULL THEN
@@ -43,27 +37,25 @@ BEGIN
     RETURNING id INTO v_client_id;
   END IF;
 
-  RAISE NOTICE 'Populando cliente Mercado Ponto Certo (ID: %)...', v_client_id;
-
-  -- 3. Categorias Financeiras Padrão
+  -- 3. Categorias Financeiras Padrao (Incluindo user_id)
   SELECT id INTO v_cat_vendas FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Venda%' AND type = 'income' LIMIT 1;
   IF v_cat_vendas IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Venda de Produtos', 'income', '1.01')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Venda de Produtos', 'income', '1.01')
     RETURNING id INTO v_cat_vendas;
   END IF;
 
   SELECT id INTO v_cat_mercadorias FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Mercadoria%' AND type = 'expense' LIMIT 1;
   IF v_cat_mercadorias IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Custo com Mercadorias (CMV)', 'expense', '2.01')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Custo com Mercadorias (CMV)', 'expense', '2.01')
     RETURNING id INTO v_cat_mercadorias;
   END IF;
 
   SELECT id INTO v_cat_aluguel FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Aluguel%' AND type = 'expense' LIMIT 1;
   IF v_cat_aluguel IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Aluguel e Condomínio', 'expense', '2.02')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Aluguel e Condomínio', 'expense', '2.02')
     RETURNING id INTO v_cat_aluguel;
   END IF;
 
@@ -96,7 +88,7 @@ BEGIN
   VALUES (v_client_id, 'Maria Aparecida Santos', '987.654.321-11', '(11) 97654-3210', 'maria.santos@outlook.com', 'PF', '1992-11-20', '01301-000', 'Rua da Consolação', '250', 'Centro', 'São Paulo', 'SP')
   RETURNING id INTO v_cust_maria;
 
-  -- 6. Produtos (ERP Expandido com Categoria, Unidade, SKU e Localização)
+  -- 6. Produtos (ERP Expandido com Categoria, Unidade, SKU e Localizacao)
   INSERT INTO public.products (client_id, supplier_id, name, sku, cost_price, sale_price, current_stock, min_stock, category, unit, location, description)
   VALUES (v_client_id, v_supp_cocacola, 'Refrigerante Coca-Cola 2L', '7894900011517', 6.50, 10.99, 48, 12, 'Bebidas', 'UN', 'Prateleira A1', 'Refrigerante de cola garrafa 2 litros pet')
   RETURNING id INTO v_prod_coca;
@@ -117,7 +109,7 @@ BEGIN
   VALUES (v_client_id, v_supp_unilever, 'Sabão em Pó OMO Lavagem Perfeita 1kg', '7891030001010', 14.50, 22.90, 15, 5, 'Limpeza', 'CX', 'Prateleira D4', 'Detergente em pó Omo 1kg caixa')
   RETURNING id INTO v_prod_omo;
 
-  -- 7. Lançamentos Financeiros (Vendas e Custos para dar vida aos gráficos)
+  -- 7. Lancamentos Financeiros (Vendas e Custos)
   INSERT INTO public.transactions (client_id, type, category_id, amount, description, date, reference, payment_method, customer_id, notes)
   VALUES 
     (v_client_id, 'income', v_cat_vendas, 15480.00, 'Vendas Totais do Mês - Mercado Ponto Certo', CURRENT_DATE - INTERVAL '2 days', 'Venda #1001', 'pix', v_cust_restaurante, 'Vendas de bebidas e mantimentos no atacado'),
@@ -126,5 +118,4 @@ BEGIN
     (v_client_id, 'expense', v_cat_mercadorias, 6420.00, 'Reposição de Estoque Coca-Cola e Ambev', CURRENT_DATE - INTERVAL '5 days', 'NF-e #45210', NULL, 'Boleto faturado para 30 dias'),
     (v_client_id, 'expense', v_cat_aluguel, 2800.00, 'Aluguel Comercial do Galpão', CURRENT_DATE - INTERVAL '10 days', 'Recibo #07/2026', NULL, 'Pago via Pix');
 
-  RAISE NOTICE '✅ Dados do Mercado Ponto Certo populados com sucesso!';
 END $$;

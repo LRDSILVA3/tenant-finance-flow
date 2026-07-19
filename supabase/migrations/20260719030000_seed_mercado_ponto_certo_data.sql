@@ -37,25 +37,25 @@ BEGIN
     RETURNING id INTO v_client_id;
   END IF;
 
-  -- 3. Categorias Financeiras Padrao
+  -- 3. Categorias Financeiras Padrao (Incluindo user_id)
   SELECT id INTO v_cat_vendas FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Venda%' AND type = 'income' LIMIT 1;
   IF v_cat_vendas IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Venda de Produtos', 'income', '1.01')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Venda de Produtos', 'income', '1.01')
     RETURNING id INTO v_cat_vendas;
   END IF;
 
   SELECT id INTO v_cat_mercadorias FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Mercadoria%' AND type = 'expense' LIMIT 1;
   IF v_cat_mercadorias IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Custo com Mercadorias (CMV)', 'expense', '2.01')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Custo com Mercadorias (CMV)', 'expense', '2.01')
     RETURNING id INTO v_cat_mercadorias;
   END IF;
 
   SELECT id INTO v_cat_aluguel FROM public.categories WHERE client_id = v_client_id AND name ILIKE '%Aluguel%' AND type = 'expense' LIMIT 1;
   IF v_cat_aluguel IS NULL THEN
-    INSERT INTO public.categories (client_id, name, type, code)
-    VALUES (v_client_id, 'Aluguel e Condomínio', 'expense', '2.02')
+    INSERT INTO public.categories (user_id, client_id, name, type, code)
+    VALUES (v_user_id, v_client_id, 'Aluguel e Condomínio', 'expense', '2.02')
     RETURNING id INTO v_cat_aluguel;
   END IF;
 
