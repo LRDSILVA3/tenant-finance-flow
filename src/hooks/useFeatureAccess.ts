@@ -16,14 +16,21 @@ export const useFeatureAccess = () => {
       return new Date(currentSubscription.currentPeriodEnd) > now;
     }
 
-    if (currentSubscription.status === 'trialing') {
+    if (currentSubscription.status === 'trialing' || currentSubscription.status === 'future') {
+      return new Date(currentSubscription.trialEnd) > now;
+    }
+
+    if (currentSubscription.status === 'pending') {
       return new Date(currentSubscription.trialEnd) > now;
     }
 
     // Status cancelado: Permite acesso apenas se ainda não expirou o período pago
     if (currentSubscription.status === 'canceled') {
-      const endDate = currentSubscription.currentPeriodEnd || currentSubscription.trialEnd;
-      return new Date(endDate) > now;
+      const trialEnd = currentSubscription.trialEnd ? new Date(currentSubscription.trialEnd) : null;
+      const periodEnd = currentSubscription.currentPeriodEnd ? new Date(currentSubscription.currentPeriodEnd) : new Date();
+      
+      const endDate = (trialEnd && trialEnd > now) ? trialEnd : periodEnd;
+      return endDate > now;
     }
 
     return false;

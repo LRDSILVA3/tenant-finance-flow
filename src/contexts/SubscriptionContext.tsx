@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { createPagarmeSubscription, cancelPagarmeSubscription } from '@/integrations/supabase/pagarme';
+import { createPagarmeSubscription, cancelPagarmeSubscription, translatePagarmeError } from '@/integrations/supabase/pagarme';
 import { useAuth } from '@/hooks/useAuth';
 import { Subscription, Plan, BillingMethod, SubscriptionStatus, Address } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
@@ -31,6 +31,13 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [billingMethods, setBillingMethods] = useState<BillingMethod[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
+
+  // Reset context states when user changes/logs out
+  useEffect(() => {
+    setCurrentSubscription(null);
+    setCurrentPlan(null);
+    setBillingMethods([]);
+  }, [user?.id]);
 
   const loadPlans = useCallback(async () => {
     setLoadingPlans(true);
@@ -190,8 +197,9 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       throw new Error(response.error || "Erro no pagamento");
     } catch (error: any) {
       console.error("Subscription Error Details:", error);
-      toast({ title: "Erro no pagamento", description: error.message, variant: 'destructive' });
-      return { success: false, error: error.message };
+      const friendlyMessage = translatePagarmeError(error.message);
+      toast({ title: "Erro no pagamento", description: friendlyMessage, variant: 'destructive' });
+      return { success: false, error: friendlyMessage };
     } finally {
       setLoadingSubscription(false);
     }

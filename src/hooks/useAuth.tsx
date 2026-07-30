@@ -37,7 +37,20 @@ export const useAuth = (): UseAuthReturn => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      // Force clear local storage keys for supabase auth
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('sb-') || key.includes('supabase.auth')) {
+          localStorage.removeItem(key);
+        }
+      }
+      // Force redirect to landing page
+      window.location.href = '/';
+    }
   };
 
   return { user, session, loading, signOut };

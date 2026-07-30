@@ -1,8 +1,9 @@
 // Inventory Component - Contains Products & Suppliers tabs, item creation, stock movements, alerts, and Realtime Mobile Barcode Scanner
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Switch } from '@/components/ui/switch';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
@@ -47,6 +48,15 @@ import {
   Barcode,
   Sparkles,
 } from 'lucide-react';
+
+const isSameCart = (cartA: any[], cartB: any[]) => {
+  if (!cartA || !cartB) return false;
+  if (cartA.length !== cartB.length) return false;
+  return cartA.every((itemA, index) => {
+    const itemB = cartB[index];
+    return itemB && itemA.product?.id === itemB.product?.id && itemA.quantity === itemB.quantity;
+  });
+};
 
 // Global Open EAN/GTIN Product Lookup (Open Food Facts API)
 const fetchEanInfo = async (sku: string) => {
@@ -160,6 +170,7 @@ export const Inventory: React.FC = () => {
   const [scanSessionId, setScanSessionId] = useState<string>(() => crypto.randomUUID());
   const [scanConnected, setScanConnected] = useState(false);
   const [scanMode, setScanMode] = useState<'sale' | 'in' | 'adjustment'>('sale');
+  const [mobileSyncWorkflow, setMobileSyncWorkflow] = useState(true);
   
   // Scanner Mode: Cart (Venda)
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -313,15 +324,34 @@ export const Inventory: React.FC = () => {
     scanModeRef.current = scanMode;
   }, [scanMode]);
 
+  const mobileSyncWorkflowRef = React.useRef(mobileSyncWorkflow);
+  useEffect(() => {
+    mobileSyncWorkflowRef.current = mobileSyncWorkflow;
+  }, [mobileSyncWorkflow]);
+
+  const cartItemsRef = React.useRef(cartItems);
+  useEffect(() => {
+    cartItemsRef.current = cartItems;
+  }, [cartItems]);
+
+  const activeChannelRef = React.useRef<any>(null);
+
   // Handle Realtime Barcode Event from Mobile Phone (Stable reference)
   const handleBarcodeReceived = useCallback((code: string) => {
     if (!code) return;
     const cleanCode = code.trim();
+
+    playPcBeep(880, 0.12);
+
+    if (mobileSyncWorkflowRef.current) {
+      // In Mobile Sync Workflow, the phone processes the database operations.
+      // The PC only plays a beep and updates logs, but doesn't pop up modals.
+      return;
+    }
+
     const currentProducts = productsRef.current;
     const currentScanMode = scanModeRef.current;
     const foundProduct = currentProducts.find(p => p.sku && p.sku.trim() === cleanCode);
-
-    playPcBeep(880, 0.12);
 
     if (currentScanMode === 'sale') {
       if (!foundProduct) {
@@ -420,19 +450,70 @@ export const Inventory: React.FC = () => {
       config: { broadcast: { self: true } }
     });
 
-    channel.on('broadcast', { event: 'join' }, () => {
+    activeChannelRef.current = channel;
+
+    channel.on('broadcast', { event: 'join' }, async () => {
       setScanConnected(true);
       playPcBeep(523.25, 0.15); // Som agradável de conexão
+
+      const { data: { session } } = await supabase.auth.getSession();
+
       channel.send({
         type: 'broadcast',
         event: 'join_ack',
-        payload: {}
+        payload: {
+          mobileWorkflowEnabled: mobileSyncWorkflowRef.current,
+          scanMode: scanModeRef.current,
+          clientId: currentClient?.id,
+          clientName: currentClient?.name,
+          cartItems: cartItemsRef.current,
+          session: session ? {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          } : null
+        }
       });
     });
 
     channel.on('broadcast', { event: 'barcode' }, ({ payload }) => {
       if (payload && payload.code) {
         handleBarcodeReceived(payload.code);
+      }
+    });
+
+    channel.on('broadcast', { event: 'cart_sync' }, ({ payload }) => {
+      console.log("PC: Recebeu evento 'cart_sync':", payload);
+      if (payload && payload.cartItems) {
+        const same = isSameCart(payload.cartItems, cartItemsRef.current);
+        console.log("PC: isSameCart comparado com local ref:", same, "Payload:", payload.cartItems, "Ref:", cartItemsRef.current);
+        if (!same) {
+          setCartItems(payload.cartItems);
+        }
+      }
+    });
+
+    channel.on('broadcast', { event: 'cart_finalized' }, () => {
+      setCartItems([]);
+      loadProducts();
+    });
+
+    channel.on('broadcast', { event: 'stock_updated' }, ({ payload }) => {
+      loadProducts();
+      if (payload && payload.productName) {
+        toast({
+          title: payload.type === 'in' ? "Entrada registrada no celular" : "Estoque ajustado no celular",
+          description: `${payload.productName}: ${payload.quantity} unidades.`,
+        });
+      }
+    });
+
+    channel.on('broadcast', { event: 'mode_change' }, ({ payload }) => {
+      if (payload && payload.scanMode) {
+        setScanMode(payload.scanMode);
+        toast({
+          title: "Modo alterado no celular",
+          description: `Novo modo ativo: ${payload.scanMode === 'sale' ? 'Venda' : payload.scanMode === 'in' ? 'Entrada' : 'Ajuste'}`,
+        });
       }
     });
 
@@ -444,8 +525,36 @@ export const Inventory: React.FC = () => {
 
     return () => {
       supabase.removeChannel(channel);
+      activeChannelRef.current = null;
     };
-  }, [isScanModalOpen, scanSessionId, handleBarcodeReceived]);
+  }, [isScanModalOpen, scanSessionId, handleBarcodeReceived, loadProducts, currentClient]);
+
+  // Sync configs when scanMode or mobileSyncWorkflow changes
+  useEffect(() => {
+    if (activeChannelRef.current && scanConnected && currentClient) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'config_update',
+        payload: {
+          mobileWorkflowEnabled: mobileSyncWorkflow,
+          scanMode: scanMode,
+          clientId: currentClient.id,
+          clientName: currentClient.name,
+        }
+      });
+    }
+  }, [scanMode, mobileSyncWorkflow, scanConnected, currentClient]);
+
+  // Synchronize PC's cart changes back to the mobile phone
+  useEffect(() => {
+    if (activeChannelRef.current && scanConnected) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'cart_sync',
+        payload: { cartItems }
+      });
+    }
+  }, [cartItems, scanConnected]);
 
   // Hardware USB / Bluetooth Barcode Scanner Listener
   useEffect(() => {
@@ -1204,6 +1313,24 @@ export const Inventory: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4 py-2">
+                {/* Mobile sync workflow toggle */}
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg border border-primary/10">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="mobile-sync-toggle" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                      <Smartphone className="h-4 w-4 text-primary animate-pulse" />
+                      Modo Portátil (Continuar no Celular)
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Permite inserir a quantidade, registrar entradas/ajustes e fechar o carrinho direto no celular de onde estiver.
+                    </p>
+                  </div>
+                  <Switch
+                    id="mobile-sync-toggle"
+                    checked={mobileSyncWorkflow}
+                    onCheckedChange={setMobileSyncWorkflow}
+                  />
+                </div>
+
                 {/* Mode Selectors */}
                 <div className="grid grid-cols-3 gap-2">
                   <Button

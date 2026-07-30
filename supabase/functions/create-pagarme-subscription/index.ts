@@ -76,8 +76,102 @@ serve(async (req) => {
       throw new Error("Plan not found");
     }
 
+    const { data: existingSub } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('client_id', clientId)
+      .maybeSingle();
+
+    if (amount === 0) {
+      console.log(`Bypassing Pagar.me for zero-amount plan ${planName}`);
+      const now = new Date();
+      const periodEndDate = new Date();
+      periodEndDate.setMonth(now.getMonth() + 1);
+
+      const subData = {
+        client_id: clientId,
+        plan_id: planId,
+        status: 'active',
+        provider_subscription_id: null,
+        trial_start: now.toISOString(),
+        trial_end: now.toISOString(),
+        current_period_start: now.toISOString(),
+        current_period_end: periodEndDate.toISOString(),
+        updated_at: now.toISOString(),
+      };
+
+      let dbError;
+      if (existingSub) {
+        const { error } = await supabase
+          .from('subscriptions')
+          .update(subData)
+          .eq('id', (existingSub as { id: string }).id);
+        dbError = error;
+      } else {
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert(subData);
+        dbError = error;
+      }
+
+      if (dbError) {
+        console.error("Database Error:", dbError);
+        throw new Error("Erro ao salvar assinatura grátis no banco de dados");
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          pagarmeSubscriptionId: null,
+          status: 'active',
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
     const trialMonths = plan.trial_months || 0;
     const trialDays = trialMonths > 0 ? 7 : 0; // Trial de 7 dias fixos para os planos que oferecem degustação
+
+    // --- PIX Trial Onboarding Bypass ---
+    if (paymentMethod === 'pix' && trialDays > 0 && !existingSub) {
+      console.log(`Bypassing Pagar.me for new PIX subscription with trial for plan ${planName}`);
+      const now = new Date();
+      const trialEndDate = new Date();
+      trialEndDate.setDate(now.getDate() + trialDays);
+
+      const periodEndDate = new Date();
+      periodEndDate.setMonth(now.getMonth() + 1);
+
+      const subData = {
+        client_id: clientId,
+        plan_id: planId,
+        status: 'trialing',
+        provider_subscription_id: null,
+        trial_start: now.toISOString(),
+        trial_end: trialEndDate.toISOString(),
+        current_period_start: now.toISOString(),
+        current_period_end: periodEndDate.toISOString(),
+        updated_at: now.toISOString(),
+      };
+
+      const { error: dbError } = await supabase
+        .from('subscriptions')
+        .insert(subData);
+
+      if (dbError) {
+        console.error("Database Error:", dbError);
+        throw new Error("Erro ao salvar assinatura de teste no banco de dados");
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          pagarmeSubscriptionId: null,
+          status: 'trialing',
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
 
     let pagarmeData;
     let endpoint = "https://api.pagar.me/core/v5/subscriptions";
@@ -190,9 +284,12 @@ serve(async (req) => {
         items: [
           {
             amount: amount,
+            unit_price: amount,
             description: `Plano ${planName}`,
+            title: `Plano ${planName}`,
             quantity: 1,
-            code: planId
+            code: planId,
+            tangible: false
           }
         ],
         payments: [
@@ -232,24 +329,31 @@ serve(async (req) => {
       throw new Error(errorDetails || pagarmeData.message || "Pagar.me API error");
     }
 
-    // 2. Update Supabase Database using Service Role
-    const { data: existingSub } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('client_id', clientId)
-      .maybeSingle();
+    if (pagarmeData.status === 'failed') {
+      console.error("Pagar.me Order Failed:", JSON.stringify(pagarmeData, null, 2));
+      const charge = pagarmeData.charges?.[0];
+      const tx = charge?.last_transaction;
+      const gatewayError = tx?.gateway_response?.errors?.[0]?.message;
+      const failureReason = gatewayError || tx?.failure_reason || tx?.acquirer_message || pagarmeData.failure_reason || "Falha ao processar pagamento com o gateway";
+      throw new Error(failureReason);
+    }
 
+    // 2. Update Supabase Database using Service Role
     const now = new Date();
     const trialEndDate = new Date();
     trialEndDate.setDate(now.getDate() + trialDays);
 
     const periodEndDate = new Date();
-    periodEndDate.setMonth(now.getMonth() + (trialMonths || 1));
+    periodEndDate.setMonth(now.getMonth() + 1);
+
+    const initialStatus = paymentMethod === 'pix' 
+      ? (trialDays > 0 ? 'trialing' : 'pending') 
+      : pagarmeData.status;
 
     const subData = {
       client_id: clientId,
       plan_id: planId,
-      status: paymentMethod === 'pix' ? 'pending' : pagarmeData.status, // active/trialing for card, pending for pix
+      status: initialStatus,
       provider_subscription_id: pagarmeData.id,
       trial_start: now.toISOString(),
       trial_end: trialEndDate.toISOString(),

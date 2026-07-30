@@ -83,7 +83,7 @@ export interface UserSettings {
   enableCommission: boolean;
 }
 
-export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'future';
 
 export interface PlanFeatures {
   payment_methods: boolean;

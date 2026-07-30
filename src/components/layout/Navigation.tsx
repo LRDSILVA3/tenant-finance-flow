@@ -59,9 +59,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
     if (!currentSubscription || userProfile?.isAdmin) return null;
 
     const now = new Date();
-    const endDate = currentSubscription.status === 'trialing' 
-      ? new Date(currentSubscription.trialEnd) 
-      : new Date(currentSubscription.currentPeriodEnd);
+    const trialEnd = currentSubscription.trialEnd ? new Date(currentSubscription.trialEnd) : null;
+    const periodEnd = currentSubscription.currentPeriodEnd ? new Date(currentSubscription.currentPeriodEnd) : new Date();
+
+    const endDate = (currentSubscription.status === 'trialing' || currentSubscription.status === 'pending' || currentSubscription.status === 'future' || (currentSubscription.status === 'canceled' && trialEnd && trialEnd > now)) 
+      ? (trialEnd || periodEnd) 
+      : periodEnd;
 
     const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -76,9 +79,11 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
       return {
         type: 'warning',
         title: 'Atenção',
-        message: currentSubscription.status === 'trialing' 
+        message: (currentSubscription.status === 'trialing' || currentSubscription.status === 'future') 
           ? `Seu período de teste grátis termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
-          : `Sua assinatura expira em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}. Verifique seu método de pagamento.`,
+          : currentSubscription.status === 'canceled'
+            ? `Seu acesso à conta termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
+            : `Sua assinatura expira em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}. Verifique seu método de pagamento.`,
         variant: 'default' as const
       };
     }

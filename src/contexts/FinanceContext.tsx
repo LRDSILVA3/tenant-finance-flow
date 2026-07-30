@@ -34,7 +34,7 @@ interface FinanceContextType {
   clients: Client[];
   currentClient: Client | null;
   setCurrentClient: (client: Client | null) => void;
-  addClient: (client: { name: string; taxId?: string }) => Promise<string | undefined>;
+  addClient: (client: { name: string; taxId?: string }, userId?: string) => Promise<string | undefined>;
   loadingClients: boolean;
 
   // Addresses
@@ -109,6 +109,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
 
+  // Reset context states when user changes/logs out
+  useEffect(() => {
+    setClients([]);
+    setCurrentClient(null);
+    setUserProfile(null);
+    setUserRole(null);
+    setCurrentAddress(null);
+  }, [user?.id]);
+
   const t = translations[language];
   const isAuthenticated = !!user;
 
@@ -120,6 +129,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const status = currentSubscription.status;
     if (status === 'active') return new Date(currentSubscription.currentPeriodEnd) > now;
     if (status === 'trialing') return new Date(currentSubscription.trialEnd) > now;
+    if (status === 'pending') return new Date(currentSubscription.trialEnd) > now;
     if (status === 'canceled') {
       const endDate = currentSubscription.currentPeriodEnd || currentSubscription.trialEnd;
       return new Date(endDate) > now;
@@ -193,6 +203,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (data) setUserProfile({ 
           id: data.id, 
           isAdmin: data.is_admin, 
+          email: data.email || user.email || undefined,
           whatsappNumber: data.whatsapp_number,
           updatedAt: new Date(data.updated_at) 
         });
@@ -265,9 +276,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, [currentPlan, isSubscriptionActive, userProfile?.isAdmin]);
 
-  const addClient = useCallback(async (client: { name: string; taxId?: string }) => {
-    if (!user) return;
-    const { data } = await supabase.from('clients').insert({ user_id: user.id, name: client.name, tax_id: client.taxId }).select().single();
+  const addClient = useCallback(async (client: { name: string; taxId?: string }, userId?: string) => {
+    const targetUserId = userId || user?.id;
+    if (!targetUserId) return;
+    const { data } = await supabase.from('clients').insert({ user_id: targetUserId, name: client.name, tax_id: client.taxId }).select().single();
     if (data) {
       const newC = { id: data.id, name: data.name, taxId: data.tax_id, createdAt: new Date(data.created_at) };
       setClients(prev => [...prev, newC]);

@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
+import { translatePagarmeError } from '@/integrations/supabase/pagarme';
 
 interface PaymentModalProps {
   plan: Plan | null;
@@ -233,17 +234,32 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ plan, isOpen, onClos
       }
     } catch (error: any) {
       console.error("Erro no processamento do pagamento:", error);
+      const friendlyMessage = translatePagarmeError(error.message);
       toast({
         title: "Falha no Pagamento",
-        description: error.message,
+        description: friendlyMessage,
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !loading) {
+        onClose();
+      }
+    }}>
+      <DialogContent 
+        className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (loading) {
+            e.preventDefault();
+          }
+        }}
+      >
         {showPixResult && qrCode ? (
           <div className="space-y-6 py-4 text-center">
             <DialogHeader>

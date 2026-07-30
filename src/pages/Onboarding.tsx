@@ -98,7 +98,7 @@ export default function Onboarding() {
     
     // If authenticated but without plan subscription, auto-set step 2
     if (!authLoading && isAuthenticated && !loadingClients && !loadingSubscription && clients.length > 0 && !currentSubscription) {
-      setStep(2);
+      setStep(prev => prev < 2 ? 2 : prev);
       if (clients[0]) {
         setCompanyName(clients[0].name);
         setTaxId(clients[0].taxId || '');
@@ -174,7 +174,7 @@ export default function Onboarding() {
           }
 
           // Create client under new user session (address is created in step 3 or saved as blank for now)
-          await addClient({ name: companyName, taxId });
+          await addClient({ name: companyName, taxId }, data.user.id);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Erro desconhecido';
           toast({ title: 'Erro ao criar conta', description: message, variant: 'destructive' });
@@ -424,7 +424,7 @@ export default function Onboarding() {
 
 
 
-  if (authLoading || loadingClients || loadingPlans || (isAuthenticated && loadingSubscription)) {
+  if (authLoading || loadingClients || loadingPlans || (isAuthenticated && loadingSubscription && step === 1)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

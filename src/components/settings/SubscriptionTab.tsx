@@ -34,9 +34,20 @@ export const SubscriptionTab: React.FC = () => {
 
   const getEndDate = () => {
     if (!currentSubscription) return new Date();
-    return currentSubscription.status === 'trialing' 
-      ? currentSubscription.trialEnd 
-      : currentSubscription.currentPeriodEnd;
+    const now = new Date();
+    const trialEnd = currentSubscription.trialEnd ? new Date(currentSubscription.trialEnd) : null;
+    const periodEnd = currentSubscription.currentPeriodEnd ? new Date(currentSubscription.currentPeriodEnd) : new Date();
+
+    if (currentSubscription.status === 'canceled') {
+      if (trialEnd && trialEnd > now) {
+        return trialEnd;
+      }
+      return periodEnd;
+    }
+
+    return (currentSubscription.status === 'trialing' || currentSubscription.status === 'pending' || currentSubscription.status === 'future') 
+      ? (trialEnd || periodEnd)
+      : periodEnd;
   };
 
   const isWithinRefundPeriod = () => {
@@ -68,6 +79,24 @@ export const SubscriptionTab: React.FC = () => {
 
   const isCanceled = currentSubscription?.status === 'canceled';
 
+  const getBadgeDetails = () => {
+    if (!currentSubscription) return { label: 'Inativo', variant: 'destructive' as const };
+    if (isCanceled) return { label: 'Cancelado', variant: 'destructive' as const };
+    if (currentSubscription.status === 'trialing' || currentSubscription.status === 'future') {
+      return { label: t.trialPeriod, variant: 'secondary' as const };
+    }
+    if (currentSubscription.status === 'pending') {
+      const now = new Date();
+      if (new Date(currentSubscription.trialEnd) > now) {
+        return { label: t.trialPeriod, variant: 'secondary' as const };
+      }
+      return { label: t.pending, variant: 'outline' as const };
+    }
+    return { label: 'Ativo', variant: 'default' as const };
+  };
+
+  const badgeDetails = getBadgeDetails();
+
   return (
     <div className="space-y-6 animate-fade-in">
       {currentPlan && currentSubscription && (
@@ -78,20 +107,24 @@ export const SubscriptionTab: React.FC = () => {
                 <ShieldCheck className="h-5 w-5 text-primary" />
                 {t.currentPlan}: {currentPlan.name}
               </CardTitle>
-              <Badge variant={isCanceled ? 'destructive' : currentSubscription.status === 'trialing' ? 'secondary' : 'default'}>
-                {isCanceled ? 'Cancelado' : currentSubscription.status === 'trialing' ? t.trialPeriod : 'Ativo'}
+              <Badge variant={badgeDetails.variant}>
+                {badgeDetails.label}
               </Badge>
             </div>
             <CardDescription>
               {isCanceled 
                 ? `Sua assinatura foi cancelada. Você continuará tendo acesso aos recursos do plano ${currentPlan.name} até o final do período vigente.`
-                : currentPlan.description}
+                : (currentSubscription.status === 'future' || currentSubscription.status === 'trialing')
+                  ? `Você está no período de teste gratuito do plano ${currentPlan.name}. A cobrança recorrente começará a partir de ${format(getEndDate(), 'dd/MM/yyyy')}.`
+                  : currentPlan.description}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <p className="text-muted-foreground">
-                {isCanceled ? 'Acesso disponível até' : t.activeUntil}: <span className="font-semibold text-foreground">
+                {(currentSubscription.status === 'trialing' || currentSubscription.status === 'future')
+                  ? 'Período de teste gratuito até'
+                  : (isCanceled ? 'Acesso disponível até' : t.activeUntil)}: <span className="font-semibold text-foreground">
                   {format(getEndDate(), 'dd/MM/yyyy')}
                 </span>
               </p>
