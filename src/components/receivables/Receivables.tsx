@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { MoneyInput } from '@/components/ui/money-input';
 import { 
   Select, 
   SelectContent, 
@@ -83,6 +84,7 @@ export const Receivables: React.FC = () => {
     getCategoryById,
     getCustomerById,
     updateTransaction,
+    addTransaction,
     userSettings
   } = useFinance();
 
@@ -91,6 +93,8 @@ export const Receivables: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [partialAction, setPartialAction] = useState<'discount' | 'split'>('split');
   const [confirming, setConfirming] = useState(false);
 
   // Filter pending income transactions with customerId
@@ -165,9 +169,11 @@ export const Receivables: React.FC = () => {
 
   const handleOpenPaymentDialog = (tx: Transaction) => {
     setSelectedTx(tx);
-    // Set default payment method to first option
+    // Set default values
     setPaymentMethod('pix');
     setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaidAmount(tx.amount);
+    setPartialAction('split');
   };
 
   const handleMarkAsPaid = async () => {
@@ -176,14 +182,48 @@ export const Receivables: React.FC = () => {
 
     try {
       const selectedDate = new Date(paymentDate + 'T12:00:00');
-      await updateTransaction(selectedTx.id, {
-        paymentMethod: paymentMethod,
-        date: selectedDate
-      });
-      toast({
-        title: "Recebimento Confirmado!",
-        description: `O lançamento de ${formatCurrency(selectedTx.amount)} foi marcado como pago via ${paymentMethod} em ${formatDate(selectedDate)}.`,
-      });
+      const originalAmount = selectedTx.amount;
+      const difference = originalAmount - paidAmount;
+
+      if (difference > 0 && partialAction === 'split') {
+        // Update original to paid amount and mark as paid
+        await updateTransaction(selectedTx.id, {
+          amount: paidAmount,
+          paymentMethod: paymentMethod,
+          date: selectedDate
+        });
+
+        // Add a new pending transaction with the remainder
+        await addTransaction({
+          clientId: selectedTx.clientId,
+          categoryId: selectedTx.categoryId,
+          type: 'income',
+          amount: difference,
+          description: `${selectedTx.description} (Saldo Remanescente)`,
+          date: selectedTx.date, // keep original date
+          paymentMethod: 'pending',
+          customerId: selectedTx.customerId,
+          notes: `Saldo devedor restante do lançamento original de ${formatCurrency(originalAmount)} no qual foi pago ${formatCurrency(paidAmount)} em ${formatDate(selectedDate)}.`
+        });
+
+        toast({
+          title: "Pagamento Parcial Confirmado!",
+          description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. Restante de ${formatCurrency(difference)} criado como nova conta pendente.`,
+        });
+      } else {
+        // Update original to paidAmount and mark as paid (full or with discount)
+        await updateTransaction(selectedTx.id, {
+          amount: paidAmount,
+          paymentMethod: paymentMethod,
+          date: selectedDate
+        });
+
+        toast({
+          title: "Recebimento Confirmado!",
+          description: `Lançamento de ${formatCurrency(paidAmount)} marcado como pago via ${paymentMethod}.${difference > 0 ? ' (Diferença lançada como desconto)' : ''}`,
+        });
+      }
+
       setSelectedTx(null);
     } catch (error) {
       toast({
@@ -384,17 +424,62 @@ export const Receivables: React.FC = () => {
               <div className="border p-3 rounded-lg bg-muted/30">
                 <div className="text-xs text-muted-foreground mb-1">Título / Descrição</div>
                 <div className="font-semibold text-sm">{selectedTx.description}</div>
-                <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t">
+              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t">
                   <div>
                     <span className="text-[10px] text-muted-foreground block uppercase">Data Original</span>
                     <span className="text-xs font-medium">{formatDate(selectedTx.date)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-muted-foreground block uppercase">Valor</span>
-                    <span className="text-sm font-bold text-emerald-600 money-font">{formatCurrency(selectedTx.amount)}</span>
+                    <span className="text-[10px] text-muted-foreground block uppercase">Valor Original</span>
+                    <span className="text-sm font-bold text-muted-foreground money-font">{formatCurrency(selectedTx.amount)}</span>
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paidAmount">Valor Pago (R$)</Label>
+                <MoneyInput
+                  id="paidAmount"
+                  value={paidAmount}
+                  onChange={(val) => setPaidAmount(val)}
+                />
+              </div>
+
+              {paidAmount < selectedTx.amount && (
+                <div className="space-y-2 border p-3 rounded-lg bg-amber-500/5 border-amber-500/20">
+                  <Label className="text-xs font-semibold text-amber-700 block mb-1">
+                    O valor pago é menor que o devido ({formatCurrency(selectedTx.amount)})
+                  </Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="split"
+                        name="partialAction"
+                        checked={partialAction === 'split'}
+                        onChange={() => setPartialAction('split')}
+                        className="h-4 w-4 text-primary"
+                      />
+                      <Label htmlFor="split" className="text-xs font-normal cursor-pointer">
+                        <strong>Manter saldo devedor:</strong> Gerar nova conta pendente de <strong>{formatCurrency(selectedTx.amount - paidAmount)}</strong>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="discount"
+                        name="partialAction"
+                        checked={partialAction === 'discount'}
+                        onChange={() => setPartialAction('discount')}
+                        className="h-4 w-4 text-primary"
+                      />
+                      <Label htmlFor="discount" className="text-xs font-normal cursor-pointer">
+                        <strong>Dar baixa total (desconto):</strong> Considerar a dívida quitada com esse valor.
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Forma de Pagamento Recebida</Label>
