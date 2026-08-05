@@ -143,7 +143,8 @@ interface CartItem {
 }
 
 export const Inventory: React.FC = () => {
-  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications } = useFinance();
+  const { currentClient, customers, categories, addTransaction, transactions, t } = useFinance();
+  const refreshNotifications = () => {};
   const [activeTab, setActiveTab] = useState<'products' | 'suppliers'>('products');
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
