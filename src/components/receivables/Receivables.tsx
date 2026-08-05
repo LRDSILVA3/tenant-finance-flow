@@ -187,6 +187,14 @@ export const Receivables: React.FC = () => {
 
   const handleMarkAsPaid = async () => {
     if (!selectedTx) return;
+    if (paidAmount <= 0) {
+      toast({
+        title: "Valor inválido",
+        description: "O valor pago deve ser maior que R$ 0,00.",
+        variant: "destructive"
+      });
+      return;
+    }
     setConfirming(true);
 
     try {
@@ -195,11 +203,14 @@ export const Receivables: React.FC = () => {
       const difference = originalAmount - paidAmount;
 
       if (difference > 0 && partialAction === 'split') {
+        const splitOriginalNotes = (selectedTx.notes ? selectedTx.notes + '\n' : '') + `Lançamento original de ${formatCurrency(originalAmount)} pago parcialmente (${formatCurrency(paidAmount)}) em ${formatDate(selectedDate)}. Saldo restante de ${formatCurrency(difference)} desmembrado.`;
+
         // Update original to paid amount and mark as paid
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
-          date: selectedDate
+          date: selectedDate,
+          notes: splitOriginalNotes
         });
 
         const newDueDate = new Date(remainderDueDate + 'T12:00:00');
@@ -221,11 +232,14 @@ export const Receivables: React.FC = () => {
           description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. Saldo devedor restante de ${formatCurrency(difference)} agendado para ${formatDate(newDueDate)}.`,
         });
       } else if (difference > 0 && partialAction === 'installments') {
+        const installmentsOriginalNotes = (selectedTx.notes ? selectedTx.notes + '\n' : '') + `Lançamento original de ${formatCurrency(originalAmount)} pago parcialmente (${formatCurrency(paidAmount)}) em ${formatDate(selectedDate)}. Saldo restante de ${formatCurrency(difference)} parcelado em ${installmentCount}x.`;
+
         // Update original to paid amount and mark as paid
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
-          date: selectedDate
+          date: selectedDate,
+          notes: installmentsOriginalNotes
         });
 
         // Calculate installments details
@@ -248,7 +262,7 @@ export const Receivables: React.FC = () => {
             date: installmentDate,
             paymentMethod: 'pending',
             customerId: selectedTx.customerId,
-            notes: `Parcela ${i + 1}/${installmentCount} referente ao saldo restante de ${formatCurrency(difference)} com juros de ${interestRate}% por parcela.`
+            notes: `Parcela ${i + 1}/${installmentCount} referente ao saldo restante de ${formatCurrency(difference)} com juros de ${interestRate}% por parcela. Lançamento original: ${formatCurrency(originalAmount)}.`
           });
         }
 
@@ -257,16 +271,21 @@ export const Receivables: React.FC = () => {
           description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. O restante de ${formatCurrency(difference)} foi parcelado em ${installmentCount}x de ${formatCurrency(finalInstallmentAmount)}.`,
         });
       } else {
+        const discountNotes = difference > 0
+          ? (selectedTx.notes ? selectedTx.notes + '\n' : '') + `Lançamento original de ${formatCurrency(originalAmount)} baixado com desconto/baixa total por ${formatCurrency(paidAmount)} em ${formatDate(selectedDate)}.`
+          : selectedTx.notes;
+
         // Update original to paidAmount and mark as paid (full or with discount)
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
-          date: selectedDate
+          date: selectedDate,
+          notes: discountNotes
         });
 
         toast({
           title: "Recebimento Confirmado!",
-          description: `Lançamento de ${formatCurrency(paidAmount)} marcado como pago via ${paymentMethod}.${difference > 0 ? ' (Diferença lançada como desconto)' : ''}`,
+          description: `Lançamento de ${formatCurrency(paidAmount)} marcado como pago via ${paymentMethod}.${difference > 0 ? ' (Desconto registrado nas observações)' : ''}`,
         });
       }
 
@@ -489,6 +508,9 @@ export const Receivables: React.FC = () => {
                   value={paidAmount}
                   onChange={(val) => setPaidAmount(val)}
                 />
+                {paidAmount <= 0 && (
+                  <p className="text-xs text-destructive font-medium mt-1">O valor pago deve ser maior que R$ 0,00.</p>
+                )}
               </div>
 
               {paidAmount < selectedTx.amount && (
@@ -669,7 +691,7 @@ export const Receivables: React.FC = () => {
             <Button variant="outline" onClick={() => setSelectedTx(null)} disabled={confirming}>
               Cancelar
             </Button>
-            <Button onClick={handleMarkAsPaid} disabled={confirming} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleMarkAsPaid} disabled={confirming || paidAmount <= 0} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
               {confirming ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
