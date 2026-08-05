@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer } from '@/types/finance';
+import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 
 interface TransactionContextType {
@@ -10,10 +10,12 @@ interface TransactionContextType {
   transactions: Transaction[];
   collaborators: Collaborator[];
   customers: Customer[];
+  customPaymentMethods: CustomPaymentMethod[];
   loadCategories: (clientId: string) => Promise<void>;
   loadTransactions: (clientId: string) => Promise<void>;
   loadCollaborators: (clientId: string) => Promise<void>;
   loadCustomers: (clientId: string) => Promise<void>;
+  loadCustomPaymentMethods: (clientId: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
@@ -23,6 +25,9 @@ interface TransactionContextType {
   addCollaborator: (clientId: string, name: string, maxCollaborators?: number) => Promise<Collaborator | null>;
   updateCollaborator: (id: string, name: string) => Promise<void>;
   deleteCollaborator: (id: string) => Promise<void>;
+  addCustomPaymentMethod: (clientId: string, name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => Promise<CustomPaymentMethod | null>;
+  deleteCustomPaymentMethod: (id: string) => Promise<void>;
+}
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
@@ -33,6 +38,50 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customPaymentMethods, setCustomPaymentMethods] = useState<CustomPaymentMethod[]>([]);
+
+  const loadCustomPaymentMethods = useCallback(async (clientId: string) => {
+    const { data, error } = await supabase.from('client_payment_methods').select('*').eq('client_id', clientId);
+    if (!error && data) setCustomPaymentMethods(data.map((c: any) => ({
+      id: c.id, clientId: c.client_id, name: c.name, parentType: c.parent_type as any, createdAt: new Date(c.created_at)
+    })));
+  }, []);
+
+  const addCustomPaymentMethod = useCallback(async (clientId: string, name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => {
+    if (!name.trim()) return null;
+    const { data, error } = await supabase
+      .from('client_payment_methods')
+      .insert({ client_id: clientId, name: name.trim(), parent_type: parentType })
+      .select()
+      .single();
+
+    if (!error && data) {
+      const newMethod: CustomPaymentMethod = {
+        id: data.id,
+        clientId: data.client_id,
+        name: data.name,
+        parentType: data.parent_type as any,
+        createdAt: new Date(data.created_at)
+      };
+      setCustomPaymentMethods(prev => [...prev, newMethod]);
+      toast({ title: "Forma de pagamento adicionada!" });
+      return newMethod;
+    } else {
+      console.error(error);
+      toast({ title: "Erro ao adicionar forma de pagamento", description: error?.message || "Erro desconhecido", variant: "destructive" });
+      return null;
+    }
+  }, []);
+
+  const deleteCustomPaymentMethod = useCallback(async (id: string) => {
+    const { error } = await supabase.from('client_payment_methods').delete().eq('id', id);
+    if (!error) {
+      setCustomPaymentMethods(prev => prev.filter(m => m.id !== id));
+      toast({ title: "Forma de pagamento excluída!" });
+    } else {
+      toast({ title: "Erro ao excluir forma de pagamento", variant: "destructive" });
+    }
+  }, []);
 
   const loadCategories = useCallback(async (clientId: string) => {
     const { data, error } = await supabase.from('categories').select('*').eq('client_id', clientId).order('sort_order');
@@ -43,7 +92,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const loadTransactions = useCallback(async (clientId: string) => {
-    const { data, error } = await supabase.from('transactions').select('*, transaction_commissions(*)').eq('client_id', clientId).order('date', { ascending: false });
+    const { data, error } = await supabase.from('transactions').select('*, transaction_commissions(*)').eq('client_id', clientId).order('date', { ascending: true });
     if (!error && data) setTransactions(data.map((t: any) => ({
       id: t.id, clientId: t.client_id, categoryId: t.category_id, type: t.type as TransactionType,
       amount: Number(t.amount), description: t.description, date: new Date(`${t.date}T00:00:00`),
@@ -78,6 +127,8 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       isActive: c.is_active, createdAt: new Date(c.created_at)
     })));
   }, []);
+
+
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => {
     if (!user) return;
@@ -271,15 +322,17 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [collaborators, loadCollaborators]);
 
   const value = React.useMemo(() => ({
-    categories, transactions, collaborators, customers, loadCategories, loadTransactions, loadCollaborators, loadCustomers,
+    categories, transactions, collaborators, customers, customPaymentMethods, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
-    addCollaborator, updateCollaborator, deleteCollaborator
+    addCollaborator, updateCollaborator, deleteCollaborator,
+    addCustomPaymentMethod, deleteCustomPaymentMethod
   }), [
-    categories, transactions, collaborators, customers, loadCategories, loadTransactions, loadCollaborators, loadCustomers,
+    categories, transactions, collaborators, customers, customPaymentMethods, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
-    addCollaborator, updateCollaborator, deleteCollaborator
+    addCollaborator, updateCollaborator, deleteCollaborator,
+    addCustomPaymentMethod, deleteCustomPaymentMethod
   ]);
 
   return (
