@@ -28,7 +28,6 @@ interface TransactionContextType {
   addCustomPaymentMethod: (clientId: string, name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => Promise<CustomPaymentMethod | null>;
   deleteCustomPaymentMethod: (id: string) => Promise<void>;
 }
-}
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
 
