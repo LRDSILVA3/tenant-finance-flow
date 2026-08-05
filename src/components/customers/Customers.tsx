@@ -67,7 +67,7 @@ type FilterStatus = 'all' | 'active' | 'inactive';
 export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) => void }> = ({
   onNavigateToSchedule,
 }) => {
-  const { currentClient } = useFinance();
+  const { currentClient, loadCustomers: reloadContextCustomers } = useFinance();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -197,6 +197,9 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
 
       setIsModalOpen(false);
       loadCustomers();
+      if (currentClient) {
+        reloadContextCustomers(currentClient.id);
+      }
     } catch (err) {
       toast({
         title: 'Erro ao salvar cliente',
@@ -219,6 +222,9 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
       if (error) throw error;
       toast({ title: c.isActive ? 'Cliente inativado.' : 'Cliente reativado.' });
       loadCustomers();
+      if (currentClient) {
+        reloadContextCustomers(currentClient.id);
+      }
     } catch (err) {
       toast({
         title: 'Erro ao alterar status',
@@ -239,6 +245,9 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
       setIsDeleteOpen(false);
       setSelectedCustomer(null);
       loadCustomers();
+      if (currentClient) {
+        reloadContextCustomers(currentClient.id);
+      }
     } catch (err) {
       toast({
         title: 'Erro ao remover cliente',

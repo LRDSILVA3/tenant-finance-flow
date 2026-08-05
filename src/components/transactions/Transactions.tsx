@@ -85,7 +85,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
-  MoreHorizontal
+  MoreHorizontal,
+  FileText,
+  Wallet
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -104,11 +106,56 @@ const formatDate = (date: Date) => {
 
 type ViewMode = 'list' | 'calendar';
 
-const paymentMethodIcons: Record<PaymentMethod, React.ReactNode> = {
-  cash: <Banknote className="h-3 w-3" />,
-  card: <CreditCard className="h-3 w-3" />,
-  pix: <Smartphone className="h-3 w-3" />,
-  pending: <Clock className="h-3 w-3" />,
+const getPaymentMethodIcon = (method: string) => {
+  if (!method) return null;
+  const mLower = method.toLowerCase();
+  if (mLower === 'cash' || mLower.includes('dinheiro') || mLower.includes('espécie')) {
+    return <Banknote className="h-3 w-3 text-emerald-500" />;
+  }
+  if (mLower === 'card' || mLower.includes('cartão') || mLower.includes('crédito') || mLower.includes('débito') || mLower.includes('card')) {
+    return <CreditCard className="h-3 w-3 text-blue-500" />;
+  }
+  if (mLower === 'pix') {
+    return <Smartphone className="h-3 w-3 text-purple-500" />;
+  }
+  if (mLower === 'boleto') {
+    return <FileText className="h-3 w-3 text-cyan-500" />;
+  }
+  if (mLower === 'pending' || mLower.includes('pendente')) {
+    return <Clock className="h-3 w-3 text-amber-500" />;
+  }
+  return <Wallet className="h-3 w-3 text-slate-500" />;
+};
+
+const getPaymentMethodIconLarge = (method: string) => {
+  if (!method) return null;
+  const mLower = method.toLowerCase();
+  if (mLower === 'cash' || mLower.includes('dinheiro') || mLower.includes('espécie')) {
+    return <Banknote className="h-4 w-4 text-emerald-500" />;
+  }
+  if (mLower === 'card' || mLower.includes('cartão') || mLower.includes('crédito') || mLower.includes('débito') || mLower.includes('card')) {
+    return <CreditCard className="h-4 w-4 text-blue-500" />;
+  }
+  if (mLower === 'pix') {
+    return <Smartphone className="h-4 w-4 text-purple-500" />;
+  }
+  if (mLower === 'boleto') {
+    return <FileText className="h-4 w-4 text-cyan-500" />;
+  }
+  if (mLower === 'pending' || mLower.includes('pendente')) {
+    return <Clock className="h-4 w-4 text-amber-500" />;
+  }
+  return <Wallet className="h-4 w-4 text-slate-500" />;
+};
+
+const getPaymentMethodLabel = (method: string, t: any) => {
+  if (!method) return '-';
+  if (method === 'cash') return t.cash;
+  if (method === 'card') return t.card;
+  if (method === 'pix') return t.pix;
+  if (method === 'boleto') return t.boleto;
+  if (method === 'pending') return t.pending;
+  return method;
 };
 
 export const Transactions: React.FC = () => {
@@ -129,6 +176,12 @@ export const Transactions: React.FC = () => {
     addCollaborator,
     language,
     userSettings,
+    customPaymentMethods = [],
+    clientAsaasConfig,
+    invoices = [],
+    emitInvoice,
+    cancelInvoice,
+    syncInvoice
   } = useFinance();
   const { loadTransactions } = useTransactions();
 
@@ -215,7 +268,10 @@ export const Transactions: React.FC = () => {
 
   // Get all subcategories for filter dropdown
   const allSubcategories = useMemo(() => {
-    return categories.filter(c => c.parentId !== null);
+    const parentIdsWithChildren = new Set(
+      categories.filter(c => c.parentId !== null).map(c => c.parentId)
+    );
+    return categories.filter(c => c.parentId !== null || !parentIdsWithChildren.has(c.id));
   }, [categories]);
 
   // Filter transactions
@@ -242,7 +298,7 @@ export const Transactions: React.FC = () => {
 
   const sortedTransactions = useMemo(() => {
     return [...filteredTransactions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+      new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }, [filteredTransactions]);
 
@@ -273,7 +329,10 @@ export const Transactions: React.FC = () => {
 
   const availableCategories = useMemo(() => {
     const cats = getCategoriesByType(formData.type);
-    return cats.filter((c) => c.parentId !== null);
+    const parentIdsWithChildren = new Set(
+      cats.filter(c => c.parentId !== null).map(c => c.parentId)
+    );
+    return cats.filter((c) => c.parentId !== null || !parentIdsWithChildren.has(c.id));
   }, [formData.type, getCategoriesByType]);
 
   // Filter descriptions by selected category (extract just the description strings, already sorted by frequency)
@@ -405,6 +464,35 @@ export const Transactions: React.FC = () => {
       repeatUntil: undefined as Date | undefined,
     });
     setIsDialogOpen(true);
+  };
+
+  const [operatingInvoiceId, setOperatingInvoiceId] = useState<string | null>(null);
+
+  const handleEmitInvoice = async (transactionId: string) => {
+    setOperatingInvoiceId(transactionId);
+    try {
+      await emitInvoice(transactionId);
+    } finally {
+      setOperatingInvoiceId(null);
+    }
+  };
+
+  const handleCancelInvoice = async (invoiceId: string) => {
+    setOperatingInvoiceId(invoiceId);
+    try {
+      await cancelInvoice(invoiceId);
+    } finally {
+      setOperatingInvoiceId(null);
+    }
+  };
+
+  const handleSyncInvoice = async (invoiceId: string) => {
+    setOperatingInvoiceId(invoiceId);
+    try {
+      await syncInvoice(invoiceId);
+    } finally {
+      setOperatingInvoiceId(null);
+    }
   };
 
   const handleOpenEdit = (transaction: Transaction) => {
@@ -693,28 +781,42 @@ export const Transactions: React.FC = () => {
                   <SelectItem value="all">Todas as Formas</SelectItem>
                   <SelectItem value="cash">
                     <div className="flex items-center gap-2">
-                      <Banknote className="h-4 w-4" />
+                      <Banknote className="h-4 w-4 text-emerald-500" />
                       {t.cash}
                     </div>
                   </SelectItem>
                   <SelectItem value="card">
                     <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
+                      <CreditCard className="h-4 w-4 text-blue-500" />
                       {t.card}
                     </div>
                   </SelectItem>
                   <SelectItem value="pix">
                     <div className="flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" />
+                      <Smartphone className="h-4 w-4 text-purple-500" />
                       {t.pix}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="boleto">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-cyan-500" />
+                      {t.boleto}
                     </div>
                   </SelectItem>
                   <SelectItem value="pending">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
+                      <Clock className="h-4 w-4 text-amber-500" />
                       {t.pending}
                     </div>
                   </SelectItem>
+                  {customPaymentMethods.map((m) => (
+                    <SelectItem key={m.id} value={m.name}>
+                      <div className="flex items-center gap-2">
+                        {getPaymentMethodIconLarge(m.parentType)}
+                        {m.name}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -723,19 +825,30 @@ export const Transactions: React.FC = () => {
           {/* Category Filter */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">{t.category}</Label>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.allCategories}</SelectItem>
-                {allSubcategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.code} - {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filterCategory === 'all' ? t.allCategories : (() => {
+                const selectedCat = allSubcategories.find(c => c.id === filterCategory);
+                return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
+              })()}
+              onChange={(val) => {
+                if (val === t.allCategories || !val) {
+                  setFilterCategory('all');
+                } else {
+                  const selectedCat = allSubcategories.find(c => `${c.code} - ${c.name}` === val);
+                  if (selectedCat) {
+                    setFilterCategory(selectedCat.id);
+                  } else {
+                    setFilterCategory('all');
+                  }
+                }
+              }}
+              options={[t.allCategories, ...allSubcategories.map(cat => `${cat.code} - ${cat.name}`)]}
+              placeholder={t.category}
+              searchPlaceholder="Buscar categoria..."
+              emptyMessage="Nenhuma categoria encontrada."
+              allowAdd={false}
+              className="w-[200px]"
+            />
           </div>
 
           {/* Daily Filter */}
@@ -788,35 +901,41 @@ export const Transactions: React.FC = () => {
 
         {/* Payment Method Breakdown */}
         {userSettings.enablePaymentMethods && (
-          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t text-sm">
-            <div className="flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.cash}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'cash').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.card}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'card').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.pix}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pix').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.pending}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pending').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
+          <div className="flex flex-wrap gap-x-8 gap-y-3 mt-3 pt-3 border-t text-sm">
+            {(() => {
+              const defaultMethods = ['cash', 'card', 'pix', 'boleto', 'pending'];
+              const customUsedMethods = Array.from(new Set(
+                filteredTransactions
+                  .map(txn => txn.paymentMethod)
+                  .filter(m => m && !defaultMethods.includes(m))
+              )) as string[];
+
+              const allMethods = [...defaultMethods, ...customUsedMethods];
+
+              return allMethods.map(method => {
+                const incomeTotal = filteredTransactions
+                  .filter(txn => txn.type === 'income' && txn.paymentMethod === method)
+                  .reduce((s, txn) => s + txn.amount, 0);
+
+                const expenseTotal = filteredTransactions
+                  .filter(txn => txn.type === 'expense' && txn.paymentMethod === method)
+                  .reduce((s, txn) => s + txn.amount, 0);
+
+                if (incomeTotal === 0 && expenseTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                  return null;
+                }
+
+                return (
+                  <div key={method} className="flex items-center gap-2">
+                    {getPaymentMethodIcon(method)}
+                    <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
+                    <span className="font-semibold money-font">
+                      {formatCurrency(incomeTotal - expenseTotal)}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </div>
@@ -866,6 +985,8 @@ export const Transactions: React.FC = () => {
                       .map(c => `${getCollaboratorById(c.collaboratorId)?.name || '?'}: ${formatCurrency(c.commissionAmount)}`)
                       .join(' | ');
 
+                    const invoice = invoices.find(inv => inv.transactionId === transaction.id);
+
                     return (
                       <TableRow key={transaction.id}>
                         <TableCell className="font-mono text-sm text-muted-foreground">
@@ -889,11 +1010,24 @@ export const Transactions: React.FC = () => {
                             </div>
                             <div className="flex flex-col">
                               <span className="font-medium">{transaction.description}</span>
-                              {transaction.customerId && (
-                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded mt-0.5 font-medium">
-                                  Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
-                                </span>
-                              )}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                {transaction.customerId && (
+                                  <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium">
+                                    Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                                  </span>
+                                )}
+                                {invoice && (
+                                  <span className={cn(
+                                    "text-[9px] w-fit px-1.5 py-0.5 rounded font-medium border",
+                                    invoice.status === 'AUTHORIZED' && "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+                                    invoice.status === 'ERROR' && "bg-red-500/10 text-red-700 border-red-200",
+                                    invoice.status === 'CANCELED' && "bg-slate-500/10 text-slate-700 border-slate-200",
+                                    !['AUTHORIZED', 'ERROR', 'CANCELED'].includes(invoice.status) && "bg-blue-500/10 text-blue-700 border-blue-200"
+                                  )}>
+                                    NF: {invoice.status === 'AUTHORIZED' ? 'Autorizada' : invoice.status === 'ERROR' ? 'Erro' : invoice.status === 'CANCELED' ? 'Cancelada' : 'Processando'}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
@@ -905,10 +1039,10 @@ export const Transactions: React.FC = () => {
                         </TableCell>
                         {userSettings.enablePaymentMethods && (
                           <TableCell>
-                            {transaction.type === 'income' && transaction.paymentMethod ? (
+                            {transaction.paymentMethod ? (
                               <div className="flex items-center gap-1.5 text-muted-foreground">
-                                {paymentMethodIcons[transaction.paymentMethod]}
-                                <span className="text-sm">{t[transaction.paymentMethod]}</span>
+                                {getPaymentMethodIcon(transaction.paymentMethod)}
+                                <span className="text-sm">{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
@@ -936,6 +1070,51 @@ export const Transactions: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 justify-end">
+                            {transaction.type === 'income' && transaction.customerId && clientAsaasConfig && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0"
+                                    disabled={operatingInvoiceId === transaction.id || (invoice && operatingInvoiceId === invoice.id)}
+                                  >
+                                    {operatingInvoiceId === transaction.id || (invoice && operatingInvoiceId === invoice.id) ? (
+                                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    ) : (
+                                      <FileText className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                    )}
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  {!invoice && (
+                                    <DropdownMenuItem onClick={() => handleEmitInvoice(transaction.id)}>
+                                      Emitir Nota Fiscal
+                                    </DropdownMenuItem>
+                                  )}
+                                  {invoice && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => handleSyncInvoice(invoice.id)}>
+                                        Sincronizar Status
+                                      </DropdownMenuItem>
+                                      {invoice.pdfUrl && (
+                                        <DropdownMenuItem onClick={() => window.open(invoice.pdfUrl, '_blank')}>
+                                          Visualizar PDF
+                                        </DropdownMenuItem>
+                                      )}
+                                      {invoice.status !== 'CANCELED' && (
+                                        <DropdownMenuItem 
+                                          className="text-destructive focus:text-destructive"
+                                          onClick={() => handleCancelInvoice(invoice.id)}
+                                        >
+                                          Cancelar Nota Fiscal
+                                        </DropdownMenuItem>
+                                      )}
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -975,6 +1154,7 @@ export const Transactions: React.FC = () => {
               sortedTransactions.map((transaction) => {
                 const category = getCategoryById(transaction.categoryId);
                 const commissionsList = transaction.commissions || [];
+                const invoice = invoices.find(inv => inv.transactionId === transaction.id);
                 return (
                   <div key={transaction.id} className="finance-card p-4 flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2 min-w-0">
@@ -1002,6 +1182,17 @@ export const Transactions: React.FC = () => {
                                 Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
                               </span>
                             )}
+                            {invoice && (
+                              <span className={cn(
+                                "text-[9px] w-fit px-1.5 py-0.5 rounded font-medium border",
+                                invoice.status === 'AUTHORIZED' && "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+                                invoice.status === 'ERROR' && "bg-red-500/10 text-red-700 border-red-200",
+                                invoice.status === 'CANCELED' && "bg-slate-500/10 text-slate-700 border-slate-200",
+                                !['AUTHORIZED', 'ERROR', 'CANCELED'].includes(invoice.status) && "bg-blue-500/10 text-blue-700 border-blue-200"
+                              )}>
+                                NF: {invoice.status === 'AUTHORIZED' ? 'Autorizada' : invoice.status === 'ERROR' ? 'Erro' : invoice.status === 'CANCELED' ? 'Cancelada' : 'Processando'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1025,12 +1216,12 @@ export const Transactions: React.FC = () => {
                         <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Referência</span>
                         <span className="font-medium text-foreground">{transaction.reference || '-'}</span>
                       </div>
-                      {userSettings.enablePaymentMethods && transaction.type === 'income' && transaction.paymentMethod && (
+                      {userSettings.enablePaymentMethods && transaction.paymentMethod && (
                         <div>
                           <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Forma de Pagamento</span>
                           <div className="flex items-center gap-1 mt-0.5 text-foreground">
-                            {paymentMethodIcons[transaction.paymentMethod]}
-                            <span>{t[transaction.paymentMethod]}</span>
+                            {getPaymentMethodIcon(transaction.paymentMethod)}
+                            <span>{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
                           </div>
                         </div>
                       )}
@@ -1053,6 +1244,52 @@ export const Transactions: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                      {transaction.type === 'income' && transaction.customerId && clientAsaasConfig && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 gap-1"
+                              disabled={operatingInvoiceId === transaction.id || (invoice && operatingInvoiceId === invoice.id)}
+                            >
+                              {operatingInvoiceId === transaction.id || (invoice && operatingInvoiceId === invoice.id) ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                              Nota Fiscal
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            {!invoice && (
+                              <DropdownMenuItem onClick={() => handleEmitInvoice(transaction.id)}>
+                                Emitir Nota Fiscal
+                              </DropdownMenuItem>
+                            )}
+                            {invoice && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleSyncInvoice(invoice.id)}>
+                                  Sincronizar Status
+                                </DropdownMenuItem>
+                                {invoice.pdfUrl && (
+                                  <DropdownMenuItem onClick={() => window.open(invoice.pdfUrl, '_blank')}>
+                                    Visualizar PDF
+                                  </DropdownMenuItem>
+                                )}
+                                {invoice.status !== 'CANCELED' && (
+                                  <DropdownMenuItem 
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => handleCancelInvoice(invoice.id)}
+                                  >
+                                    Cancelar Nota Fiscal
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1257,21 +1494,26 @@ export const Transactions: React.FC = () => {
 
               <div className="space-y-2">
                 <Label className={cn(errors.categoryId && "text-destructive")}>{t.category}</Label>
-                <Select
-                  value={formData.categoryId}
-                  onValueChange={(val) => updateFormField('categoryId', val)}
-                >
-                  <SelectTrigger className={cn(errors.categoryId && "border-destructive")}>
-                    <SelectValue placeholder={t.category} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCategories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.code} - {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={(() => {
+                    const selectedCat = availableCategories.find(c => c.id === formData.categoryId);
+                    return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
+                  })()}
+                  onChange={(val) => {
+                    const selectedCat = availableCategories.find(c => `${c.code} - ${c.name}` === val);
+                    if (selectedCat) {
+                      updateFormField('categoryId', selectedCat.id);
+                    } else {
+                      updateFormField('categoryId', '');
+                    }
+                  }}
+                  options={availableCategories.map(cat => `${cat.code} - ${cat.name}`)}
+                  placeholder={t.category}
+                  searchPlaceholder="Buscar categoria..."
+                  emptyMessage="Nenhuma categoria encontrada."
+                  allowAdd={false}
+                  className={cn(errors.categoryId && "border-destructive")}
+                />
                 {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
               </div>
             </div>
@@ -1279,7 +1521,7 @@ export const Transactions: React.FC = () => {
             {/* Amount, Date and Payment Method */}
             <div className={cn(
               "grid gap-4",
-              userSettings.enablePaymentMethods && formData.type === 'income' 
+              userSettings.enablePaymentMethods 
                 ? "grid-cols-1 sm:grid-cols-3" 
                 : "grid-cols-1 sm:grid-cols-2"
             )}>
@@ -1321,10 +1563,10 @@ export const Transactions: React.FC = () => {
                 </Popover>
                 {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
               </div>
-              {userSettings.enablePaymentMethods && formData.type === 'income' && (
+              {userSettings.enablePaymentMethods && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
-                    {t.paymentMethod}
+                    {formData.type === 'income' ? t.paymentMethod : 'Forma de Pagamento'}
                     <UpgradeBadge />
                   </Label>
                   <Select
@@ -1333,33 +1575,47 @@ export const Transactions: React.FC = () => {
                     disabled={!hasFeature('payment_methods')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : t.paymentMethod} />
+                      <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : (formData.type === 'income' ? t.paymentMethod : 'Forma de Pagamento')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">
                         <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4" />
-                          {t.cash}
+                          <Banknote className="h-4 w-4 text-emerald-500" />
+                          <span>{t.cash}</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="card">
                         <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          {t.card}
+                          <CreditCard className="h-4 w-4 text-blue-500" />
+                          <span>{t.card}</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="pix">
                         <div className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4" />
-                          {t.pix}
+                          <Smartphone className="h-4 w-4 text-purple-500" />
+                          <span>{t.pix}</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="boleto">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-cyan-500" />
+                          <span>{t.boleto}</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="pending">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {t.pending}
+                          <Clock className="h-4 w-4 text-amber-500" />
+                          <span>{t.pending}</span>
                         </div>
                       </SelectItem>
+                      {customPaymentMethods.map((method) => (
+                        <SelectItem key={method.id} value={method.name}>
+                          <div className="flex items-center gap-2">
+                            {getPaymentMethodIconLarge(method.parentType)}
+                            <span>{method.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

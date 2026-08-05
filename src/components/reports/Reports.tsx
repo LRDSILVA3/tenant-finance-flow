@@ -70,6 +70,7 @@ interface Product {
   sale_price: number;
   current_stock: number;
   min_stock: number;
+  expiration_date: string | null;
 }
 
 type PeriodType = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
@@ -84,6 +85,7 @@ export const Reports: React.FC = () => {
     getCategoryById,
     getCollaboratorById,
     userSettings,
+    customPaymentMethods = [],
   } = useFinance();
 
   const { hasFeature } = useFeatureAccess();
@@ -227,7 +229,13 @@ export const Reports: React.FC = () => {
   const dreData = useMemo(() => {
     let incomeTotal = 0;
     let expenseTotal = 0;
-    const categoryTotals: Record<string, { name: string; amount: number; code: string }> = {};
+    const categoryTree: Record<string, {
+      id: string;
+      name: string;
+      code: string;
+      amount: number;
+      subcategories: { id: string; name: string; code: string; amount: number }[];
+    }> = {};
 
     filteredTransactions.forEach(txn => {
       if (txn.type === 'income') {
@@ -237,20 +245,48 @@ export const Reports: React.FC = () => {
         const cat = getCategoryById(txn.categoryId);
         if (cat) {
           let rootCat = cat;
+          let isSub = false;
           if (cat.parentId) {
             const parent = categories.find(c => c.id === cat.parentId);
-            if (parent) rootCat = parent;
+            if (parent) {
+              rootCat = parent;
+              isSub = true;
+            }
           }
           
-          if (!categoryTotals[rootCat.id]) {
-            categoryTotals[rootCat.id] = { name: rootCat.name, amount: 0, code: rootCat.code };
+          if (!categoryTree[rootCat.id]) {
+            categoryTree[rootCat.id] = {
+              id: rootCat.id,
+              name: rootCat.name,
+              code: rootCat.code,
+              amount: 0,
+              subcategories: []
+            };
           }
-          categoryTotals[rootCat.id].amount += txn.amount;
+          categoryTree[rootCat.id].amount += txn.amount;
+
+          if (isSub) {
+            const existingSubIndex = categoryTree[rootCat.id].subcategories.findIndex(s => s.id === cat.id);
+            if (existingSubIndex > -1) {
+              categoryTree[rootCat.id].subcategories[existingSubIndex].amount += txn.amount;
+            } else {
+              categoryTree[rootCat.id].subcategories.push({
+                id: cat.id,
+                name: cat.name,
+                code: cat.code,
+                amount: txn.amount
+              });
+            }
+          }
         }
       }
     });
 
-    const operatingExpensesList = Object.values(categoryTotals).sort((a, b) => b.amount - a.amount);
+    const operatingExpensesList = Object.values(categoryTree).sort((a, b) => b.amount - a.amount);
+    operatingExpensesList.forEach(root => {
+      root.subcategories.sort((a, b) => b.amount - a.amount);
+    });
+
     const netProfit = incomeTotal - expenseTotal;
     const grossMarginPercent = incomeTotal > 0 ? (netProfit / incomeTotal) * 100 : 0;
 
@@ -560,20 +596,35 @@ export const Reports: React.FC = () => {
       const tableRows: string[][] = [];
       tableRows.push(['1. RECEITA OPERACIONAL BRUTA', formatCurrency(dreData.grossRevenue), '100.0%']);
 
-      categories.filter(c => c.parentId === null && c.type === 'income').forEach(rootCat => {
-        const amount = filteredTransactions
+      categories.filter(c => c.parentId === null && c.type === 'income').forEach((rootCat, rootIdx) => {
+        const rootAmount = filteredTransactions
           .filter(t => {
             const cat = getCategoryById(t.categoryId);
             return cat && (cat.id === rootCat.id || cat.parentId === rootCat.id);
           })
           .reduce((s, t) => s + t.amount, 0);
 
-        if (amount > 0) {
+        if (rootAmount > 0) {
           tableRows.push([
-            `   1.1. ${rootCat.name}`,
-            formatCurrency(amount),
-            `${dreData.grossRevenue > 0 ? ((amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+            `   1.1.${rootIdx+1}. ${rootCat.name}`,
+            formatCurrency(rootAmount),
+            `${dreData.grossRevenue > 0 ? ((rootAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
           ]);
+
+          const subCats = categories.filter(c => c.parentId === rootCat.id);
+          subCats.forEach((subCat, subIdx) => {
+            const subAmount = filteredTransactions
+              .filter(t => t.categoryId === subCat.id)
+              .reduce((s, t) => s + t.amount, 0);
+
+            if (subAmount > 0) {
+              tableRows.push([
+                `      1.1.${rootIdx+1}.${subIdx+1}. ${subCat.name}`,
+                formatCurrency(subAmount),
+                `${dreData.grossRevenue > 0 ? ((subAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+              ]);
+            }
+          });
         }
       });
 
@@ -585,6 +636,14 @@ export const Reports: React.FC = () => {
           `(${formatCurrency(exp.amount)})`,
           `${dreData.grossRevenue > 0 ? ((-exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
         ]);
+
+        exp.subcategories.forEach((sub, subIdx) => {
+          tableRows.push([
+            `      2.${idx+1}.${subIdx+1}. ${sub.name}`,
+            `(${formatCurrency(sub.amount)})`,
+            `${dreData.grossRevenue > 0 ? ((-sub.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+          ]);
+        });
       });
 
       tableRows.push(['RESULTADO LIQUIDO DO EXERCICIO', formatCurrency(dreData.netResult), `${dreData.marginPercent.toFixed(1)}%`]);
@@ -897,7 +956,13 @@ export const Reports: React.FC = () => {
                   <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="card">Cartão</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="pending">A Receber</SelectItem>
+                  {customPaymentMethods.map((m) => (
+                    <SelectItem key={m.id} value={m.name}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1009,23 +1074,45 @@ export const Reports: React.FC = () => {
                       </TableRow>
 
                       {/* Detail Income categories if they have values */}
-                      {categories.filter(c => c.parentId === null && c.type === 'income').map(rootCat => {
-                        const amount = filteredTransactions
+                      {categories.filter(c => c.parentId === null && c.type === 'income').map((rootCat, rootIdx) => {
+                        const rootAmount = filteredTransactions
                           .filter(t => {
                             const cat = getCategoryById(t.categoryId);
                             return cat && (cat.id === rootCat.id || cat.parentId === rootCat.id);
                           })
                           .reduce((s, t) => s + t.amount, 0);
 
-                        if (amount === 0) return null;
+                        if (rootAmount === 0) return null;
+
+                        const subCats = categories.filter(c => c.parentId === rootCat.id);
+
                         return (
-                          <TableRow key={rootCat.id} className="hover:bg-transparent text-sm text-muted-foreground pl-4">
-                            <TableCell className="pl-8">1.1. {rootCat.name}</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(amount)}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {dreData.grossRevenue > 0 ? ((amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={rootCat.id}>
+                            <TableRow className="hover:bg-transparent text-sm font-medium text-foreground">
+                              <TableCell className="pl-8">1.1.{rootIdx+1}. {rootCat.name}</TableCell>
+                              <TableCell className="text-right font-mono">{formatCurrency(rootAmount)}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {dreData.grossRevenue > 0 ? ((rootAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                            {subCats.map((subCat, subIdx) => {
+                              const subAmount = filteredTransactions
+                                .filter(t => t.categoryId === subCat.id)
+                                .reduce((s, t) => s + t.amount, 0);
+                              
+                              if (subAmount === 0) return null;
+                              
+                              return (
+                                <TableRow key={subCat.id} className="hover:bg-transparent text-xs text-muted-foreground/80">
+                                  <TableCell className="pl-14">1.1.{rootIdx+1}.{subIdx+1}. {subCat.name}</TableCell>
+                                  <TableCell className="text-right font-mono">{formatCurrency(subAmount)}</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {dreData.grossRevenue > 0 ? ((subAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </React.Fragment>
                         );
                       })}
 
@@ -1046,13 +1133,26 @@ export const Reports: React.FC = () => {
                       {/* Detail Expense categories */}
                       {dreData.operatingExpenses.map((exp, idx) => {
                         return (
-                          <TableRow key={idx} className="hover:bg-transparent text-sm text-muted-foreground">
-                            <TableCell className="pl-8">2.{idx+1}. {exp.name}</TableCell>
-                            <TableCell className="text-right font-mono text-expense">({formatCurrency(exp.amount)})</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {dreData.grossRevenue > 0 ? ((exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={idx}>
+                            <TableRow className="hover:bg-transparent text-sm font-medium text-foreground">
+                              <TableCell className="pl-8">2.{idx+1}. {exp.name}</TableCell>
+                              <TableCell className="text-right font-mono text-expense">({formatCurrency(exp.amount)})</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {dreData.grossRevenue > 0 ? ((exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                            {exp.subcategories.map((sub, subIdx) => {
+                              return (
+                                <TableRow key={sub.id} className="hover:bg-transparent text-xs text-muted-foreground/80">
+                                  <TableCell className="pl-14">2.{idx+1}.{subIdx+1}. {sub.name}</TableCell>
+                                  <TableCell className="text-right font-mono text-expense">({formatCurrency(sub.amount)})</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {dreData.grossRevenue > 0 ? ((sub.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </React.Fragment>
                         );
                       })}
 

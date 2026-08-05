@@ -1,6 +1,7 @@
 # Project Task Board
 
 ## ✅ Done
+- [x] Corrigir cálculo de expiração da assinatura (7 meses para 1 mês) e restaurar acesso durante trial de Pix (status pending) no frontend e Edge Function.
 - [x] Create public Landing Page for ad conversion and routing adjustments (Refactored to premium version with Pricing, Testimonials, and FAQ).
 - [x] Update platform branding to use "Previna" name and logo.
 - [x] Add standard SaaS legal pages (Terms of Use, Privacy Policy, Cancellation).
@@ -31,6 +32,16 @@
 - [x] Fix 401 Unauthorized error in create-pagarme-subscription Edge Function (ES256 support).
 - [x] Fix revenue registration error on Schedule screen with interactive dialog, mobile/desktop layouts, and context state synchronization.
 - [x] **PIX Payment Integration (Pagar.me v5)**: Implementação de assinatura via PIX, com geração de QR Code dinâmico e código copia e cola no Onboarding e painel de faturamento das configurações, e modificação correspondente na Edge Function `create-pagarme-subscription`.
+- [x] **Product Expiration & Alert System**: Inclusão de data de vencimento no cadastro/edição e tabela de produtos, e geração dinâmica de alertas de validade e estoque crítico.
+- [x] **Notification Center**: Sino com contador no cabeçalho e tela dedicada de notificações com histórico de leitura.
+- [x] **Expense Payment Methods**: Forma de pagamento/recebimento habilitada em despesas (saídas).
+- [x] **Searchable Category Selection**: Busca textual inteligente nos selects de categorias de transações e filtros.
+- [x] **Postings Sorting**: Ordenação padrão crescente (do mais antigo para o mais recente) das transações.
+- [x] **DRE Subcategories Division**: Agrupamento e detalhamento por subcategorias no relatório DRE na tela e na exportação PDF.
+- [x] **Mobile Barcode Scanner Corrections**: Travamento físico contra leituras duplicadas (debounce), desligamento automático da câmera após decodificação para economizar recursos e botão "Tentar Novamente" com reativação automática da câmera.
+- [x] **Custom Payment Methods (Formas de Pagamento Personalizadas)**: Gerenciamento completo de formas de pagamento personalizadas nas Configurações do sistema (adicionar, listar, excluir), integração com o fluxo de lançamentos (receitas e despesas), filtros e breakdown dinâmico inteligente no cabeçalho das transações, suporte nativo ao termo "Boleto" e filtros no Reports.
+- [x] **Integração NFS-e via Asaas**: Integração completa com a API do Asaas (v3) para emissão de notas fiscais automática em faturamento de planos (Pagar.me webhook - Cenário A) e manual/automática em lançamentos de vendas dos tenants (Cenário B). Suporta emitir, sincronizar status, baixar/visualizar PDF e cancelar notas.
+- [x] **Cobrança Baseada em Uso (Notas Fiscais)**: Contagem de notas emitidas por ciclo, faturamento automatizado de notas excedentes via webhook (`invoice.created`) anexando itens na fatura mensal do Pagar.me, barra de progresso de franquia do plano no faturamento do tenant, e contagem em tempo real na visão de clientes do administrador.
 
 ## 🟡 In Progress
 - [ ] Refine Gemini CLI Context and Rules.

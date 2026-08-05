@@ -27,7 +27,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Building2, Globe, Plus, LogOut, User, Loader2, Sparkles } from 'lucide-react';
+import { 
+  Building2, 
+  Globe, 
+  Plus, 
+  LogOut, 
+  User, 
+  Loader2, 
+  Sparkles, 
+  Bell, 
+  AlertTriangle, 
+  Clock, 
+  Calendar, 
+  Check, 
+  CheckCheck, 
+  X 
+} from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -43,7 +59,11 @@ const languageFlags: Record<Language, string> = {
   es: '🇪🇸',
 };
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onViewChange?: (view: any) => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
   const { 
     language, 
     setLanguage, 
@@ -57,6 +77,11 @@ export const Header: React.FC = () => {
     userProfile,
     userSettings,
     currentPlan,
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
     t 
   } = useFinance();
 
@@ -151,6 +176,135 @@ export const Header: React.FC = () => {
             >
               <Plus className="h-4 w-4" />
             </Button>
+
+            {/* Sino de Notificações */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="relative hover:bg-muted/60 transition-all rounded-full duration-300 h-9 w-9"
+                  title="Notificações"
+                >
+                  <Bell className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors duration-200" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm animate-pulse">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0 shadow-xl border-border bg-card/95 backdrop-blur-md overflow-hidden rounded-xl animate-in fade-in zoom-in-95 duration-200" align="end">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/20">
+                  <span className="font-semibold text-sm flex items-center gap-1.5">
+                    <Bell className="h-4 w-4 text-primary" /> Notificações
+                  </span>
+                  {unreadNotificationsCount > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={markAllNotificationsAsRead}
+                      className="h-7 text-[10px] px-2 text-primary hover:text-primary-hover font-medium flex items-center gap-1"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" /> Ler todas
+                    </Button>
+                  )}
+                </div>
+                
+                {/* List */}
+                <div className="max-h-[300px] overflow-y-auto divide-y divide-border/60">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 px-4 text-center text-muted-foreground">
+                      <Bell className="h-8 w-8 text-muted-foreground/30 mb-2 stroke-[1.5]" />
+                      <p className="text-xs font-medium">Nenhuma notificação por aqui!</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">Tudo limpo e sob controle.</p>
+                    </div>
+                  ) : (
+                    notifications.map((n) => {
+                      let Icon = Bell;
+                      let iconColor = "text-blue-500 bg-blue-500/10";
+                      if (n.type === 'low_stock') {
+                        Icon = AlertTriangle;
+                        iconColor = "text-amber-500 bg-amber-500/10";
+                      } else if (n.type === 'expired_product') {
+                        Icon = Clock;
+                        iconColor = "text-red-500 bg-red-500/10";
+                      } else if (n.type === 'expiring_product') {
+                        Icon = Clock;
+                        iconColor = "text-amber-500 bg-amber-500/10";
+                      } else if (n.type === 'plan_expiration') {
+                        Icon = Calendar;
+                        iconColor = "text-purple-500 bg-purple-500/10";
+                      }
+                      
+                      return (
+                        <div 
+                          key={n.id} 
+                          className={cn(
+                            "p-3 flex items-start gap-3 hover:bg-muted/40 transition-colors relative group",
+                            !n.read && "bg-primary/5/30"
+                          )}
+                        >
+                          <div className={cn("p-1.5 rounded-lg shrink-0", iconColor)}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0 pr-6">
+                            <p className={cn("text-xs font-semibold leading-normal truncate", !n.read ? "text-foreground" : "text-muted-foreground")}>
+                              {n.title}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-normal mt-0.5 break-words">
+                              {n.message}
+                            </p>
+                            <span className="text-[9px] text-muted-foreground/60 block mt-1.5">
+                              {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(n.date))}
+                            </span>
+                          </div>
+                          
+                          {/* Actions overlay */}
+                          <div className="absolute right-2 top-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            {!n.read && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded-full hover:bg-muted"
+                                onClick={() => markNotificationAsRead(n.id)}
+                                title="Marcar como lida"
+                              >
+                                <Check className="h-3 w-3 text-emerald-600" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full hover:bg-muted text-muted-foreground hover:text-destructive"
+                              onClick={() => clearNotification(n.id)}
+                              title="Excluir alerta"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                
+                {/* Footer */}
+                {onViewChange && (
+                  <div className="border-t p-2 text-center bg-muted/10">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full text-xs text-primary hover:text-primary-hover font-semibold py-1 h-8"
+                      onClick={() => onViewChange('notifications')}
+                    >
+                      Ver todas as notificações
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Language Selector */}

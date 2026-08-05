@@ -134,6 +134,7 @@ interface Product {
   unit: string;
   location: string | null;
   description: string | null;
+  expiration_date: string | null;
 }
 
 interface CartItem {
@@ -142,7 +143,7 @@ interface CartItem {
 }
 
 export const Inventory: React.FC = () => {
-  const { currentClient, customers, categories, addTransaction, transactions, t } = useFinance();
+  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications } = useFinance();
   const [activeTab, setActiveTab] = useState<'products' | 'suppliers'>('products');
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
@@ -243,6 +244,7 @@ export const Inventory: React.FC = () => {
     unit: 'UN',
     location: '',
     description: '',
+    expirationDate: '',
   });
 
   // Form States - Supplier
@@ -300,10 +302,12 @@ export const Inventory: React.FC = () => {
         unit: p.unit || 'UN',
         location: p.location || null,
         description: p.description || null,
+        expiration_date: p.expiration_date || null,
       })));
+      refreshNotifications();
     }
     setLoading(false);
-  }, [currentClient]);
+  }, [currentClient, refreshNotifications]);
 
   // Initial Load
   useEffect(() => {
@@ -337,13 +341,13 @@ export const Inventory: React.FC = () => {
   const activeChannelRef = React.useRef<any>(null);
 
   // Handle Realtime Barcode Event from Mobile Phone (Stable reference)
-  const handleBarcodeReceived = useCallback((code: string) => {
+  const handleBarcodeReceived = useCallback((code: string, isFromMobile = false) => {
     if (!code) return;
     const cleanCode = code.trim();
 
     playPcBeep(880, 0.12);
 
-    if (mobileSyncWorkflowRef.current) {
+    if (isFromMobile && mobileSyncWorkflowRef.current) {
       // In Mobile Sync Workflow, the phone processes the database operations.
       // The PC only plays a beep and updates logs, but doesn't pop up modals.
       return;
@@ -477,7 +481,7 @@ export const Inventory: React.FC = () => {
 
     channel.on('broadcast', { event: 'barcode' }, ({ payload }) => {
       if (payload && payload.code) {
-        handleBarcodeReceived(payload.code);
+        handleBarcodeReceived(payload.code, true);
       }
     });
 
@@ -628,6 +632,7 @@ export const Inventory: React.FC = () => {
       unit: 'UN',
       location: '',
       description: '',
+      expirationDate: '',
     });
     setIsProductModalOpen(true);
   };
@@ -647,6 +652,7 @@ export const Inventory: React.FC = () => {
       unit: product.unit || 'UN',
       location: product.location || '',
       description: product.description || '',
+      expirationDate: product.expiration_date || '',
     });
     setIsProductModalOpen(true);
   };
@@ -680,23 +686,10 @@ export const Inventory: React.FC = () => {
     if (!currentClient || !productForm.name.trim()) return;
 
     try {
-      const payload: {
-        client_id: string;
-        name: string;
-        sku: string | null;
-        supplier_id: string | null;
-        cost_price: number;
-        sale_price: number;
-        min_stock: number;
-        current_stock?: number;
-        category: string | null;
-        unit: string;
-        location: string | null;
-        description: string | null;
-      } = {
+      const payload: any = {
         client_id: currentClient.id,
-        name: productForm.name,
-        sku: productForm.sku || null,
+        name: productForm.name.trim(),
+        sku: productForm.sku.trim() || null,
         supplier_id: productForm.supplierId || null,
         cost_price: productForm.costPrice,
         sale_price: productForm.salePrice,
@@ -705,6 +698,7 @@ export const Inventory: React.FC = () => {
         unit: productForm.unit,
         location: productForm.location.trim() || null,
         description: productForm.description.trim() || null,
+        expiration_date: productForm.expirationDate || null,
       };
 
       if (selectedProduct) {
@@ -1101,6 +1095,30 @@ export const Inventory: React.FC = () => {
                                       📍 {p.location}
                                     </Badge>
                                   )}
+                                  {p.expiration_date && (() => {
+                                    const expDate = new Date(`${p.expiration_date}T00:00:00`);
+                                    const today = new Date();
+                                    today.setHours(0,0,0,0);
+                                    const diffTime = expDate.getTime() - today.getTime();
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    
+                                    let badgeColor = "bg-slate-50 border-slate-200 text-slate-600";
+                                    let label = `📅 Venc: ${new Intl.DateTimeFormat('pt-BR').format(expDate)}`;
+                                    
+                                    if (diffDays < 0) {
+                                      badgeColor = "bg-red-50 border-red-200 text-red-600 font-bold";
+                                      label = `🚨 Vencido (${new Intl.DateTimeFormat('pt-BR').format(expDate)})`;
+                                    } else if (diffDays <= 30) {
+                                      badgeColor = "bg-amber-50 border-amber-200 text-amber-600 font-semibold";
+                                      label = `⚠️ Vence em ${diffDays}d (${new Intl.DateTimeFormat('pt-BR').format(expDate)})`;
+                                    }
+                                    
+                                    return (
+                                      <Badge variant="outline" className={cn("text-[9px] px-1 py-0 h-4 font-mono", badgeColor)}>
+                                        {label}
+                                      </Badge>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </TableCell>
@@ -1268,52 +1286,60 @@ export const Inventory: React.FC = () => {
               </form>
             </div>
 
-            {!scanConnected ? (
-              <div className="py-4 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="p-3 bg-white rounded-xl shadow-md border border-slate-200">
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanUrl)}`} 
-                    alt="QR Code de Conexão" 
-                    className="w-[180px] h-[180px]"
-                  />
-                </div>
-                <div className="space-y-1 max-w-sm">
-                  <p className="text-sm font-semibold">1. Abra a câmera do seu celular</p>
-                  <p className="text-xs text-muted-foreground">Aponte para o QR Code acima para abrir a página de escaneamento instantâneo.</p>
-                </div>
-
-                {window.location.origin.includes('localhost') && (
-                  <div className="w-full max-w-xs mx-auto space-y-1.5 text-left border p-3 rounded-lg bg-amber-50/20 border-amber-500/20">
-                    <Label htmlFor="local-ip" className="text-xs font-semibold text-amber-600">Rodando no Localhost?</Label>
-                    <Input
-                      id="local-ip"
-                      placeholder="Ex: 192.168.1.15"
-                      className="h-8 text-xs bg-background"
-                      value={localIp}
-                      onChange={(e) => setLocalIp(e.target.value)}
-                    />
-                    <p className="text-[10px] text-muted-foreground leading-normal">
-                      Como o celular não acessa "localhost", insira o IP local do seu computador na mesma rede Wi-Fi. No terminal, inicie o Vite com <code className="bg-muted px-1 rounded font-mono text-[9px]">npm run dev -- --host</code>.
+            {/* Mobile Sync Pairing Section (only if not connected) */}
+            {!scanConnected && (
+              <div className="border rounded-lg p-3 bg-indigo-50/10 border-indigo-500/20 space-y-2">
+                <details className="group">
+                  <summary className="text-xs font-semibold flex items-center justify-between cursor-pointer text-indigo-600 dark:text-indigo-400 select-none">
+                    <span className="flex items-center gap-1.5">
+                      <Smartphone className="h-4 w-4" />
+                      Deseja usar o Celular como Leitor Sem Fio?
+                    </span>
+                    <span className="transition group-open:rotate-180">▼</span>
+                  </summary>
+                  <div className="pt-3 flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-200">
+                    <div className="p-2.5 bg-white rounded-lg shadow border border-slate-200">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(scanUrl)}`} 
+                        alt="QR Code de Conexão" 
+                        className="w-[140px] h-[140px]"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground max-w-sm">
+                      Aponte a câmera do celular para o QR Code acima para parear o dispositivo e escanear de onde estiver.
                     </p>
+                    {window.location.origin.includes('localhost') && (
+                      <div className="w-full max-w-xs mx-auto space-y-1.5 text-left">
+                        <Label htmlFor="local-ip" className="text-[10px] font-semibold text-amber-600">IP local do Computador:</Label>
+                        <Input
+                          id="local-ip"
+                          placeholder="Ex: 192.168.1.15"
+                          className="h-7 text-xs bg-background"
+                          value={localIp}
+                          onChange={(e) => setLocalIp(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-2 text-[10px] text-muted-foreground"
+                      onClick={() => {
+                        navigator.clipboard.writeText(scanUrl);
+                        toast({ title: "Link copiado para a área de transferência!" });
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar link de conexão
+                    </Button>
                   </div>
-                )}
-
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="gap-2 text-xs text-muted-foreground"
-                  onClick={() => {
-                    navigator.clipboard.writeText(scanUrl);
-                    toast({ title: "Link copiado para a área de transferência!" });
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copiar link de conexão
-                </Button>
+                </details>
               </div>
-            ) : (
-              <div className="space-y-4 py-2">
-                {/* Mobile sync workflow toggle */}
+            )}
+
+            <div className="space-y-4 py-2">
+              {/* Mobile sync workflow toggle */}
+              {scanConnected && (
                 <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg border border-primary/10">
                   <div className="space-y-0.5">
                     <Label htmlFor="mobile-sync-toggle" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
@@ -1330,194 +1356,194 @@ export const Inventory: React.FC = () => {
                     onCheckedChange={setMobileSyncWorkflow}
                   />
                 </div>
+              )}
 
-                {/* Mode Selectors */}
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    variant={scanMode === 'sale' ? 'default' : 'outline'}
-                    onClick={() => setScanMode('sale')}
-                    className="gap-2 h-11"
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    <span>Venda (Carrinho)</span>
-                  </Button>
-                  <Button
-                    variant={scanMode === 'in' ? 'default' : 'outline'}
-                    onClick={() => setScanMode('in')}
-                    className="gap-2 h-11"
-                  >
-                    <PackagePlus className="h-4 w-4" />
-                    <span>Entrada de Estoque</span>
-                  </Button>
-                  <Button
-                    variant={scanMode === 'adjustment' ? 'default' : 'outline'}
-                    onClick={() => setScanMode('adjustment')}
-                    className="gap-2 h-11"
-                  >
-                    <History className="h-4 w-4" />
-                    <span>Inventário / Ajuste</span>
-                  </Button>
-                </div>
+              {/* Mode Selectors */}
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant={scanMode === 'sale' ? 'default' : 'outline'}
+                  onClick={() => setScanMode('sale')}
+                  className="gap-2 h-11"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>Venda (Carrinho)</span>
+                </Button>
+                <Button
+                  variant={scanMode === 'in' ? 'default' : 'outline'}
+                  onClick={() => setScanMode('in')}
+                  className="gap-2 h-11"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  <span>Entrada de Estoque</span>
+                </Button>
+                <Button
+                  variant={scanMode === 'adjustment' ? 'default' : 'outline'}
+                  onClick={() => setScanMode('adjustment')}
+                  className="gap-2 h-11"
+                >
+                  <History className="h-4 w-4" />
+                  <span>Inventário / Ajuste</span>
+                </Button>
+              </div>
 
-                {/* MODE 1: SALE (CARRINHO) */}
-                {scanMode === 'sale' && (
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Itens no Carrinho</span>
-                      <span className="text-xs font-mono font-semibold text-primary">{cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'}</span>
+              {/* MODE 1: SALE (CARRINHO) */}
+              {scanMode === 'sale' && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Itens no Carrinho</span>
+                    <span className="text-xs font-mono font-semibold text-primary">{cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'}</span>
+                  </div>
+
+                  {cartItems.length === 0 ? (
+                    <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
+                      <BarcodeIcon className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
+                      <p>Escaneie os códigos de barras ou bipe com o leitor USB para adicionar produtos ao carrinho...</p>
                     </div>
-
-                    {cartItems.length === 0 ? (
-                      <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
-                        <BarcodeIcon className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
-                        <p>Escaneie os códigos de barras no celular para adicionar produtos ao carrinho...</p>
-                      </div>
-                    ) : (
-                      <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1">
-                        {cartItems.map((item) => (
-                          <div key={item.product.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-sm truncate">{item.product.name}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{formatCurrency(item.product.sale_price)} un</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-1 bg-background border rounded-md px-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    setCartItems(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i));
-                                  }}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="font-mono text-sm px-2">{item.quantity}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    setCartItems(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: i.quantity + 1 } : i));
-                                  }}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <span className="font-mono font-bold text-sm text-income min-w-[70px] text-right">
-                                {formatCurrency(item.product.sale_price * item.quantity)}
-                              </span>
+                  ) : (
+                    <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1">
+                      {cartItems.map((item) => (
+                        <div key={item.product.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm truncate">{item.product.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{formatCurrency(item.product.sale_price)} un</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 bg-background border rounded-md px-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0 text-destructive"
+                                className="h-6 w-6 p-0"
                                 onClick={() => {
-                                  setCartItems(prev => prev.filter(i => i.product.id !== item.product.id));
+                                  setCartItems(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i));
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="font-mono text-sm px-2">{item.quantity}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  setCartItems(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: i.quantity + 1 } : i));
+                                }}
+                              >
+                                <Plus className="h-3 w-3" />
                               </Button>
                             </div>
+                            <span className="font-mono font-bold text-sm text-income min-w-[70px] text-right">
+                              {formatCurrency(item.product.sale_price * item.quantity)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive"
+                              onClick={() => {
+                                  setCartItems(prev => prev.filter(i => i.product.id !== item.product.id));
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* MODE 2: ENTRADA DE ESTOQUE */}
-                {scanMode === 'in' && (
-                  <div className="py-4 space-y-4">
-                    {!scannedProductForAction ? (
-                      <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
-                        <PackagePlus className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
-                        <p>Escaneie o código de barras de um produto no celular para dar entrada de estoque...</p>
-                      </div>
-                    ) : (
-                      <Card className="border-emerald-200 bg-emerald-50/40">
-                        <CardContent className="p-4 space-y-3">
-                          <div>
-                            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Produto Selecionado</p>
-                            <h4 className="font-bold text-lg">{scannedProductForAction.name}</h4>
-                            <p className="text-xs text-muted-foreground font-mono">Estoque Atual: {scannedProductForAction.current_stock} un</p>
+              {/* MODE 2: ENTRADA DE ESTOQUE */}
+              {scanMode === 'in' && (
+                <div className="py-4 space-y-4">
+                  {!scannedProductForAction ? (
+                    <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
+                      <PackagePlus className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
+                      <p>Escaneie ou bipe o código de barras de um produto para dar entrada de estoque...</p>
+                    </div>
+                  ) : (
+                    <Card className="border-emerald-200 bg-emerald-50/40">
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Produto Selecionado</p>
+                          <h4 className="font-bold text-lg">{scannedProductForAction.name}</h4>
+                          <p className="text-xs text-muted-foreground font-mono">Estoque Atual: {scannedProductForAction.current_stock} un</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-in-qty">Quantidade a Adicionar</Label>
+                            <Input
+                              id="scan-in-qty"
+                              type="number"
+                              min="1"
+                              value={scannedActionQty}
+                              onChange={(e) => setScannedActionQty(parseInt(e.target.value) || 1)}
+                            />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <Label htmlFor="scan-in-qty">Quantidade a Adicionar</Label>
-                              <Input
-                                id="scan-in-qty"
-                                type="number"
-                                min="1"
-                                value={scannedActionQty}
-                                onChange={(e) => setScannedActionQty(parseInt(e.target.value) || 1)}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor="scan-in-notes">Observações</Label>
-                              <Input
-                                id="scan-in-notes"
-                                value={scannedActionNotes}
-                                onChange={(e) => setScannedActionNotes(e.target.value)}
-                              />
-                            </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-in-notes">Observações</Label>
+                            <Input
+                              id="scan-in-notes"
+                              value={scannedActionNotes}
+                              onChange={(e) => setScannedActionNotes(e.target.value)}
+                            />
                           </div>
-                          <Button onClick={handleSaveScanInput} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700">
-                            <Check className="h-4 w-4" />
-                            Confirmar Entrada de Estoque
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
+                        </div>
+                        <Button onClick={handleSaveScanInput} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700">
+                          <Check className="h-4 w-4" />
+                          Confirmar Entrada de Estoque
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
 
-                {/* MODE 3: AJUSTE DE ESTOQUE */}
-                {scanMode === 'adjustment' && (
-                  <div className="py-4 space-y-4">
-                    {!scannedProductForAction ? (
-                      <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
-                        <History className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
-                        <p>Escaneie o produto no celular para realizar inventário / ajuste de saldo...</p>
-                      </div>
-                    ) : (
-                      <Card className="border-amber-200 bg-amber-50/40">
-                        <CardContent className="p-4 space-y-3">
-                          <div>
-                            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Ajuste de Inventário</p>
-                            <h4 className="font-bold text-lg">{scannedProductForAction.name}</h4>
-                            <p className="text-xs text-muted-foreground font-mono">Estoque Atual Cadastrado: {scannedProductForAction.current_stock} un</p>
+              {/* MODE 3: AJUSTE DE ESTOQUE */}
+              {scanMode === 'adjustment' && (
+                <div className="py-4 space-y-4">
+                  {!scannedProductForAction ? (
+                    <div className="py-8 text-center border border-dashed rounded-lg text-muted-foreground text-sm space-y-2">
+                      <History className="h-8 w-8 mx-auto opacity-40 animate-pulse" />
+                      <p>Escaneie ou bipe o produto para realizar inventário / ajuste de saldo...</p>
+                    </div>
+                  ) : (
+                    <Card className="border-amber-200 bg-amber-50/40">
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Ajuste de Inventário</p>
+                          <h4 className="font-bold text-lg">{scannedProductForAction.name}</h4>
+                          <p className="text-xs text-muted-foreground font-mono">Estoque Atual Cadastrado: {scannedProductForAction.current_stock} un</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-adj-qty">Nova Quantidade Real</Label>
+                            <Input
+                              id="scan-adj-qty"
+                              type="number"
+                              min="0"
+                              value={scannedActionQty}
+                              onChange={(e) => setScannedActionQty(parseInt(e.target.value) || 0)}
+                            />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <Label htmlFor="scan-adj-qty">Nova Quantidade Real</Label>
-                              <Input
-                                id="scan-adj-qty"
-                                type="number"
-                                min="0"
-                                value={scannedActionQty}
-                                onChange={(e) => setScannedActionQty(parseInt(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor="scan-adj-notes">Motivo / Notas</Label>
-                              <Input
-                                id="scan-adj-notes"
-                                value={scannedActionNotes}
-                                onChange={(e) => setScannedActionNotes(e.target.value)}
-                              />
-                            </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-adj-notes">Motivo / Notas</Label>
+                            <Input
+                              id="scan-adj-notes"
+                              value={scannedActionNotes}
+                              onChange={(e) => setScannedActionNotes(e.target.value)}
+                            />
                           </div>
-                          <Button onClick={handleSaveScanInput} className="w-full gap-2 bg-amber-600 hover:bg-amber-700">
-                            <Check className="h-4 w-4" />
-                            Atualizar Contagem Real
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                        </div>
+                        <Button onClick={handleSaveScanAdjustment} className="w-full gap-2 bg-amber-600 hover:bg-amber-700">
+                          <Check className="h-4 w-4" />
+                          Atualizar Contagem Real
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="p-4 border-t shrink-0 gap-2 sm:gap-0 bg-background">
@@ -1803,6 +1829,16 @@ export const Inventory: React.FC = () => {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="prod-expiration">Data de Vencimento</Label>
+                <Input
+                  id="prod-expiration"
+                  type="date"
+                  value={productForm.expirationDate}
+                  onChange={(e) => setProductForm(p => ({ ...p, expirationDate: e.target.value }))}
+                />
               </div>
 
               <div className="space-y-1">

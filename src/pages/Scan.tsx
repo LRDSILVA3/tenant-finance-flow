@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Camera, CheckCircle2, Wifi, WifiOff, Send, Smartphone, AlertTriangle, Loader2, StopCircle, Plus, Minus, ShoppingCart, History } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { MoneyInput } from '@/components/ui/money-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 const isSameCart = (cartA: any[], cartB: any[]) => {
   if (!cartA || !cartB) return false;
   if (cartA.length !== cartB.length) return false;
@@ -32,6 +34,9 @@ export const Scan: React.FC = () => {
 
   const channelRef = useRef<any>(null);
   const html5QrCodeRef = useRef<any>(null);
+  const isProcessingRef = useRef(false);
+  const lastScannedCodeRef = useRef<string | null>(null);
+  const lastScannedTimeRef = useRef<number>(0);
 
   // Mobile Sync Workflow States
   const [mobileWorkflowEnabled, setMobileWorkflowEnabled] = useState(false);
@@ -47,6 +52,17 @@ export const Scan: React.FC = () => {
   const [scannedNotes, setScannedNotes] = useState('');
   const [scannedCostPrice, setScannedCostPrice] = useState<number>(0);
   const [localCart, setLocalCart] = useState<{ product: any; quantity: number }[]>([]);
+
+  // Refs for camera loop closures to avoid stale closures
+  const mobileWorkflowEnabledRef = useRef(mobileWorkflowEnabled);
+  const scanModeRef = useRef(scanMode);
+  const clientIdRef = useRef(clientId);
+  const localCartRef = useRef(localCart);
+
+  useEffect(() => { mobileWorkflowEnabledRef.current = mobileWorkflowEnabled; }, [mobileWorkflowEnabled]);
+  useEffect(() => { scanModeRef.current = scanMode; }, [scanMode]);
+  useEffect(() => { clientIdRef.current = clientId; }, [clientId]);
+  useEffect(() => { localCartRef.current = localCart; }, [localCart]);
   
 
 
@@ -114,6 +130,8 @@ export const Scan: React.FC = () => {
       }
       if (payload.scanMode) {
         setScanMode(payload.scanMode);
+        lastScannedCodeRef.current = null;
+        lastScannedTimeRef.current = 0;
       }
       if (payload.clientId) {
         setClientId(payload.clientId);
@@ -182,18 +200,40 @@ export const Scan: React.FC = () => {
     };
   }, [sessionId]);
 
-
+  // Reset scan history when all workflow panels are closed
+  useEffect(() => {
+    if (!selectedProduct && !productNotFoundCode) {
+      lastScannedCodeRef.current = null;
+      lastScannedTimeRef.current = 0;
+    }
+  }, [selectedProduct, productNotFoundCode]);
 
   // Handle barcode scanned
   const handleBarcodeScanned = async (code: string) => {
     if (!code) return;
 
+    // Evitar eventos concorrentes / leituras repetidas enquanto processa
+    if (isProcessingRef.current || loadingProduct || selectedProduct || productNotFoundCode) {
+      return;
+    }
+
+    // Debounce de 2.5 segundos para o MESMO código de barras
+    const now = Date.now();
+    if (code === lastScannedCodeRef.current && (now - lastScannedTimeRef.current) < 2500) {
+      return;
+    }
+
+    lastScannedCodeRef.current = code;
+    lastScannedTimeRef.current = now;
+
+    isProcessingRef.current = true;
+
     playBeep();
     triggerVibration();
 
     setLastScanned(code);
-    const now = new Date().toLocaleTimeString('pt-BR');
-    setScannedCodes((prev) => [{ code, time: now }, ...prev.slice(0, 4)]);
+    const timeString = new Date().toLocaleTimeString('pt-BR');
+    setScannedCodes((prev) => [{ code, time: timeString }, ...prev.slice(0, 4)]);
 
     if (channelRef.current) {
       channelRef.current.send({
@@ -203,7 +243,7 @@ export const Scan: React.FC = () => {
       });
     }
 
-    if (mobileWorkflowEnabled && clientId) {
+    if (mobileWorkflowEnabledRef.current && clientIdRef.current) {
       setLoadingProduct(true);
       setSelectedProduct(null);
       setProductNotFoundCode(null);
@@ -211,19 +251,20 @@ export const Scan: React.FC = () => {
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .eq('client_id', clientId)
+          .eq('client_id', clientIdRef.current)
           .eq('sku', code)
           .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
+          // Mostra o painel de confirmação para pedir a quantidade em todos os modos
           setSelectedProduct(data);
-          setScannedQty(scanMode === 'sale' ? 1 : (scanMode === 'adjustment' ? data.current_stock : 1));
+          setScannedQty(scanModeRef.current === 'sale' ? 1 : (scanModeRef.current === 'adjustment' ? data.current_stock : 1));
           setScannedCostPrice(data.cost_price || 0);
-          setScannedNotes(scanMode === 'in' ? 'Entrada via leitor móvel' : (scanMode === 'adjustment' ? 'Ajuste via leitor móvel' : ''));
-          toast({ title: "Produto localizado!", description: data.name });
+          setScannedNotes(scanModeRef.current === 'in' ? 'Entrada via leitor móvel' : (scanModeRef.current === 'adjustment' ? 'Ajuste via leitor móvel' : ''));
         } else {
+          // Produto não cadastrado: abre o cadastro
           setProductNotFoundCode(code);
           setNewProductForm({
             name: '',
@@ -239,6 +280,7 @@ export const Scan: React.FC = () => {
       } catch (err) {
         console.error(err);
         toast({ title: "Erro ao buscar produto", description: "Não foi possível carregar os detalhes do produto.", variant: "destructive" });
+        isProcessingRef.current = false;
       } finally {
         setLoadingProduct(false);
       }
@@ -247,6 +289,7 @@ export const Scan: React.FC = () => {
         title: "Código enviado!",
         description: `Código: ${code}`,
       });
+      isProcessingRef.current = false;
     }
   };
 
@@ -292,6 +335,7 @@ export const Scan: React.FC = () => {
       toast({ title: "Erro ao registrar entrada", description: err instanceof Error ? err.message : 'Erro desconhecido', variant: "destructive" });
     } finally {
       setLoadingProduct(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -328,6 +372,7 @@ export const Scan: React.FC = () => {
       toast({ title: "Erro ao ajustar estoque", description: err instanceof Error ? err.message : 'Erro desconhecido', variant: "destructive" });
     } finally {
       setLoadingProduct(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -357,6 +402,7 @@ export const Scan: React.FC = () => {
       addDebugLog("Carrinho local atualizado. Total itens: " + updatedCart.length);
       setLocalCart(updatedCart);
       setSelectedProduct(null);
+      isProcessingRef.current = false;
       toast({ title: "Item adicionado ao carrinho!" });
 
       // Sync with PC
@@ -424,7 +470,7 @@ export const Scan: React.FC = () => {
         });
       }
 
-      // Immediately select the product
+      // Immediately select the product for manual confirmation
       setSelectedProduct(data);
       setScannedQty(scanMode === 'sale' ? 1 : (scanMode === 'adjustment' ? data.current_stock : 1));
       setScannedCostPrice(data.cost_price || 0);
@@ -437,12 +483,14 @@ export const Scan: React.FC = () => {
     }
   };
 
-  // Handle changing active scan mode from the mobile phone
   const handleMobileModeChange = (mode: 'sale' | 'in' | 'adjustment') => {
     setScanMode(mode);
     setSelectedProduct(null);
     setProductNotFoundCode(null);
     setScannedQty(mode === 'sale' ? 1 : 0);
+    
+    lastScannedCodeRef.current = null;
+    lastScannedTimeRef.current = 0;
     
     // Broadcast to PC
     if (channelRef.current) {
@@ -472,6 +520,8 @@ export const Scan: React.FC = () => {
   const startCamera = async () => {
     setLoadingCamera(true);
     setCameraError(null);
+    isProcessingRef.current = false; // Destrava leituras ao abrir a câmera
+    lastScannedCodeRef.current = null; // Reseta cache de duplicados ao abrir a câmera
 
     try {
       const Html5QrcodeClass = await ensureHtml5QrcodeLoaded();
@@ -739,7 +789,10 @@ export const Scan: React.FC = () => {
                 </div>
                 <div className="flex gap-2 pt-1">
                   <Button 
-                    onClick={() => setSelectedProduct(null)} 
+                    onClick={() => {
+                      setSelectedProduct(null);
+                      isProcessingRef.current = false;
+                    }} 
                     variant="outline" 
                     className="flex-1 border-slate-800 text-slate-400 hover:text-white h-9 text-xs"
                   >
@@ -786,12 +839,11 @@ export const Scan: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-300 font-semibold">Preço de Custo (R$)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01"
+                    <Label className="text-xs text-slate-300 font-semibold">Preço de Custo</Label>
+                    <MoneyInput 
+                      id="scanned-cost"
                       value={scannedCostPrice} 
-                      onChange={e => setScannedCostPrice(parseFloat(e.target.value) || 0)}
+                      onChange={val => setScannedCostPrice(val)}
                       className="bg-slate-800 border-slate-700 text-white h-8 text-xs text-center focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
                     />
                   </div>
@@ -809,7 +861,10 @@ export const Scan: React.FC = () => {
 
                 <div className="flex gap-2 pt-1">
                   <Button 
-                    onClick={() => setSelectedProduct(null)} 
+                    onClick={() => {
+                      setSelectedProduct(null);
+                      isProcessingRef.current = false;
+                    }} 
                     variant="outline" 
                     className="flex-1 border-slate-800 text-slate-400 hover:text-white h-9 text-xs"
                   >
@@ -877,7 +932,10 @@ export const Scan: React.FC = () => {
 
                 <div className="flex gap-2 pt-1">
                   <Button 
-                    onClick={() => setSelectedProduct(null)} 
+                    onClick={() => {
+                      setSelectedProduct(null);
+                      isProcessingRef.current = false;
+                    }} 
                     variant="outline" 
                     className="flex-1 border-slate-800 text-slate-400 hover:text-white h-9 text-xs"
                   >
@@ -921,27 +979,21 @@ export const Scan: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="new-cost" className="text-xs text-slate-300 font-semibold">Preço de Custo (R$)</Label>
-                  <Input 
+                  <Label htmlFor="new-cost" className="text-xs text-slate-300 font-semibold">Preço de Custo</Label>
+                  <MoneyInput 
                     id="new-cost" 
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    className="bg-slate-800 border-slate-700 text-white h-9 text-xs text-center focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
+                    className="bg-slate-800 border-slate-700 text-white h-9 text-xs focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
                     value={newProductForm.costPrice}
-                    onChange={e => setNewProductForm(prev => ({ ...prev, costPrice: parseFloat(e.target.value) || 0 }))}
+                    onChange={val => setNewProductForm(prev => ({ ...prev, costPrice: val }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="new-sale" className="text-xs text-slate-300 font-semibold">Preço de Venda (R$)</Label>
-                  <Input 
+                  <Label htmlFor="new-sale" className="text-xs text-slate-300 font-semibold">Preço de Venda</Label>
+                  <MoneyInput 
                     id="new-sale" 
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    className="bg-slate-800 border-slate-700 text-white h-9 text-xs text-center focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
+                    className="bg-slate-800 border-slate-700 text-white h-9 text-xs focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
                     value={newProductForm.salePrice}
-                    onChange={e => setNewProductForm(prev => ({ ...prev, salePrice: parseFloat(e.target.value) || 0 }))}
+                    onChange={val => setNewProductForm(prev => ({ ...prev, salePrice: val }))}
                   />
                 </div>
               </div>
@@ -960,13 +1012,25 @@ export const Scan: React.FC = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="new-unit" className="text-xs text-slate-300 font-semibold">Unidade de Medida</Label>
-                  <Input 
-                    id="new-unit" 
-                    placeholder="UN, kg, etc."
-                    className="bg-slate-800 border-slate-700 text-white h-9 text-xs text-center font-mono focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
+                  <Select
                     value={newProductForm.unit}
-                    onChange={e => setNewProductForm(prev => ({ ...prev, unit: e.target.value }))}
-                  />
+                    onValueChange={v => setNewProductForm(prev => ({ ...prev, unit: v }))}
+                  >
+                    <SelectTrigger 
+                      id="new-unit" 
+                      className="bg-slate-800 border-slate-700 text-white h-9 text-xs focus:bg-slate-700 focus:border-indigo-500 focus:text-white"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                      <SelectItem value="UN" className="text-xs focus:bg-indigo-600 focus:text-white">Unidade (UN)</SelectItem>
+                      <SelectItem value="KG" className="text-xs focus:bg-indigo-600 focus:text-white">Quilo (KG)</SelectItem>
+                      <SelectItem value="L" className="text-xs focus:bg-indigo-600 focus:text-white">Litro (L)</SelectItem>
+                      <SelectItem value="PCT" className="text-xs focus:bg-indigo-600 focus:text-white">Pacote (PCT)</SelectItem>
+                      <SelectItem value="CX" className="text-xs focus:bg-indigo-600 focus:text-white">Caixa (CX)</SelectItem>
+                      <SelectItem value="M" className="text-xs focus:bg-indigo-600 focus:text-white">Metro (M)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -984,11 +1048,15 @@ export const Scan: React.FC = () => {
               <div className="flex gap-2 pt-1">
                 <Button 
                   type="button"
-                  onClick={() => setProductNotFoundCode(null)} 
+                  onClick={() => {
+                    setProductNotFoundCode(null);
+                    isProcessingRef.current = false;
+                  }} 
                   variant="outline" 
-                  className="flex-1 border-slate-800 text-slate-400 hover:text-white h-9 text-xs"
+                  className="flex-1 border-slate-800 text-slate-350 hover:text-white h-9 text-xs flex items-center justify-center gap-1.5"
                 >
-                  Cancelar
+                  <Camera className="h-3.5 w-3.5 text-emerald-400" />
+                  Tentar Novamente
                 </Button>
                 <Button 
                   type="submit"

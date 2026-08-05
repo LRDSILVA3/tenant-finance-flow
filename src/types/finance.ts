@@ -4,7 +4,15 @@ export type Language = 'pt' | 'en' | 'es';
 
 export type TransactionType = 'income' | 'expense';
 
-export type PaymentMethod = 'cash' | 'card' | 'pix' | 'pending';
+export type PaymentMethod = string;
+
+export interface CustomPaymentMethod {
+  id: string;
+  clientId: string;
+  name: string;
+  parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other';
+  createdAt: Date;
+}
 
 export type UserRole = 'owner' | 'collaborator';
 
@@ -175,6 +183,7 @@ export interface Customer {
   state?: string;
   notes?: string;
   isActive: boolean;
+  asaasCustomerId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -214,3 +223,50 @@ export interface Appointment {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface SystemNotification {
+  id: string;
+  type: 'low_stock' | 'expired_product' | 'expiring_product' | 'plan_expiration' | 'invoice_authorized' | 'invoice_error';
+  title: string;
+  message: string;
+  date: Date;
+  referenceId?: string;
+  read: boolean;
+}
+
+export interface ClientAsaasConfig {
+  clientId: string;
+  apiKey: string;
+  environment: 'sandbox' | 'production';
+  municipalServiceCode?: string;
+  issPercent: number;
+  cofinsPercent: number;
+  pisPercent: number;
+  inssPercent: number;
+  irPercent: number;
+  csllPercent: number;
+  automaticEmission: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type InvoiceStatus = 'SCHEDULED' | 'SYNCHRONIZED' | 'AUTHORIZED' | 'PROCESSING_CANCELLATION' | 'CANCELED' | 'DENIED' | 'ERROR';
+
+export interface Invoice {
+  id: string;
+  clientId: string;
+  subscriptionId?: string;
+  transactionId?: string;
+  asaasId?: string;
+  status: InvoiceStatus;
+  amount: number;
+  description?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
+  clientApiKeyUsed: boolean;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+

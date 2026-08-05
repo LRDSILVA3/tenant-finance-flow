@@ -35,6 +35,7 @@ interface SearchableSelectProps {
   addNewLabel?: string;
   className?: string;
   disabled?: boolean;
+  allowAdd?: boolean;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -48,6 +49,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   addNewLabel = 'Adicionar',
   className,
   disabled = false,
+  allowAdd = true,
 }) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -70,7 +72,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   );
 
   // Check if search value is a new option
-  const isNewOption = searchValue.trim() !== '' && 
+  const isNewOption = allowAdd && searchValue.trim() !== '' && 
     !allOptions.some(opt => opt.toLowerCase() === searchValue.trim().toLowerCase());
 
   const hasResults = groupedOptions 
