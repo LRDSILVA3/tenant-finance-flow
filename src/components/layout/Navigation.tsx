@@ -4,12 +4,12 @@ import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, ArrowRightLeft, BarChart3, Package, Settings, ShieldCheck, AlertTriangle, Users, CalendarDays, Bell } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, BarChart3, Package, Settings, ShieldCheck, AlertTriangle, Users, CalendarDays, Bell, HandCoins } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
 interface NavigationProps {
   currentView?: View;
@@ -26,6 +26,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
   const navItems: { id: View; label: string; icon: React.ReactNode; isPage?: boolean }[] = [
     { id: 'dashboard', label: t.dashboard, icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'transactions', label: t.transactions, icon: <ArrowRightLeft className="h-4 w-4" /> },
+    { id: 'receivables', label: 'Contas a Receber', icon: <HandCoins className="h-4 w-4" /> },
     { id: 'customers', label: 'Clientes', icon: <Users className="h-4 w-4" /> },
     { id: 'schedule', label: 'Agenda', icon: <CalendarDays className="h-4 w-4" /> },
     { id: 'inventory', label: 'Estoque', icon: <Package className="h-4 w-4" /> },
