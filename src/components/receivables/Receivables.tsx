@@ -94,7 +94,11 @@ export const Receivables: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
-  const [partialAction, setPartialAction] = useState<'discount' | 'split'>('split');
+  const [partialAction, setPartialAction] = useState<'discount' | 'split' | 'installments'>('split');
+  const [remainderDueDate, setRemainderDueDate] = useState<string>('');
+  const [installmentCount, setInstallmentCount] = useState<number>(2);
+  const [firstInstallmentDate, setFirstInstallmentDate] = useState<string>('');
+  const [interestRate, setInterestRate] = useState<number>(0);
   const [confirming, setConfirming] = useState(false);
 
   // Filter pending income transactions with customerId
@@ -174,6 +178,11 @@ export const Receivables: React.FC = () => {
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaidAmount(tx.amount);
     setPartialAction('split');
+    const defaultFutureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    setRemainderDueDate(defaultFutureDate);
+    setFirstInstallmentDate(defaultFutureDate);
+    setInstallmentCount(2);
+    setInterestRate(0);
   };
 
   const handleMarkAsPaid = async () => {
@@ -193,14 +202,15 @@ export const Receivables: React.FC = () => {
           date: selectedDate
         });
 
-        // Add a new pending transaction with the remainder
+        const newDueDate = new Date(remainderDueDate + 'T12:00:00');
+        // Add a new pending transaction with the remainder and new due date
         await addTransaction({
           clientId: selectedTx.clientId,
           categoryId: selectedTx.categoryId,
           type: 'income',
           amount: difference,
           description: `${selectedTx.description} (Saldo Remanescente)`,
-          date: selectedTx.date, // keep original date
+          date: newDueDate,
           paymentMethod: 'pending',
           customerId: selectedTx.customerId,
           notes: `Saldo devedor restante do lançamento original de ${formatCurrency(originalAmount)} no qual foi pago ${formatCurrency(paidAmount)} em ${formatDate(selectedDate)}.`
@@ -208,7 +218,43 @@ export const Receivables: React.FC = () => {
 
         toast({
           title: "Pagamento Parcial Confirmado!",
-          description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. Restante de ${formatCurrency(difference)} criado como nova conta pendente.`,
+          description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. Saldo devedor restante de ${formatCurrency(difference)} agendado para ${formatDate(newDueDate)}.`,
+        });
+      } else if (difference > 0 && partialAction === 'installments') {
+        // Update original to paid amount and mark as paid
+        await updateTransaction(selectedTx.id, {
+          amount: paidAmount,
+          paymentMethod: paymentMethod,
+          date: selectedDate
+        });
+
+        // Calculate installments details
+        const baseInstallmentAmount = difference / installmentCount;
+        const interestFactor = 1 + (interestRate / 100);
+        const finalInstallmentAmount = Number((baseInstallmentAmount * interestFactor).toFixed(2));
+
+        const firstDate = new Date(firstInstallmentDate + 'T12:00:00');
+
+        for (let i = 0; i < installmentCount; i++) {
+          const installmentDate = new Date(firstDate);
+          installmentDate.setMonth(installmentDate.getMonth() + i);
+
+          await addTransaction({
+            clientId: selectedTx.clientId,
+            categoryId: selectedTx.categoryId,
+            type: 'income',
+            amount: finalInstallmentAmount,
+            description: `${selectedTx.description} (Parc. ${i + 1}/${installmentCount})`,
+            date: installmentDate,
+            paymentMethod: 'pending',
+            customerId: selectedTx.customerId,
+            notes: `Parcela ${i + 1}/${installmentCount} referente ao saldo restante de ${formatCurrency(difference)} com juros de ${interestRate}% por parcela.`
+          });
+        }
+
+        toast({
+          title: "Saldo Parcelado com Sucesso!",
+          description: `Recebido ${formatCurrency(paidAmount)} via ${paymentMethod}. O restante de ${formatCurrency(difference)} foi parcelado em ${installmentCount}x de ${formatCurrency(finalInstallmentAmount)}.`,
         });
       } else {
         // Update original to paidAmount and mark as paid (full or with discount)
@@ -461,7 +507,20 @@ export const Receivables: React.FC = () => {
                         className="h-4 w-4 text-primary"
                       />
                       <Label htmlFor="split" className="text-xs font-normal cursor-pointer">
-                        <strong>Manter saldo devedor:</strong> Gerar nova conta pendente de <strong>{formatCurrency(selectedTx.amount - paidAmount)}</strong>
+                        <strong>Manter saldo devedor (única):</strong> Nova conta pendente de <strong>{formatCurrency(selectedTx.amount - paidAmount)}</strong>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="installments"
+                        name="partialAction"
+                        checked={partialAction === 'installments'}
+                        onChange={() => setPartialAction('installments')}
+                        className="h-4 w-4 text-primary"
+                      />
+                      <Label htmlFor="installments" className="text-xs font-normal cursor-pointer">
+                        <strong>Parcelar o saldo restante:</strong> Dividir o saldo restante em parcelas mensais.
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -478,6 +537,75 @@ export const Receivables: React.FC = () => {
                       </Label>
                     </div>
                   </div>
+
+                  {partialAction === 'split' && (
+                    <div className="space-y-2 border-t pt-3 mt-3">
+                      <Label htmlFor="remainderDueDate" className="text-xs">Vencimento do Saldo Restante</Label>
+                      <Input
+                        id="remainderDueDate"
+                        type="date"
+                        value={remainderDueDate}
+                        onChange={(e) => setRemainderDueDate(e.target.value)}
+                        className="w-full bg-background"
+                      />
+                    </div>
+                  )}
+
+                  {partialAction === 'installments' && (
+                    <div className="space-y-3 border-t pt-3 mt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="installmentCount" className="text-xs">Qtd. Parcelas</Label>
+                          <Input
+                            id="installmentCount"
+                            type="number"
+                            min={2}
+                            max={24}
+                            value={installmentCount}
+                            onChange={(e) => setInstallmentCount(Number(e.target.value))}
+                            className="w-full bg-background h-8"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="interestRate" className="text-xs">Juros / Parcela (%)</Label>
+                          <Input
+                            id="interestRate"
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={interestRate}
+                            onChange={(e) => setInterestRate(Number(e.target.value))}
+                            className="w-full bg-background h-8"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="firstInstallmentDate" className="text-xs">Vencimento da 1ª Parcela</Label>
+                        <Input
+                          id="firstInstallmentDate"
+                          type="date"
+                          value={firstInstallmentDate}
+                          onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                          className="w-full bg-background h-8"
+                        />
+                      </div>
+                      {installmentCount > 1 && (
+                        <div className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded italic">
+                          Resumo: {installmentCount}x de aproximadamente{' '}
+                          <strong>
+                            {formatCurrency(
+                              ((selectedTx.amount - paidAmount) / installmentCount) * (1 + interestRate / 100)
+                            )}
+                          </strong>{' '}
+                          (Total:{' '}
+                          {formatCurrency(
+                            (selectedTx.amount - paidAmount) * (1 + interestRate / 100)
+                          )}
+                          )
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
