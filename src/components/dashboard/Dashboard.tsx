@@ -10,7 +10,7 @@ import { MonthlyFlowData, FinancialSummary, PaymentMethod } from '@/types/financ
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Banknote, CreditCard, Smartphone, Clock, Lock } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, Clock, Lock, FileText, Wallet } from 'lucide-react';
 import { CategoryBreakdown } from './CategoryBreakdown';
 import { TodayScheduleWidget } from './TodayScheduleWidget';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -28,11 +28,12 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const paymentMethodConfig: Record<PaymentMethod, { icon: React.ReactNode; color: string }> = {
+const paymentMethodConfig: Record<string, { icon: React.ReactNode; color: string }> = {
   cash: { icon: <Banknote className="h-4 w-4" />, color: 'text-emerald-600' },
   card: { icon: <CreditCard className="h-4 w-4" />, color: 'text-blue-600' },
   pix: { icon: <Smartphone className="h-4 w-4" />, color: 'text-teal-600' },
   pending: { icon: <Clock className="h-4 w-4" />, color: 'text-amber-600' },
+  boleto: { icon: <FileText className="h-4 w-4" />, color: 'text-cyan-600' },
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, onNavigateToSchedule }) => {
@@ -85,7 +86,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
 
     const incomeTransactions = filteredTransactionsForPeriod.filter(txn => txn.type === 'income');
     
-    const breakdown: Record<PaymentMethod, number> = {
+    const breakdown: Record<string, number> = {
       cash: 0,
       card: 0,
       pix: 0,
@@ -94,6 +95,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
 
     incomeTransactions.forEach(txn => {
       if (txn.paymentMethod) {
+        if (breakdown[txn.paymentMethod] === undefined) {
+          breakdown[txn.paymentMethod] = 0;
+        }
         breakdown[txn.paymentMethod] += txn.amount;
       }
     });
@@ -188,16 +192,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(Object.keys(paymentMethodBreakdown) as PaymentMethod[]).map((method) => {
-                const config = paymentMethodConfig[method];
+              {(Object.keys(paymentMethodBreakdown) as string[]).map((method) => {
+                const config = paymentMethodConfig[method] || {
+                  icon: <Wallet className="h-4 w-4" />,
+                  color: 'text-indigo-600'
+                };
                 const value = paymentMethodBreakdown[method];
+                
+                // If it is a custom payment method with 0 value, do not render it
+                if (value === 0 && !['cash', 'card', 'pix', 'pending'].includes(method)) {
+                  return null;
+                }
+
                 return (
                   <div key={method} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                     <div className={`p-2 rounded-full bg-background ${config.color}`}>
                       {config.icon}
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">{t[method]}</p>
+                      <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
                       <p className="font-semibold money-font">{formatCurrency(value)}</p>
                     </div>
                   </div>
