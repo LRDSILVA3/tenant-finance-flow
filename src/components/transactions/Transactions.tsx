@@ -1089,17 +1089,6 @@ export const Transactions: React.FC = () => {
                                 Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
                               </span>
                             )}
-                            {invoice && (
-                              <span className={cn(
-                                "text-[9px] w-fit px-1.5 py-0.5 rounded font-medium border",
-                                invoice.status === 'AUTHORIZED' && "bg-emerald-500/10 text-emerald-700 border-emerald-200",
-                                invoice.status === 'ERROR' && "bg-red-500/10 text-red-700 border-red-200",
-                                invoice.status === 'CANCELED' && "bg-slate-500/10 text-slate-700 border-slate-200",
-                                !['AUTHORIZED', 'ERROR', 'CANCELED'].includes(invoice.status) && "bg-blue-500/10 text-blue-700 border-blue-200"
-                              )}>
-                                NF: {invoice.status === 'AUTHORIZED' ? 'Autorizada' : invoice.status === 'ERROR' ? 'Erro' : invoice.status === 'CANCELED' ? 'Cancelada' : 'Processando'}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
