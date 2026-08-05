@@ -12,10 +12,9 @@ import { Reports } from '@/components/reports/Reports';
 import { Inventory } from '@/components/inventory/Inventory';
 import { Customers } from '@/components/customers/Customers';
 import { Schedule } from '@/components/schedule/Schedule';
-import { Notifications } from '@/components/notifications/Notifications';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -96,8 +95,6 @@ const Index: React.FC = () => {
             initialCustomerId={scheduleCustomerId}
           />
         );
-      case 'notifications':
-        return <Notifications />;
       default:
         return <Dashboard onNavigateToTransactions={() => setCurrentView('transactions')} />;
     }

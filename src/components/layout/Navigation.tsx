@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin';
 
 interface NavigationProps {
   currentView?: View;
@@ -17,7 +17,8 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
-  const { t, userProfile, currentSubscription, unreadNotificationsCount } = useFinance();
+  const { t, userProfile, currentSubscription } = useFinance();
+  const unreadNotificationsCount = 0;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,7 +31,6 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
     { id: 'schedule', label: 'Agenda', icon: <CalendarDays className="h-4 w-4" /> },
     { id: 'inventory', label: 'Estoque', icon: <Package className="h-4 w-4" /> },
     { id: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
-    { id: 'notifications', label: 'Notificações', icon: <Bell className="h-4 w-4" /> },
     { id: 'settings', label: t.settings, icon: <Settings className="h-4 w-4" /> },
   ];
 
