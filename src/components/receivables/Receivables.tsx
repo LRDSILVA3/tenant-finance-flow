@@ -90,6 +90,7 @@ export const Receivables: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [confirming, setConfirming] = useState(false);
 
   // Filter pending income transactions with customerId
@@ -166,6 +167,7 @@ export const Receivables: React.FC = () => {
     setSelectedTx(tx);
     // Set default payment method to first option
     setPaymentMethod('pix');
+    setPaymentDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleMarkAsPaid = async () => {
@@ -173,12 +175,14 @@ export const Receivables: React.FC = () => {
     setConfirming(true);
 
     try {
+      const selectedDate = new Date(paymentDate + 'T12:00:00');
       await updateTransaction(selectedTx.id, {
-        paymentMethod: paymentMethod
+        paymentMethod: paymentMethod,
+        date: selectedDate
       });
       toast({
         title: "Recebimento Confirmado!",
-        description: `O lançamento de ${formatCurrency(selectedTx.amount)} foi marcado como pago via ${paymentMethod}.`,
+        description: `O lançamento de ${formatCurrency(selectedTx.amount)} foi marcado como pago via ${paymentMethod} em ${formatDate(selectedDate)}.`,
       });
       setSelectedTx(null);
     } catch (error) {
@@ -433,6 +437,17 @@ export const Receivables: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Data de Recebimento</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full bg-background"
+                />
               </div>
             </div>
           )}
