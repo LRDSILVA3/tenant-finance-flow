@@ -1,0 +1,13 @@
+function nvm {
+    if ($args.Count -eq 1 -and $args[0] -eq "use") {
+        if (Test-Path .nvmrc) {
+            $version = Get-Content .nvmrc -Raw
+            $version = $version.Trim()
+            nvm.exe use $version
+        } else {
+            nvm.exe use
+        }
+    } else {
+        & nvm.exe $args
+    }
+}
