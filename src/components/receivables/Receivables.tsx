@@ -457,7 +457,7 @@ export const Receivables: React.FC = () => {
 
       {/* Mark As Paid Dialog */}
       <Dialog open={selectedTx !== null} onOpenChange={(open) => !open && setSelectedTx(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Confirmar Recebimento</DialogTitle>
             <DialogDescription>
