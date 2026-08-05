@@ -236,6 +236,7 @@ export const Transactions: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
+  const [filterCustomer, setFilterCustomer] = useState<string>('all');
   
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
@@ -286,10 +287,13 @@ export const Transactions: React.FC = () => {
 
       // Payment Method filter
       if (filterPaymentMethod !== 'all' && txn.paymentMethod !== filterPaymentMethod) return false;
+
+      // Customer filter
+      if (filterCustomer !== 'all' && txn.customerId !== filterCustomer) return false;
       
       return true;
     });
-  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod]);
+  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod, filterCustomer]);
 
   const sortedTransactions = useMemo(() => {
     return [...filteredTransactions].sort((a, b) => 
@@ -380,6 +384,7 @@ export const Transactions: React.FC = () => {
     setFilterCategory('all');
     setFilterType('all');
     setFilterPaymentMethod('all');
+    setFilterCustomer('all');
   };
 
   const handleExportCsv = () => {
@@ -817,6 +822,24 @@ export const Transactions: React.FC = () => {
               allowAdd={false}
               className="w-[200px]"
             />
+          </div>
+
+          {/* Customer Filter */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Cliente</Label>
+            <Select value={filterCustomer} onValueChange={setFilterCustomer}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todos os Clientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Clientes</SelectItem>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Daily Filter */}
