@@ -77,14 +77,13 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
     userProfile,
     userSettings,
     currentPlan,
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
     t 
   } = useFinance();
-
-  const notifications: any[] = [];
-  const unreadNotificationsCount = 0;
-  const markNotificationAsRead = () => {};
-  const markAllNotificationsAsRead = () => {};
-  const clearNotification = () => {};
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);

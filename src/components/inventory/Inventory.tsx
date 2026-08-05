@@ -142,10 +142,8 @@ interface CartItem {
   quantity: number;
 }
 
-const refreshNotifications = () => {};
-
 export const Inventory: React.FC = () => {
-  const { currentClient, customers, categories, addTransaction, transactions, t } = useFinance();
+  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications } = useFinance();
   const [activeTab, setActiveTab] = useState<'products' | 'suppliers'>('products');
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);

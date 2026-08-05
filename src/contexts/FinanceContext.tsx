@@ -2,13 +2,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Language, UserProfile, Client, UserRole, Address } from '@/types/finance';
+import { Language, UserProfile, Client, UserRole, Address, CustomPaymentMethod, ClientAsaasConfig, Invoice } from '@/types/finance';
 import { translations, Translations } from '@/i18n/translations';
 import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 
-import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer } from '@/types/finance';
+import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification } from '@/types/finance';
 
 interface UserSettings {
   enablePaymentMethods: boolean;
@@ -17,6 +17,8 @@ interface UserSettings {
 }
 
 interface FinanceContextType {
+
+
   // Auth & Profile
   isAuthenticated: boolean;
   authLoading: boolean;
@@ -70,11 +72,21 @@ interface FinanceContextType {
   addCollaborator: (name: string) => Promise<Collaborator | null>;
   updateCollaborator: (id: string, name: string) => Promise<void>;
   deleteCollaborator: (id: string) => Promise<void>;
+  addCustomPaymentMethod: (name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => Promise<CustomPaymentMethod | null>;
+  deleteCustomPaymentMethod: (id: string) => Promise<void>;
   getCategoriesByType: (type: TransactionType) => Category[];
   getCategoryById: (id: string) => Category | undefined;
   getCollaboratorById: (id: string) => Collaborator | undefined;
   getCustomerById: (id: string) => Customer | undefined;
   loadCustomers: (clientId: string) => Promise<void>;
+
+  // Notifications
+  notifications: SystemNotification[];
+  unreadNotificationsCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotification: (id: string) => void;
+  refreshNotifications: () => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -94,7 +106,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     loadCategories, 
     loadTransactions, 
     loadCollaborators,
-    loadCustomers
+    loadCustomers,
+    loadCustomPaymentMethods
   } = tx;
 
   const [language, setLanguage] = useState<Language>('pt');
@@ -109,6 +122,25 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
 
+  // Notifications states
+  const [rawAlerts, setRawAlerts] = useState<Omit<SystemNotification, 'read'>[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('read_notification_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [clearedNotificationIds, setClearedNotificationIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('cleared_notification_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Reset context states when user changes/logs out
   useEffect(() => {
     setClients([]);
@@ -116,6 +148,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setUserProfile(null);
     setUserRole(null);
     setCurrentAddress(null);
+    setRawAlerts([]);
   }, [user?.id]);
 
   const t = translations[language];
@@ -136,6 +169,159 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
     return false;
   }, [userProfile, currentSubscription, currentPlan]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!currentClient) {
+      setRawAlerts([]);
+      return;
+    }
+
+    try {
+      const list: Omit<SystemNotification, 'read'>[] = [];
+
+      // 1. Plan warning notification
+      if (currentSubscription && !userProfile?.isAdmin) {
+        const now = new Date();
+        const trialEnd = currentSubscription.trialEnd ? new Date(currentSubscription.trialEnd) : null;
+        const periodEnd = currentSubscription.currentPeriodEnd ? new Date(currentSubscription.currentPeriodEnd) : new Date();
+
+        const endDate = (currentSubscription.status === 'trialing' || currentSubscription.status === 'pending' || currentSubscription.status === 'future' || (currentSubscription.status === 'canceled' && trialEnd && trialEnd > now)) 
+          ? (trialEnd || periodEnd) 
+          : periodEnd;
+
+        const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining < 0) {
+          list.push({
+            id: 'plan-expired',
+            type: 'plan_expiration',
+            title: 'Assinatura Expirada',
+            message: 'Sua conta está em modo de leitura. Renove sua assinatura para adicionar novos lançamentos.',
+            date: new Date(),
+          });
+        } else if (daysRemaining <= 3) {
+          const msg = (currentSubscription.status === 'trialing' || currentSubscription.status === 'future') 
+            ? `Seu período de teste grátis termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
+            : currentSubscription.status === 'canceled'
+              ? `Seu acesso à conta termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
+              : `Sua assinatura expira em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}. Verifique seu método de pagamento.`;
+          list.push({
+            id: `plan-warning-${daysRemaining}`,
+            type: 'plan_expiration',
+            title: 'Assinatura Expirando em Breve',
+            message: msg,
+            date: new Date(),
+          });
+        }
+      }
+
+      // 2. Fetch products for low stock and expiration
+      const { data: productsData, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('client_id', currentClient.id);
+
+      if (!error && productsData) {
+        productsData.forEach((p: any) => {
+          // Low stock alert
+          if (p.current_stock <= p.min_stock) {
+            list.push({
+              id: `low_stock-${p.id}`,
+              type: 'low_stock',
+              title: `Estoque Baixo: ${p.name}`,
+              message: `Produto possui apenas ${p.current_stock} ${p.unit || 'UN'} em estoque (mínimo de ${p.min_stock}).`,
+              date: new Date(p.updated_at || p.created_at),
+              referenceId: p.id,
+            });
+          }
+
+          // Expiration alert
+          if (p.expiration_date) {
+            const expDate = new Date(`${p.expiration_date}T00:00:00`);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffTime = expDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const formattedExp = new Intl.DateTimeFormat('pt-BR').format(expDate);
+
+            if (diffDays < 0) {
+              list.push({
+                id: `expired-${p.id}-${p.expiration_date}`,
+                type: 'expired_product',
+                title: `Produto Vencido: ${p.name}`,
+                message: `O lote deste produto venceu no dia ${formattedExp}.`,
+                date: expDate,
+                referenceId: p.id,
+              });
+            } else if (diffDays <= 30) {
+              list.push({
+                id: `expiring-${p.id}-${p.expiration_date}`,
+                type: 'expiring_product',
+                title: `Produto Próximo ao Vencimento: ${p.name}`,
+                message: `O produto vence em ${diffDays} ${diffDays === 1 ? 'dia' : 'dias'} (${formattedExp}).`,
+                date: expDate,
+                referenceId: p.id,
+              });
+            }
+          }
+        });
+      }
+
+
+
+      // Sort notifications by date (newest first)
+      list.sort((a, b) => b.date.getTime() - a.date.getTime());
+      setRawAlerts(list);
+    } catch (err) {
+      console.error('Error generating notifications:', err);
+    }
+  }, [currentClient, currentSubscription, userProfile]);
+
+  // Generate final notifications list by mapping read and filtering cleared
+  const notifications = React.useMemo(() => {
+    return rawAlerts
+      .filter(n => !clearedNotificationIds.includes(n.id))
+      .map(n => ({
+        ...n,
+        read: readNotificationIds.includes(n.id)
+      }));
+  }, [rawAlerts, readNotificationIds, clearedNotificationIds]);
+
+  const unreadNotificationsCount = React.useMemo(() => {
+    return notifications.filter(n => !n.read).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setReadNotificationIds(prev => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem('read_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    const idsToMark = notifications.map(n => n.id);
+    setReadNotificationIds(prev => {
+      const next = Array.from(new Set([...prev, ...idsToMark]));
+      localStorage.setItem('read_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, [notifications]);
+
+  const clearNotification = useCallback((id: string) => {
+    setClearedNotificationIds(prev => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem('cleared_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // Load notifications
+  useEffect(() => {
+    if (currentClient) {
+      refreshNotifications();
+    }
+  }, [currentClient?.id, currentSubscription?.id, refreshNotifications]);
 
   const loadAddress = useCallback(async (clientId: string) => {
     const { data } = await supabase
@@ -261,8 +447,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadTransactions(currentClient.id);
       loadCollaborators(currentClient.id);
       loadCustomers(currentClient.id);
+      loadCustomPaymentMethods(currentClient.id);
     }
-  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers]);
+  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods]);
 
   // Sync settings with plan and subscription status
   useEffect(() => {
@@ -333,16 +520,33 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
     updateCollaborator: withSubscriptionCheck(tx.updateCollaborator),
     deleteCollaborator: withSubscriptionCheck(tx.deleteCollaborator),
+    addCustomPaymentMethod: (name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => {
+      if (!isSubscriptionActive()) {
+        toast({ title: "Acesso Limitado", variant: 'destructive' });
+        return null;
+      }
+      return tx.addCustomPaymentMethod(currentClient?.id || '', name, parentType);
+    },
+    deleteCustomPaymentMethod: withSubscriptionCheck(tx.deleteCustomPaymentMethod),
     
     getCategoriesByType: (type: TransactionType) => tx.categories.filter(c => c.type === type),
     getCategoryById: (id: string) => tx.categories.find(c => c.id === id),
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
     getCustomerById: (id: string) => tx.customers.find(c => c.id === id),
+    
+    // Notifications
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
+    refreshNotifications,
   }), [
     isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,
     userSettings, updateUserSettings,
-    sub, tx, isSubscriptionActive, withSubscriptionCheck, currentPlan?.features.max_collaborators
+    sub, tx, isSubscriptionActive, withSubscriptionCheck, currentPlan?.features.max_collaborators,
+    notifications, unreadNotificationsCount, markNotificationAsRead, markAllNotificationsAsRead, clearNotification, refreshNotifications
   ]);
 
   return (
