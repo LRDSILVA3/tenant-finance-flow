@@ -14,7 +14,9 @@ import {
   Check, 
   CheckCheck, 
   Trash2,
-  Inbox
+  Inbox,
+  Cake,
+  TrendingDown
 } from 'lucide-react';
 
 export const Notifications: React.FC = () => {
@@ -48,6 +50,10 @@ export const Notifications: React.FC = () => {
         return <CheckCheck className="h-5 w-5 text-emerald-500" />;
       case 'invoice_error':
         return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'margin_warning':
+        return <TrendingDown className="h-5 w-5 text-red-500" />;
+      case 'birthday':
+        return <Cake className="h-5 w-5 text-pink-500" />;
       default:
         return <Bell className="h-5 w-5 text-blue-500" />;
     }
@@ -67,6 +73,10 @@ export const Notifications: React.FC = () => {
         return 'bg-emerald-500/10 border-emerald-200';
       case 'invoice_error':
         return 'bg-red-500/10 border-red-200';
+      case 'margin_warning':
+        return 'bg-red-500/10 border-red-200';
+      case 'birthday':
+        return 'bg-pink-500/10 border-pink-200';
       default:
         return 'bg-blue-500/10 border-blue-200';
     }
@@ -86,6 +96,10 @@ export const Notifications: React.FC = () => {
         return 'NF Autorizada';
       case 'invoice_error':
         return 'Erro NF';
+      case 'margin_warning':
+        return 'Margem Negativa';
+      case 'birthday':
+        return 'Aniversário';
       default:
         return 'Alerta';
     }
@@ -105,6 +119,10 @@ export const Notifications: React.FC = () => {
         return 'default'; // success is usually default or outline in custom styling
       case 'invoice_error':
         return 'destructive';
+      case 'margin_warning':
+        return 'destructive';
+      case 'birthday':
+        return 'secondary';
       default:
         return 'default';
     }

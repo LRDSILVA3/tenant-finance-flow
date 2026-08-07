@@ -240,6 +240,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
             });
           }
 
+          // Negative margin alert (cost_price > sale_price)
+          if (p.cost_price && p.sale_price && Number(p.cost_price) > Number(p.sale_price)) {
+            list.push({
+              id: `negative_margin-${p.id}`,
+              type: 'margin_warning',
+              title: `Margem Negativa: ${p.name}`,
+              message: `Atenção: O preço de custo (R$ ${Number(p.cost_price).toFixed(2)}) é maior que o preço de venda (R$ ${Number(p.sale_price).toFixed(2)}).`,
+              date: new Date(p.updated_at || p.created_at),
+              referenceId: p.id,
+            });
+          }
+
           // Expiration alert
           if (p.expiration_date) {
             const expDate = new Date(`${p.expiration_date}T00:00:00`);
@@ -266,6 +278,34 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                 message: `O produto vence em ${diffDays} ${diffDays === 1 ? 'dia' : 'dias'} (${formattedExp}).`,
                 date: expDate,
                 referenceId: p.id,
+              });
+            }
+          }
+        });
+      }
+
+      // 3. Fetch customers for birthday alerts
+      const { data: customersData, error: custError } = await supabase
+        .from('customers')
+        .select('id, name, birth_date')
+        .eq('client_id', currentClient.id);
+
+      if (!custError && customersData) {
+        const today = new Date();
+        const todayMonth = today.getMonth() + 1; // 1-12
+        const todayDay = today.getDate(); // 1-31
+
+        customersData.forEach((c: any) => {
+          if (c.birth_date) {
+            const [bYear, bMonth, bDay] = c.birth_date.split('-').map(Number);
+            if (bMonth === todayMonth && bDay === todayDay) {
+              list.push({
+                id: `birthday-${c.id}-${todayMonth}-${todayDay}`,
+                type: 'birthday',
+                title: `🎉 Aniversário Hoje: ${c.name}`,
+                message: `Hoje é aniversário do cliente ${c.name}! Entre em contato para parabenizá-lo ou oferecer uma oferta especial.`,
+                date: new Date(),
+                referenceId: c.id,
               });
             }
           }

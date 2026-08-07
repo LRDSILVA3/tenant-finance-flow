@@ -235,7 +235,7 @@ export interface Appointment {
 
 export interface SystemNotification {
   id: string;
-  type: 'low_stock' | 'expired_product' | 'expiring_product' | 'plan_expiration' | 'invoice_authorized' | 'invoice_error';
+  type: 'low_stock' | 'expired_product' | 'expiring_product' | 'plan_expiration' | 'invoice_authorized' | 'invoice_error' | 'margin_warning' | 'birthday';
   title: string;
   message: string;
   date: Date;
