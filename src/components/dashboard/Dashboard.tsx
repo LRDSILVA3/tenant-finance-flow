@@ -81,6 +81,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
     };
   }, [filteredTransactionsForPeriod]);
 
+  const netBalances = useMemo(() => {
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    
+    let bal30 = 0;
+    let bal60 = 0;
+    let bal90 = 0;
+
+    transactions.forEach((txn) => {
+      const txnDate = new Date(txn.date);
+      const diffTime = now.getTime() - txnDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+      if (diffDays >= 0) {
+        const value = txn.type === 'income' ? txn.amount : -txn.amount;
+        if (diffDays <= 30) bal30 += value;
+        if (diffDays <= 60) bal60 += value;
+        if (diffDays <= 90) bal90 += value;
+      }
+    });
+
+    return { bal30, bal60, bal90 };
+  }, [transactions]);
+
   const paymentMethodBreakdown = useMemo(() => {
     if (!userSettings.enablePaymentMethods) return null;
 
@@ -183,6 +207,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
         <StatCard title={t.incomes} value={summary.totalIncome} type="income" />
         <StatCard title={t.expenses} value={summary.totalExpense} type="expense" />
       </div>
+
+      {/* Net Balances of Last 30/60/90 Days */}
+      <Card className="border border-indigo-100 bg-indigo-50/10">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">
+            Saldo Líquido por Período (Entradas - Saídas)
+          </CardTitle>
+          <CardDescription>
+            Valor total acumulado que sobrou nos últimos 30, 60 e 90 dias.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 30 Dias</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal30 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal30)}
+              </span>
+            </div>
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal60 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal60)}
+              </span>
+            </div>
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal90 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal90)}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Payment Method Breakdown */}
       {paymentMethodBreakdown && (

@@ -312,7 +312,104 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         });
       }
 
+      // 4. Fetch pending transactions (Receivables and Payables) for alerts
+      const { data: pendingTxData, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('client_id', currentClient.id)
+        .eq('payment_method', 'pending');
 
+      if (!txError && pendingTxData) {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        pendingTxData.forEach((tx: any) => {
+          if (tx.date) {
+            const txDate = new Date(`${tx.date}T00:00:00`);
+            const diffTime = txDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (tx.type === 'income') {
+              if (diffDays < 0) {
+                list.push({
+                  id: `overdue-receivable-${tx.id}`,
+                  type: 'invoice_error',
+                  title: `Conta a Receber Atrasada: ${tx.description}`,
+                  message: `A receita de R$ ${Number(tx.amount).toFixed(2)} está atrasada desde o dia ${new Intl.DateTimeFormat('pt-BR').format(txDate)}.`,
+                  date: txDate,
+                  referenceId: tx.id,
+                });
+              } else if (diffDays === 0) {
+                list.push({
+                  id: `today-receivable-${tx.id}`,
+                  type: 'low_stock',
+                  title: `Conta a Receber Vence Hoje: ${tx.description}`,
+                  message: `A receita de R$ ${Number(tx.amount).toFixed(2)} vence hoje. Verifique com o cliente.`,
+                  date: today,
+                  referenceId: tx.id,
+                });
+              }
+            } else if (tx.type === 'expense') {
+              if (diffDays < 0) {
+                list.push({
+                  id: `overdue-payable-${tx.id}`,
+                  type: 'invoice_error',
+                  title: `Conta a Pagar Atrasada: ${tx.description}`,
+                  message: `A despesa de R$ ${Number(tx.amount).toFixed(2)} está atrasada desde o dia ${new Intl.DateTimeFormat('pt-BR').format(txDate)}.`,
+                  date: txDate,
+                  referenceId: tx.id,
+                });
+              } else if (diffDays === 0) {
+                list.push({
+                  id: `today-payable-${tx.id}`,
+                  type: 'low_stock',
+                  title: `Conta a Pagar Vence Hoje: ${tx.description}`,
+                  message: `A despesa de R$ ${Number(tx.amount).toFixed(2)} vence hoje. Realize o pagamento para evitar juros.`,
+                  date: today,
+                  referenceId: tx.id,
+                });
+              }
+            }
+          }
+        });
+      }
+
+      // 5. Calculate current cash balance for balance alerts
+      const { data: allTxData, error: allTxError } = await supabase
+        .from('transactions')
+        .select('amount, type, payment_method')
+        .eq('client_id', currentClient.id);
+
+      if (!allTxError && allTxData) {
+        let cashBalance = 0;
+        allTxData.forEach((tx: any) => {
+          if (tx.payment_method !== 'pending') {
+            if (tx.type === 'income') {
+              cashBalance += Number(tx.amount);
+            } else if (tx.type === 'expense') {
+              cashBalance -= Number(tx.amount);
+            }
+          }
+        });
+
+        if (cashBalance < 0) {
+          list.push({
+            id: 'cash-balance-negative',
+            type: 'invoice_error',
+            title: 'Caixa Geral Negativo!',
+            message: `Atenção: O saldo do seu fluxo de caixa geral está negativo: R$ ${cashBalance.toFixed(2)}.`,
+            date: new Date(),
+          });
+        } else if (cashBalance < 500) {
+          list.push({
+            id: 'cash-balance-critical',
+            type: 'low_stock',
+            title: 'Saldo de Caixa Baixo',
+            message: `Atenção: Seu saldo de caixa geral está abaixo de R$ 500,00 (Saldo atual: R$ ${cashBalance.toFixed(2)}).`,
+            date: new Date(),
+          });
+        }
+      }
 
       // Sort notifications by date (newest first)
       list.sort((a, b) => b.date.getTime() - a.date.getTime());

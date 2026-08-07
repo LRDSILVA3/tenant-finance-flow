@@ -192,6 +192,30 @@ export const Transactions: React.FC = () => {
   const { exportListToPdf, exportCalendarToPdf } = useTransactionPdfExport();
   const { exportToCsv } = useTransactionCsvExport();
 
+  const netBalances = useMemo(() => {
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    
+    let bal30 = 0;
+    let bal60 = 0;
+    let bal90 = 0;
+
+    transactions.forEach((txn) => {
+      const txnDate = new Date(txn.date);
+      const diffTime = now.getTime() - txnDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+      if (diffDays >= 0) {
+        const value = txn.type === 'income' ? txn.amount : -txn.amount;
+        if (diffDays <= 30) bal30 += value;
+        if (diffDays <= 60) bal60 += value;
+        if (diffDays <= 90) bal90 += value;
+      }
+    });
+
+    return { bal30, bal60, bal90 };
+  }, [transactions]);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpenState] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -960,6 +984,37 @@ export const Transactions: React.FC = () => {
             })()}
           </div>
         )}
+      </div>
+
+      {/* Saldo Líquido Recente (Entradas - Saídas) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 30 Dias</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal30 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal30)}
+          </span>
+        </div>
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 60 Dias</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal60 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal60)}
+          </span>
+        </div>
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 90 Dias</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal90 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal90)}
+          </span>
+        </div>
       </div>
 
       {/* List View */}
