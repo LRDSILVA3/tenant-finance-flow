@@ -258,6 +258,8 @@ export const Inventory: React.FC = () => {
     type: 'in' as 'in' | 'out' | 'adjustment',
     quantity: 1,
     notes: '',
+    costPrice: 0,
+    expirationDate: '',
   });
 
   // Fetch Suppliers
@@ -664,6 +666,8 @@ export const Inventory: React.FC = () => {
       type: 'in',
       quantity: 1,
       notes: '',
+      costPrice: product.cost_price || 0,
+      expirationDate: product.expiration_date || '',
     });
     setIsAdjustmentModalOpen(true);
   };
@@ -805,6 +809,8 @@ export const Inventory: React.FC = () => {
         type: adjustmentForm.type,
         quantity: adjustmentForm.quantity,
         notes: adjustmentForm.notes || 'Ajuste manual de estoque',
+        cost_price: adjustmentForm.type === 'in' ? (adjustmentForm.costPrice || null) : null,
+        expiration_date: adjustmentForm.type === 'in' ? (adjustmentForm.expirationDate || null) : null,
       });
 
       if (error) throw error;
@@ -814,7 +820,17 @@ export const Inventory: React.FC = () => {
       else if (adjustmentForm.type === 'out') newStock = Math.max(0, newStock - adjustmentForm.quantity);
       else if (adjustmentForm.type === 'adjustment') newStock = adjustmentForm.quantity;
 
-      await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id);
+      const productUpdate: any = { current_stock: newStock };
+      if (adjustmentForm.type === 'in') {
+        if (adjustmentForm.costPrice !== undefined) {
+          productUpdate.cost_price = adjustmentForm.costPrice;
+        }
+        if (adjustmentForm.expirationDate) {
+          productUpdate.expiration_date = adjustmentForm.expirationDate;
+        }
+      }
+
+      await supabase.from('products').update(productUpdate).eq('id', selectedProduct.id);
 
       toast({ title: 'Estoque atualizado com sucesso!' });
       setIsAdjustmentModalOpen(false);
@@ -1935,6 +1951,29 @@ export const Inventory: React.FC = () => {
                   required
                 />
               </div>
+
+              {adjustmentForm.type === 'in' && (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="adj-cost">Preço de Custo Unitário (R$)</Label>
+                    <MoneyInput
+                      id="adj-cost"
+                      value={adjustmentForm.costPrice}
+                      onChange={(val) => setAdjustmentForm(a => ({ ...a, costPrice: val }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="adj-expiration">Data de Vencimento</Label>
+                    <Input
+                      id="adj-expiration"
+                      type="date"
+                      value={adjustmentForm.expirationDate}
+                      onChange={(e) => setAdjustmentForm(a => ({ ...a, expirationDate: e.target.value }))}
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="space-y-1">
                 <Label htmlFor="adj-notes">Observações</Label>
