@@ -8,7 +8,7 @@ import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 
-import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification } from '@/types/finance';
+import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier } from '@/types/finance';
 
 interface UserSettings {
   enablePaymentMethods: boolean;
@@ -63,6 +63,7 @@ interface FinanceContextType {
   transactions: Transaction[];
   collaborators: Collaborator[];
   customers: Customer[];
+  customPaymentMethods: CustomPaymentMethod[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
@@ -79,6 +80,9 @@ interface FinanceContextType {
   getCollaboratorById: (id: string) => Collaborator | undefined;
   getCustomerById: (id: string) => Customer | undefined;
   loadCustomers: (clientId: string) => Promise<void>;
+  suppliers: Supplier[];
+  loadSuppliers: (clientId: string) => Promise<void>;
+  getSupplierById: (id: string) => Supplier | undefined;
 
   // Notifications
   notifications: SystemNotification[];
@@ -107,7 +111,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     loadTransactions, 
     loadCollaborators,
     loadCustomers,
-    loadCustomPaymentMethods
+    loadCustomPaymentMethods,
+    loadSuppliers
   } = tx;
 
   const [language, setLanguage] = useState<Language>('pt');
@@ -448,8 +453,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadCollaborators(currentClient.id);
       loadCustomers(currentClient.id);
       loadCustomPaymentMethods(currentClient.id);
+      loadSuppliers(currentClient.id);
     }
-  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods]);
+  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers]);
 
   // Sync settings with plan and subscription status
   useEffect(() => {
@@ -533,6 +539,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     getCategoryById: (id: string) => tx.categories.find(c => c.id === id),
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
     getCustomerById: (id: string) => tx.customers.find(c => c.id === id),
+    getSupplierById: (id: string) => tx.suppliers.find(s => s.id === id),
     
     // Notifications
     notifications,

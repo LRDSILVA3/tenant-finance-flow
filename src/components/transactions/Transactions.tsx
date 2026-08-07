@@ -177,6 +177,8 @@ export const Transactions: React.FC = () => {
     language,
     userSettings,
     customPaymentMethods = [],
+    suppliers,
+    getSupplierById,
   } = useFinance();
   const { loadTransactions } = useTransactions();
 
@@ -237,6 +239,7 @@ export const Transactions: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
   const [filterCustomer, setFilterCustomer] = useState<string>('all');
+  const [filterSupplier, setFilterSupplier] = useState<string>('all');
   
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
@@ -254,6 +257,7 @@ export const Transactions: React.FC = () => {
     commissionAmount: 0,
     commissions: [] as Array<{ collaboratorId: string; commissionAmount: number }>,
     customerId: '',
+    supplierId: '',
     isRecurring: false,
     recurrenceType: 'count' as 'count' | 'until',
     repeatCount: 1,
@@ -290,10 +294,13 @@ export const Transactions: React.FC = () => {
 
       // Customer filter
       if (filterCustomer !== 'all' && txn.customerId !== filterCustomer) return false;
+
+      // Supplier filter
+      if (filterSupplier !== 'all' && txn.supplierId !== filterSupplier) return false;
       
       return true;
     });
-  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod, filterCustomer]);
+  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod, filterCustomer, filterSupplier]);
 
   const sortedTransactions = useMemo(() => {
     return [...filteredTransactions].sort((a, b) => 
@@ -385,6 +392,7 @@ export const Transactions: React.FC = () => {
     setFilterType('all');
     setFilterPaymentMethod('all');
     setFilterCustomer('all');
+    setFilterSupplier('all');
   };
 
   const handleExportCsv = () => {
@@ -458,6 +466,7 @@ export const Transactions: React.FC = () => {
       commissionAmount: 0,
       commissions: [],
       customerId: '',
+      supplierId: '',
       isRecurring: false,
       recurrenceType: 'count' as 'count' | 'until',
       repeatCount: 1,
@@ -487,6 +496,7 @@ export const Transactions: React.FC = () => {
         commissionAmount: c.commissionAmount
       })) : [],
       customerId: transaction.customerId || '',
+      supplierId: transaction.supplierId || '',
       isRecurring: !!transaction.recurringId,
       recurrenceType: 'count',
       repeatCount: 1,
@@ -522,6 +532,7 @@ export const Transactions: React.FC = () => {
     const paymentMethod = formData.paymentMethod || undefined;
     const commissions = formData.commissions || [];
     const customerId = formData.customerId && formData.customerId !== 'none' ? formData.customerId : undefined;
+    const supplierId = formData.supplierId && formData.supplierId !== 'none' ? formData.supplierId : undefined;
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, {
@@ -535,6 +546,7 @@ export const Transactions: React.FC = () => {
         paymentMethod,
         commissions,
         customerId,
+        supplierId,
       });
     } else {
       const recurrence = formData.isRecurring ? {
@@ -554,6 +566,7 @@ export const Transactions: React.FC = () => {
         paymentMethod,
         commissions,
         customerId,
+        supplierId,
       }, recurrence);
     }
 
@@ -842,6 +855,24 @@ export const Transactions: React.FC = () => {
             </Select>
           </div>
 
+          {/* Supplier Filter */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Fornecedor</Label>
+            <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todos os Fornecedores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Fornecedores</SelectItem>
+                {suppliers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Daily Filter */}
           <Button
             variant="outline"
@@ -1004,6 +1035,11 @@ export const Transactions: React.FC = () => {
                                   Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
                                 </span>
                               )}
+                              {transaction.supplierId && (
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium">
+                                  Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -1110,6 +1146,11 @@ export const Transactions: React.FC = () => {
                             {transaction.customerId && (
                               <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
                                 Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                              </span>
+                            )}
+                            {transaction.supplierId && (
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
+                                Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
                               </span>
                             )}
                           </div>
@@ -1495,25 +1536,47 @@ export const Transactions: React.FC = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="customerId">Cliente (Opcional)</Label>
-              <Select
-                value={formData.customerId || 'none'}
-                onValueChange={(val) => updateFormField('customerId', val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum cliente</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {c.document ? `(${c.document})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {formData.type === 'income' ? (
+              <div className="space-y-2">
+                <Label htmlFor="customerId">Cliente (Opcional)</Label>
+                <Select
+                  value={formData.customerId || 'none'}
+                  onValueChange={(val) => updateFormField('customerId', val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cliente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum cliente</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.document ? `(${c.document})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="supplierId">Fornecedor (Opcional)</Label>
+                <Select
+                  value={formData.supplierId || 'none'}
+                  onValueChange={(val) => updateFormField('supplierId', val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um fornecedor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum fornecedor</SelectItem>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Description and Reference */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -10,6 +10,8 @@ const mockSingle = vi.fn();
 const mockSelect = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ data: [], error: null }) }) });
 const mockInsertTx = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single: mockSingle }) });
 const mockInsertComm = vi.fn().mockResolvedValue({ error: null });
+const mockSelectPaymentMethod = vi.fn();
+const mockInsertPaymentMethod = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -25,6 +27,13 @@ vi.mock('@/integrations/supabase/client', () => ({
       if (table === 'transaction_commissions') {
         return {
           insert: mockInsertComm,
+        } as any;
+      }
+      if (table === 'client_payment_methods') {
+        return {
+          select: mockSelectPaymentMethod,
+          insert: mockInsertPaymentMethod,
+          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ error: null }) }),
         } as any;
       }
       return {
@@ -65,6 +74,16 @@ describe('TransactionContext & Provider', () => {
     });
     
     mockInsertComm.mockResolvedValue({ error: null });
+
+    mockSelectPaymentMethod.mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: [], error: null })
+    });
+    
+    mockInsertPaymentMethod.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: null, error: null })
+      })
+    });
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -192,6 +211,112 @@ describe('TransactionContext & Provider', () => {
         collaborator_id: 'colab-2',
         commission_amount: 25.00,
       }
+    ]);
+  });
+
+  it('deve carregar formas de pagamento personalizadas do cliente do Supabase', async () => {
+    const mockPaymentMethods = [
+      {
+        id: 'pm-1',
+        client_id: 'client-1',
+        name: 'Boleto Sicredi',
+        parent_type: 'boleto',
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    mockSelectPaymentMethod.mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: mockPaymentMethods, error: null })
+    });
+
+    const { result } = renderHook(() => useTransactions(), { wrapper });
+
+    await act(async () => {
+      await result.current.loadCustomPaymentMethods('client-1');
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith('client_payment_methods');
+    expect(result.current.customPaymentMethods.length).toBe(1);
+    expect(result.current.customPaymentMethods[0].name).toBe('Boleto Sicredi');
+    expect(result.current.customPaymentMethods[0].parentType).toBe('boleto');
+  });
+
+  it('deve criar uma nova forma de pagamento personalizada', async () => {
+    mockInsertPaymentMethod.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: 'pm-2',
+            client_id: 'client-1',
+            name: 'Pix Inter',
+            parent_type: 'pix',
+            created_at: new Date().toISOString()
+          },
+          error: null
+        })
+      })
+    });
+
+    const { result } = renderHook(() => useTransactions(), { wrapper });
+
+    await act(async () => {
+      const pm = await result.current.addCustomPaymentMethod('client-1', 'Pix Inter', 'pix');
+      expect(pm).not.toBeNull();
+      expect(pm?.name).toBe('Pix Inter');
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith('client_payment_methods');
+    expect(mockInsertPaymentMethod).toHaveBeenCalledWith({
+      client_id: 'client-1',
+      name: 'Pix Inter',
+      parent_type: 'pix'
+    });
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Forma de pagamento adicionada!',
+    }));
+  });
+
+  it('deve utilizar uma forma de pagamento personalizada ao criar lançamento', async () => {
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'tx-with-custom-pm',
+        client_id: 'client-1',
+        category_id: 'cat-1',
+        type: 'income',
+        amount: 80.00,
+        description: 'Venda no Pix Inter',
+        date: '2026-08-05',
+        payment_method: 'Pix Inter',
+      },
+      error: null
+    });
+
+    const { result } = renderHook(() => useTransactions(), { wrapper });
+
+    await act(async () => {
+      await result.current.addTransaction({
+        clientId: 'client-1',
+        categoryId: 'cat-1',
+        type: 'income',
+        amount: 80.00,
+        description: 'Venda no Pix Inter',
+        date: new Date('2026-08-05T12:00:00'),
+        paymentMethod: 'Pix Inter' as any, // Cast para aceitar string personalizada
+      });
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(mockInsertTx).toHaveBeenCalledWith([
+      expect.objectContaining({
+        user_id: 'user-123',
+        client_id: 'client-1',
+        category_id: 'cat-1',
+        type: 'income',
+        amount: 80.00,
+        description: 'Venda no Pix Inter',
+        date: '2026-08-05',
+        payment_method: 'Pix Inter',
+      })
     ]);
   });
 });

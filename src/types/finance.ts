@@ -14,6 +14,14 @@ export interface CustomPaymentMethod {
   createdAt: Date;
 }
 
+export interface Supplier {
+  id: string;
+  clientId: string;
+  name: string;
+  contactInfo?: string;
+  createdAt: Date;
+}
+
 export type UserRole = 'owner' | 'collaborator';
 
 export interface ClientMember {
@@ -80,6 +88,7 @@ export interface Transaction {
   commissionAmount?: number; // Legado
   commissions?: TransactionCommission[];
   customerId?: string;
+  supplierId?: string;
   recurringId?: string;
   createdAt: Date;
 }

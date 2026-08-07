@@ -75,7 +75,12 @@ interface Product {
 
 type PeriodType = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
 
-export const Reports: React.FC = () => {
+interface ReportsProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
   const {
     t,
     currentClient,
@@ -99,7 +104,9 @@ export const Reports: React.FC = () => {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
 
   // internal tabs state
-  const [activeReportTab, setActiveReportTab] = useState<string>('dre');
+  const [localActiveTab, setLocalActiveTab] = useState<string>('dre');
+  const activeReportTab = activeTab || localActiveTab;
+  const setActiveReportTab = onTabChange || setLocalActiveTab;
 
   // Inventory State
   const [products, setProducts] = useState<Product[]>([]);

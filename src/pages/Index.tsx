@@ -14,9 +14,10 @@ import { Customers } from '@/components/customers/Customers';
 import { Schedule } from '@/components/schedule/Schedule';
 import { Notifications } from '@/components/notifications/Notifications';
 import { Receivables } from '@/components/receivables/Receivables';
+import { Payables } from '@/components/payables/Payables';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Index: React.FC = () => {
   } = useFinance();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [scheduleCustomerId, setScheduleCustomerId] = useState<string | undefined>(undefined);
+  const [activeReportTab, setActiveReportTab] = useState<string>('dre');
 
   useEffect(() => {
     if (!authLoading && !loadingClients) {
@@ -77,13 +79,15 @@ const Index: React.FC = () => {
       case 'inventory':
         return <Inventory />;
       case 'reports':
-        return <Reports />;
+        return <Reports activeTab={activeReportTab} onTabChange={setActiveReportTab} />;
       case 'settings':
         return <Settings />;
       case 'transactions':
         return <Transactions />;
       case 'receivables':
         return <Receivables />;
+      case 'payables':
+        return <Payables />;
       case 'customers':
         return (
           <Customers
@@ -109,7 +113,12 @@ const Index: React.FC = () => {
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-background">
       <Header onViewChange={setCurrentView} />
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
+      <Navigation 
+        currentView={currentView} 
+        onViewChange={setCurrentView} 
+        currentReportTab={activeReportTab}
+        onReportTabChange={setActiveReportTab}
+      />
       <main className="flex-1 overflow-y-auto container px-4 sm:px-6 py-6">{renderView()}</main>
     </div>
   );

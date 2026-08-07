@@ -1,63 +1,82 @@
 // Navigation Component
-
 import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, ArrowRightLeft, BarChart3, Package, Settings, ShieldCheck, AlertTriangle, Users, CalendarDays, Bell, HandCoins } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  ArrowRightLeft, 
+  BarChart3, 
+  Package, 
+  Settings, 
+  ShieldCheck, 
+  AlertTriangle, 
+  Users, 
+  CalendarDays, 
+  Bell, 
+  HandCoins, 
+  Wallet,
+  ChevronDown,
+  FileSpreadsheet,
+  PieChart as PieChartIcon,
+  LineChart as LineChartIcon,
+  Calculator,
+  Layers,
+  Percent
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
 interface NavigationProps {
   currentView?: View;
   onViewChange?: (view: View) => void;
+  currentReportTab?: string;
+  onReportTabChange?: (tab: string) => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
-  const { t, userProfile, currentSubscription, unreadNotificationsCount } = useFinance();
+export const Navigation: React.FC<NavigationProps> = ({ 
+  currentView, 
+  onViewChange,
+  currentReportTab,
+  onReportTabChange
+}) => {
+  const { t, userProfile, currentSubscription, unreadNotificationsCount, userSettings } = useFinance();
   const navigate = useNavigate();
   const location = useLocation();
 
   const isAdminView = location.pathname === '/admin';
+  const activeId = isAdminView ? 'admin' : currentView;
 
-  const navItems: { id: View; label: string; icon: React.ReactNode; isPage?: boolean }[] = [
-    { id: 'dashboard', label: t.dashboard, icon: <LayoutDashboard className="h-4 w-4" /> },
-    { id: 'transactions', label: t.transactions, icon: <ArrowRightLeft className="h-4 w-4" /> },
-    { id: 'receivables', label: 'Contas a Receber', icon: <HandCoins className="h-4 w-4" /> },
-    { id: 'customers', label: 'Clientes', icon: <Users className="h-4 w-4" /> },
-    { id: 'schedule', label: 'Agenda', icon: <CalendarDays className="h-4 w-4" /> },
-    { id: 'inventory', label: 'Estoque', icon: <Package className="h-4 w-4" /> },
-    { id: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
-    { id: 'notifications', label: 'Notificações', icon: <Bell className="h-4 w-4" /> },
-    { id: 'settings', label: t.settings, icon: <Settings className="h-4 w-4" /> },
-  ];
+  // Helpers de estado ativo para grupos do menu suspenso
+  const isFinanceActive = activeId === 'transactions' || activeId === 'receivables' || activeId === 'payables';
+  const isCadastrosActive = activeId === 'customers' || activeId === 'schedule' || activeId === 'inventory';
 
-  if (userProfile?.isAdmin) {
-    navItems.push({
-      id: 'admin',
-      label: 'Admin',
-      icon: <ShieldCheck className="h-4 w-4" />,
-      isPage: true
-    });
-  }
-
-  const handleNavClick = (item: typeof navItems[0]) => {
-    if (item.isPage) {
+  const handleNavClick = (view: View | 'admin') => {
+    if (view === 'admin') {
       navigate('/admin');
     } else {
       if (location.pathname !== '/app') {
         navigate('/app');
       }
-      onViewChange?.(item.id);
+      onViewChange?.(view);
     }
   };
 
-  const activeId = isAdminView ? 'admin' : currentView;
+  const handleReportSelect = (tab: string) => {
+    onReportTabChange?.(tab);
+    handleNavClick('reports');
+  };
 
-  // Plan Expiration Notification Logic
+  // Lógica de Notificação de Assinatura Expirada
   const expirationAlert = useMemo(() => {
     if (!currentSubscription || userProfile?.isAdmin) return null;
 
@@ -115,7 +134,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
             variant={expirationAlert.type === 'warning' ? "outline" : "default"}
             size="sm"
             className="h-6 text-xs px-3 self-start sm:self-auto shrink-0"
-            onClick={() => handleNavClick(navItems.find(i => i.id === 'settings')!)}
+            onClick={() => handleNavClick('settings')}
           >
             Renovar Agora
           </Button>
@@ -124,30 +143,274 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
       <nav className="border-b border-border bg-card">
         <div className="container px-4 sm:px-6">
           <div className="flex gap-1 overflow-x-auto">
-            {navItems.map((item) => (
+            {/* Dashboard */}
+            <button
+              onClick={() => handleNavClick('dashboard')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative',
+                activeId === 'dashboard'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              )}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              {t.dashboard}
+            </button>
+
+            {/* Menu Financeiro (Dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
+                  isFinanceActive
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Financeiro
+                <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 bg-card border border-border">
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('transactions')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'transactions' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                  {t.transactions}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('receivables')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'receivables' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <HandCoins className="h-4 w-4 text-muted-foreground" />
+                  Contas a Receber
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('payables')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'payables' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  Contas a Pagar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Menu Cadastros (Dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
+                  isCadastrosActive
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+              >
+                <Users className="h-4 w-4" />
+                Cadastros
+                <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 bg-card border border-border">
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('customers')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'customers' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  Clientes
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('schedule')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'schedule' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  Agenda
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('inventory')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'inventory' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  Estoque
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Menu Relatórios (Dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
+                  activeId === 'reports'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Relatórios
+                <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 bg-card border border-border">
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('dre')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'dre' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                  DRE Simplificado
+                </DropdownMenuItem>
+                
+                {userSettings.enableCommission && (
+                  <DropdownMenuItem
+                    onClick={() => handleReportSelect('commissions')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                      activeId === 'reports' && currentReportTab === 'commissions' && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Comissões
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('distribution')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'distribution' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+                  Distribuição
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('projection')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'projection' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <LineChartIcon className="h-4 w-4 text-muted-foreground" />
+                  Fluxo Projetado
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('breakeven')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'breakeven' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Calculator className="h-4 w-4 text-muted-foreground" />
+                  Ponto de Equilíbrio
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('payables')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'payables' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Layers className="h-4 w-4 text-muted-foreground" />
+                  Contas Pagar/Receber
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('margins')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'margins' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Percent className="h-4 w-4 text-muted-foreground" />
+                  Análise de Margem
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => handleReportSelect('inventory')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'reports' && currentReportTab === 'inventory' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  Estoque e Inventário
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Notificações */}
+            <button
+              onClick={() => handleNavClick('notifications')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative',
+                activeId === 'notifications'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              )}
+            >
+              <Bell className="h-4 w-4" />
+              Notificações
+              {unreadNotificationsCount > 0 && (
+                <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 py-0 flex items-center justify-center text-[9px] rounded-full font-bold">
+                  {unreadNotificationsCount}
+                </Badge>
+              )}
+            </button>
+
+            {/* Configurações */}
+            <button
+              onClick={() => handleNavClick('settings')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative',
+                activeId === 'settings'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              )}
+            >
+              <Settings className="h-4 w-4" />
+              {t.settings}
+            </button>
+
+            {/* Admin */}
+            {userProfile?.isAdmin && (
               <button
-                key={item.id}
-                onClick={() => handleNavClick(item)}
+                onClick={() => handleNavClick('admin')}
                 className={cn(
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative',
-                  activeId === item.id
+                  activeId === 'admin'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 )}
               >
-                {item.icon}
-                {item.label}
-                {item.id === 'notifications' && unreadNotificationsCount > 0 && (
-                  <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 py-0 flex items-center justify-center text-[9px] rounded-full font-bold">
-                    {unreadNotificationsCount}
-                  </Badge>
-                )}
+                <ShieldCheck className="h-4 w-4" />
+                Admin
               </button>
-            ))}
+            )}
           </div>
         </div>
       </nav>
     </div>
   );
 };
-

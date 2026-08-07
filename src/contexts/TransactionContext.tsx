@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice } from '@/types/finance';
+import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice, Supplier } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 
 interface TransactionContextType {
@@ -10,11 +10,13 @@ interface TransactionContextType {
   transactions: Transaction[];
   collaborators: Collaborator[];
   customers: Customer[];
+  suppliers: Supplier[];
   customPaymentMethods: CustomPaymentMethod[];
   loadCategories: (clientId: string) => Promise<void>;
   loadTransactions: (clientId: string) => Promise<void>;
   loadCollaborators: (clientId: string) => Promise<void>;
   loadCustomers: (clientId: string) => Promise<void>;
+  loadSuppliers: (clientId: string) => Promise<void>;
   loadCustomPaymentMethods: (clientId: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
@@ -38,6 +40,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customPaymentMethods, setCustomPaymentMethods] = useState<CustomPaymentMethod[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const loadCustomPaymentMethods = useCallback(async (clientId: string) => {
     const { data, error } = await supabase.from('client_payment_methods').select('*').eq('client_id', clientId);
@@ -106,6 +109,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
         commissionAmount: Number(tc.commission_amount)
       })) : [],
       customerId: t.customer_id || undefined,
+      supplierId: t.supplier_id || undefined,
       recurringId: t.recurring_id || undefined,
       createdAt: new Date(t.created_at)
     })));
@@ -127,6 +131,14 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     })));
   }, []);
 
+  const loadSuppliers = useCallback(async (clientId: string) => {
+    const { data, error } = await supabase.from('suppliers').select('*').eq('client_id', clientId).order('name');
+    if (!error && data) setSuppliers(data.map((s: any) => ({
+      id: s.id, clientId: s.client_id, name: s.name, contactInfo: s.contact_info || undefined,
+      createdAt: new Date(s.created_at)
+    })));
+  }, []);
+
 
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => {
@@ -144,6 +156,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       notes: transaction.notes || null,
       payment_method: transaction.paymentMethod || null,
       customer_id: transaction.customerId || null,
+      supplier_id: transaction.supplierId || null,
       recurring_id: recurringId
     };
 
@@ -190,6 +203,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
     if (updates.customerId !== undefined) updateData.customer_id = updates.customerId || null;
+    if (updates.supplierId !== undefined) updateData.supplier_id = updates.supplierId || null;
 
     const { error: txError, data } = await supabase.from('transactions').update(updateData).eq('id', id).select().single();
     
@@ -321,13 +335,13 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [collaborators, loadCollaborators]);
 
   const value = React.useMemo(() => ({
-    categories, transactions, collaborators, customers, customPaymentMethods, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods,
+    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator,
     addCustomPaymentMethod, deleteCustomPaymentMethod
   }), [
-    categories, transactions, collaborators, customers, customPaymentMethods, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods,
+    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator,
