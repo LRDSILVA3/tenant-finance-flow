@@ -9,7 +9,7 @@ import { RecentTransactions } from './RecentTransactions';
 import { MonthlyFlowData, FinancialSummary, PaymentMethod } from '@/types/finance';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Banknote, CreditCard, Smartphone, Clock, Lock, FileText, Wallet } from 'lucide-react';
 import { CategoryBreakdown } from './CategoryBreakdown';
 import { TodayScheduleWidget } from './TodayScheduleWidget';
