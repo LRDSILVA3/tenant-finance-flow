@@ -233,6 +233,12 @@ export const Inventory: React.FC = () => {
   // Selected Data for Edits / Adjustments
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+  // History Modal States
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  const [movementsHistory, setMovementsHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   // Form States - Product
   const [productForm, setProductForm] = useState({
     name: '',
@@ -674,6 +680,34 @@ export const Inventory: React.FC = () => {
       expirationDate: product.expiration_date || '',
     });
     setIsAdjustmentModalOpen(true);
+  };
+
+  // Load Stock Movements History
+  const loadProductHistory = async (productId: string) => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setMovementsHistory(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Open History Modal
+  const openHistoryModal = (product: Product) => {
+    setHistoryProduct(product);
+    setMovementsHistory([]);
+    loadProductHistory(product.id);
+    setIsHistoryModalOpen(true);
   };
 
   // Open Mobile Scanner Modal
@@ -1167,6 +1201,15 @@ export const Inventory: React.FC = () => {
                                   title="Movimentar estoque"
                                   onClick={() => openAdjustmentModal(p)}
                                   className="h-8 w-8 p-0"
+                                >
+                                  <PackagePlus className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  title="Ver histórico de movimentações"
+                                  onClick={() => openHistoryModal(p)}
+                                  className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
                                 >
                                   <History className="h-4 w-4" />
                                 </Button>
@@ -2020,6 +2063,91 @@ export const Inventory: React.FC = () => {
               <Button type="submit">Confirmar Operação</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock History Dialog */}
+      <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Histórico de Movimentações - {historyProduct?.name}</DialogTitle>
+            <DialogDescription>
+              Lista completa de entradas, saídas e validades de lotes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {loadingHistory ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Carregando histórico...
+              </div>
+            ) : movementsHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma movimentação registrada para este produto.
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Operação</TableHead>
+                      <TableHead className="text-center">Quantidade</TableHead>
+                      <TableHead className="text-right">Preço de Custo</TableHead>
+                      <TableHead className="text-center">Vencimento do Lote</TableHead>
+                      <TableHead>Obs / Lote</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movementsHistory.map((mv) => {
+                      const dateFormatted = new Intl.DateTimeFormat('pt-BR', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(mv.created_at));
+
+                      const expDateFormatted = mv.expiration_date
+                        ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${mv.expiration_date}T00:00:00`))
+                        : '-';
+
+                      return (
+                        <TableRow key={mv.id}>
+                          <TableCell className="font-mono text-xs">{dateFormatted}</TableCell>
+                          <TableCell>
+                            {mv.type === 'in' && <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200">Entrada (+)</Badge>}
+                            {mv.type === 'out' && <Badge className="bg-red-50 text-red-700 hover:bg-red-50 border-red-200">Saída (-)</Badge>}
+                            {mv.type === 'adjustment' && <Badge className="bg-slate-50 text-slate-700 hover:bg-slate-50 border-slate-200">Ajuste (Fixo)</Badge>}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold font-mono text-xs">{mv.quantity}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">
+                            {mv.cost_price ? formatCurrency(Number(mv.cost_price)) : '-'}
+                          </TableCell>
+                          <TableCell className="text-center font-mono text-xs">
+                            {mv.expiration_date ? (
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px]",
+                                new Date(`${mv.expiration_date}T00:00:00`).getTime() < new Date().setHours(0,0,0,0)
+                                  ? "bg-red-100 text-red-800 font-bold"
+                                  : "bg-amber-100 text-amber-800"
+                              )}>
+                                {expDateFormatted}
+                              </span>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={mv.notes}>
+                            {mv.notes || '-'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setIsHistoryModalOpen(false)}>Fechar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
