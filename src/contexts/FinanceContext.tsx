@@ -571,9 +571,31 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const loadClients = useCallback(async () => {
     if (!user) return;
     setLoadingClients(true);
-    const { data } = await supabase.from('clients').select('*').order('created_at');
-    if (data) {
-      const mapped = data.map((c: any) => ({ id: c.id, name: c.name, taxId: c.tax_id, createdAt: new Date(c.created_at) }));
+    
+    // Fetch all clients
+    const { data: clientsData } = await supabase.from('clients').select('*').order('created_at');
+    
+    // Fetch user memberships
+    const { data: membersData } = await supabase.from('client_members').select('client_id').eq('user_id', user.id);
+
+    if (clientsData) {
+      const joinedClientIds = new Set<string>();
+      if (membersData && Array.isArray(membersData)) {
+        membersData.forEach((m: any) => {
+          if (m.client_id) joinedClientIds.add(m.client_id);
+        });
+      }
+
+      // Filter: user must be the owner (user_id === user.id) OR must be a collaborator (joinedClientIds.has(id))
+      const filtered = clientsData.filter((c: any) => c.user_id === user.id || joinedClientIds.has(c.id));
+
+      const mapped = filtered.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        taxId: c.tax_id,
+        createdAt: new Date(c.created_at)
+      }));
+
       setClients(mapped);
       if (mapped.length > 0 && !currentClient) setCurrentClient(mapped[0]);
     }
