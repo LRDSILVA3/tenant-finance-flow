@@ -2068,7 +2068,7 @@ export const Inventory: React.FC = () => {
 
       {/* Stock History Dialog */}
       <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Histórico de Movimentações - {historyProduct?.name}</DialogTitle>
             <DialogDescription>
