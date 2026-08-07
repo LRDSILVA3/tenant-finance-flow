@@ -224,6 +224,8 @@ export const Inventory: React.FC = () => {
   const [scannedProductForAction, setScannedProductForAction] = useState<Product | null>(null);
   const [scannedActionQty, setScannedActionQty] = useState<number>(1);
   const [scannedActionNotes, setScannedActionNotes] = useState<string>('');
+  const [scannedActionCostPrice, setScannedActionCostPrice] = useState<number>(0);
+  const [scannedActionExpirationDate, setScannedActionExpirationDate] = useState<string>('');
 
   // Scanner Mode: Manual Fallback Input on PC
   const [manualDesktopSku, setManualDesktopSku] = useState('');
@@ -423,6 +425,8 @@ export const Inventory: React.FC = () => {
         setScannedProductForAction(foundProduct);
         setScannedActionQty(1);
         setScannedActionNotes('Entrada via leitor móvel');
+        setScannedActionCostPrice(foundProduct.cost_price || 0);
+        setScannedActionExpirationDate(foundProduct.expiration_date || '');
         toast({
           title: "Produto localizado",
           description: `${foundProduct.name} (Estoque atual: ${foundProduct.current_stock})`
@@ -849,12 +853,21 @@ export const Inventory: React.FC = () => {
         product_id: scannedProductForAction.id,
         type: 'in',
         quantity: scannedActionQty,
-        notes: scannedActionNotes || 'Entrada via scanner móvel'
+        notes: scannedActionNotes || 'Entrada via scanner móvel',
+        cost_price: scannedActionCostPrice || null,
+        expiration_date: scannedActionExpirationDate || null,
       });
       if (moveError) throw moveError;
 
       const newStock = scannedProductForAction.current_stock + scannedActionQty;
-      await supabase.from('products').update({ current_stock: newStock }).eq('id', scannedProductForAction.id);
+      const productUpdate: any = { current_stock: newStock };
+      if (scannedActionCostPrice !== undefined) {
+        productUpdate.cost_price = scannedActionCostPrice;
+      }
+      if (scannedActionExpirationDate) {
+        productUpdate.expiration_date = scannedActionExpirationDate;
+      }
+      await supabase.from('products').update(productUpdate).eq('id', scannedProductForAction.id);
 
       toast({ title: "Entrada registrada!", description: `Adicionado ${scannedActionQty} unidades a ${scannedProductForAction.name}` });
       setScannedProductForAction(null);
@@ -1493,6 +1506,23 @@ export const Inventory: React.FC = () => {
                               min="1"
                               value={scannedActionQty}
                               onChange={(e) => setScannedActionQty(parseInt(e.target.value) || 1)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-in-cost">Preço de Custo Unitário (R$)</Label>
+                            <MoneyInput
+                              id="scan-in-cost"
+                              value={scannedActionCostPrice}
+                              onChange={(val) => setScannedActionCostPrice(val)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="scan-in-expiration">Data de Vencimento</Label>
+                            <Input
+                              id="scan-in-expiration"
+                              type="date"
+                              value={scannedActionExpirationDate}
+                              onChange={(e) => setScannedActionExpirationDate(e.target.value)}
                             />
                           </div>
                           <div className="space-y-1">

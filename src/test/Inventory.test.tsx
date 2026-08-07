@@ -173,4 +173,67 @@ describe('Inventory Component - Controle de Lote de Estoque', () => {
       }));
     });
   });
+
+  it('deve permitir registrar entrada via scanner móvel/USB informando quantidade, preço de custo e validade do lote', async () => {
+    render(<Inventory />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Coca-Cola 2L')).toBeInTheDocument();
+    });
+
+    // Abrir o modal do scanner
+    const scanBtn = screen.getByRole('button', { name: /Leitor de Código/i });
+    fireEvent.click(scanBtn);
+
+    // Mudar para o modo "Entrada de Estoque"
+    const inModeBtn = screen.getByRole('button', { name: /Entrada de Estoque/i });
+    fireEvent.click(inModeBtn);
+
+    // Digitar SKU no input do leitor de PC
+    const skuInput = screen.getByPlaceholderText('Aponte o leitor físico USB e bipe o código aqui...');
+    fireEvent.change(skuInput, { target: { value: '123456' } });
+    
+    // Submeter o código
+    const submitCodeBtn = screen.getByRole('button', { name: 'Enviar Código' });
+    fireEvent.click(submitCodeBtn);
+
+    // O produto deve ser localizado e a interface de entrada de estoque deve aparecer
+    await waitFor(() => {
+      expect(screen.getByText('Produto Selecionado')).toBeInTheDocument();
+    });
+
+    // Localizar novos campos do lote na entrada via leitor
+    const qtyInput = screen.getByLabelText('Quantidade a Adicionar');
+    const costInput = screen.getByLabelText('Preço de Custo Unitário (R$)');
+    const expirationInput = screen.getByLabelText('Data de Vencimento');
+    const notesInput = screen.getByLabelText('Observações');
+
+    // Preencher as informações do novo lote
+    fireEvent.change(qtyInput, { target: { value: '5' } });
+    fireEvent.change(costInput, { target: { value: '750' } }); // R$ 7,50
+    fireEvent.change(expirationInput, { target: { value: '2027-12-31' } });
+    fireEvent.change(notesInput, { target: { value: 'Entrada de lote via leitor' } });
+
+    // Confirmar a entrada
+    const confirmBtn = screen.getByRole('button', { name: 'Confirmar Entrada de Estoque' });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      // Deve ter inserido o log do lote em stock_movements
+      expect(mockInsertMovement).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'in',
+        quantity: 5,
+        cost_price: 7.5,
+        expiration_date: '2027-12-31',
+        notes: 'Entrada de lote via leitor'
+      }));
+
+      // Deve ter atualizado o estoque do produto principal com o novo lote
+      expect(mockUpdateProduct).toHaveBeenCalledWith(expect.objectContaining({
+        current_stock: 15,
+        cost_price: 7.5,
+        expiration_date: '2027-12-31'
+      }));
+    });
+  });
 });
