@@ -18,6 +18,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Cancellation from "./pages/Cancellation";
 import Scan from "./pages/Scan";
+import { ThemeProvider } from "next-themes";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -25,31 +26,33 @@ const queryClient = new QueryClient();
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <SubscriptionProvider>
-          <TransactionProvider>
-            <FinanceProvider>
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/app" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/onboarding" element={<Onboarding />} />
-                  <Route path="/termos" element={<Terms />} />
-                  <Route path="/privacidade" element={<Privacy />} />
-                  <Route path="/cancelamento" element={<Cancellation />} />
-                  <Route path="/scan" element={<Scan />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <SupportWidget />
-              </BrowserRouter>
-            </FinanceProvider>
-          </TransactionProvider>
-        </SubscriptionProvider>
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <SubscriptionProvider>
+            <TransactionProvider>
+              <FinanceProvider>
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/app" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/termos" element={<Terms />} />
+                    <Route path="/privacidade" element={<Privacy />} />
+                    <Route path="/cancelamento" element={<Cancellation />} />
+                    <Route path="/scan" element={<Scan />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                  <SupportWidget />
+                </BrowserRouter>
+              </FinanceProvider>
+            </TransactionProvider>
+          </SubscriptionProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

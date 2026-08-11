@@ -41,8 +41,11 @@ import {
   Calendar, 
   Check, 
   CheckCheck, 
-  X 
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +87,9 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
     clearNotification,
     t 
   } = useFinance();
+
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const currentTheme = theme === 'system' ? resolvedTheme : theme;
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -306,6 +312,21 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Dark Mode Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}
+            title={currentTheme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+            className="h-9 w-9 text-muted-foreground hover:text-foreground mr-1"
+          >
+            {currentTheme === 'dark' ? (
+              <Sun className="h-5 w-5 text-amber-400" />
+            ) : (
+              <Moon className="h-5 w-5 text-slate-600" />
+            )}
+          </Button>
 
           {/* Language Selector */}
           <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
