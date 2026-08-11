@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { MoneyInput } from '@/components/ui/money-input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import {
   Dialog,
@@ -22,17 +22,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { 
-  HandCoins, 
-  Clock, 
-  ChevronDown, 
-  ChevronUp, 
-  CheckCircle2, 
-  Loader2, 
-  Banknote, 
-  CreditCard, 
-  Smartphone, 
-  FileText, 
+import {
+  HandCoins,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  Loader2,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  FileText,
   Wallet,
   CalendarDays,
   User,
@@ -104,13 +104,12 @@ export const Payables: React.FC = () => {
   // Filtrar despesas pendentes que possuem fornecedor associado
   const pendingTransactions = useMemo(() => {
     return transactions.filter(
-      (txn) => 
-        txn.type === 'expense' && 
+      (txn) =>
+        txn.type === 'expense' &&
         txn.paymentMethod === 'pending'
     );
   }, [transactions]);
-
-  // Agrupar despesas pendentes por fornecedor (ou Sem Fornecedor se sId for indefinido)
+  // Agrupar despesas pendentes por fornecedor (ou Sem Fornecedor se sId for indefinido) e filtrar por busca
   const groupedPayables = useMemo(() => {
     const groups: Record<string, {
       supplierId: string;
@@ -121,6 +120,28 @@ export const Payables: React.FC = () => {
     }> = {};
 
     pendingTransactions.forEach((txn) => {
+      // Filtrar lançamentos pelo searchQuery se fornecido
+      if (searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        const sup = txn.supplierId ? getSupplierById(txn.supplierId) : null;
+        const supplierName = sup?.name || 'Sem Fornecedor';
+        const cat = getCategoryById(txn.categoryId);
+        const categoryName = cat?.name || '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matches = 
+          supplierName.toLowerCase().includes(query) ||
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matches) return;
+      }
+
       const sId = txn.supplierId || 'unassigned';
       if (!groups[sId]) {
         const sup = txn.supplierId ? getSupplierById(txn.supplierId) : null;
@@ -136,13 +157,10 @@ export const Payables: React.FC = () => {
       groups[sId].totalOwed += txn.amount;
     });
 
-    // Converter para array e filtrar por busca
+    // Converter para array
     return Object.values(groups)
-      .filter(group => 
-        group.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
-      )
       .sort((a, b) => b.totalOwed - a.totalOwed); // Ordenar por maior saldo devedor
-  }, [pendingTransactions, getSupplierById, searchQuery]);
+  }, [pendingTransactions, getSupplierById, getCategoryById, searchQuery]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
@@ -379,7 +397,7 @@ export const Payables: React.FC = () => {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar por fornecedor..."
+            placeholder="Buscar fornecedor, descrição, ref, valor..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -397,11 +415,11 @@ export const Payables: React.FC = () => {
           groupedPayables.map((group) => {
             const isExpanded = !!expandedSuppliers[group.supplierId];
             return (
-              <Card 
-                key={group.supplierId} 
+              <Card
+                key={group.supplierId}
                 className="overflow-hidden border border-border/50 shadow-sm"
               >
-                <button 
+                <button
                   onClick={() => toggleExpand(group.supplierId)}
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-4"
                 >
@@ -455,8 +473,8 @@ export const Payables: React.FC = () => {
                                   {formatCurrency(tx.amount)}
                                 </td>
                                 <td className="py-2 px-1 text-right">
-                                  <Button 
-                                    size="sm" 
+                                  <Button
+                                    size="sm"
                                     className="h-8 gap-1"
                                     onClick={() => handleOpenPaymentDialog(tx)}
                                   >
@@ -506,9 +524,9 @@ export const Payables: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="pay-date">Data de Pagamento</Label>
-                  <Input 
+                  <Input
                     id="pay-date"
-                    type="date" 
+                    type="date"
                     value={paymentDate}
                     onChange={(e) => setPaymentDate(e.target.value)}
                   />

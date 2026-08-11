@@ -84,22 +84,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
 
   const netBalances = useMemo(() => {
     const now = new Date();
-    now.setHours(23, 59, 59, 999);
-    
-    let bal30 = 0;
-    let bal60 = 0;
-    let bal90 = 0;
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let bal30 = 0; // Mês Atual
+    let bal60 = 0; // Últimos 60 Dias (Mês Atual + Mês Anterior)
+    let bal90 = 0; // Últimos 90 Dias (Mês Atual + 2 Meses Anteriores)
 
     transactions.forEach((txn) => {
       const txnDate = new Date(txn.date);
-      const diffTime = now.getTime() - txnDate.getTime();
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      const value = txn.type === 'income' ? txn.amount : -txn.amount;
 
-      if (diffDays >= 0) {
-        const value = txn.type === 'income' ? txn.amount : -txn.amount;
-        if (diffDays <= 30) bal30 += value;
-        if (diffDays <= 60) bal60 += value;
-        if (diffDays <= 90) bal90 += value;
+      // Calcular a diferença de meses entre a transação e o mês atual
+      const monthDiff = (currentYear - txnDate.getFullYear()) * 12 + (currentMonth - txnDate.getMonth());
+
+      if (monthDiff === 0) {
+        // Mês Atual (completo, incluindo lançamentos futuros deste mês)
+        bal30 += value;
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 1) {
+        // Mês Anterior
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 2) {
+        // 2 meses atrás
+        bal90 += value;
       }
     });
 
@@ -222,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-3 bg-background border rounded-lg shadow-sm">
-              <span className="text-xs text-muted-foreground block font-medium">Últimos 30 Dias</span>
+              <span className="text-xs text-muted-foreground block font-medium">Saldo do Mês Atual (Total)</span>
               <span className={cn(
                 "text-lg font-bold font-mono mt-1 block",
                 netBalances.bal30 >= 0 ? "text-income" : "text-expense"
@@ -231,7 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
               </span>
             </div>
             <div className="p-3 bg-background border rounded-lg shadow-sm">
-              <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias</span>
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias (Mês Atual + Anterior)</span>
               <span className={cn(
                 "text-lg font-bold font-mono mt-1 block",
                 netBalances.bal60 >= 0 ? "text-income" : "text-expense"
@@ -240,7 +250,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
               </span>
             </div>
             <div className="p-3 bg-background border rounded-lg shadow-sm">
-              <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias</span>
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias (Mês Atual + 2 Ant.)</span>
               <span className={cn(
                 "text-lg font-bold font-mono mt-1 block",
                 netBalances.bal90 >= 0 ? "text-income" : "text-expense"

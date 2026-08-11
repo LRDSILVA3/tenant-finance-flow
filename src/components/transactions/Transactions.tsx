@@ -64,13 +64,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Loader2, 
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2,
   CalendarIcon,
   List,
   CalendarDays,
@@ -87,7 +87,9 @@ import {
   Upload,
   MoreHorizontal,
   FileText,
-  Wallet
+  Wallet,
+  Search,
+  SlidersHorizontal
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -194,22 +196,32 @@ export const Transactions: React.FC = () => {
 
   const netBalances = useMemo(() => {
     const now = new Date();
-    now.setHours(23, 59, 59, 999);
-    
-    let bal30 = 0;
-    let bal60 = 0;
-    let bal90 = 0;
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let bal30 = 0; // Mês Atual
+    let bal60 = 0; // Últimos 60 Dias (Mês Atual + Mês Anterior)
+    let bal90 = 0; // Últimos 90 Dias (Mês Atual + 2 Meses Anteriores)
 
     transactions.forEach((txn) => {
       const txnDate = new Date(txn.date);
-      const diffTime = now.getTime() - txnDate.getTime();
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      const value = txn.type === 'income' ? txn.amount : -txn.amount;
 
-      if (diffDays >= 0) {
-        const value = txn.type === 'income' ? txn.amount : -txn.amount;
-        if (diffDays <= 30) bal30 += value;
-        if (diffDays <= 60) bal60 += value;
-        if (diffDays <= 90) bal90 += value;
+      // Calcular a diferença de meses entre a transação e o mês atual
+      const monthDiff = (currentYear - txnDate.getFullYear()) * 12 + (currentMonth - txnDate.getMonth());
+
+      if (monthDiff === 0) {
+        // Mês Atual (completo, incluindo lançamentos futuros deste mês)
+        bal30 += value;
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 1) {
+        // Mês Anterior
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 2) {
+        // 2 meses atrás
+        bal90 += value;
       }
     });
 
@@ -226,7 +238,7 @@ export const Transactions: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
+
   const lastScrollY = React.useRef(0);
   React.useEffect(() => {
     if (isDialogOpen) {
@@ -254,7 +266,7 @@ export const Transactions: React.FC = () => {
       document.body.style.overflow = '';
     };
   }, [isDialogOpen]);
-  
+
   // Filter states
   const now = new Date();
   const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(startOfMonth(now));
@@ -264,7 +276,9 @@ export const Transactions: React.FC = () => {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
   const [filterCustomer, setFilterCustomer] = useState<string>('all');
   const [filterSupplier, setFilterSupplier] = useState<string>('all');
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
 
@@ -302,14 +316,14 @@ export const Transactions: React.FC = () => {
   const filteredTransactions = useMemo(() => {
     return transactions.filter((txn) => {
       const txnDate = new Date(txn.date);
-      
+
       // Date filter
       if (filterStartDate && txnDate < startOfDay(filterStartDate)) return false;
       if (filterEndDate && txnDate > endOfDay(filterEndDate)) return false;
-      
+
       // Category filter
       if (filterCategory !== 'all' && txn.categoryId !== filterCategory) return false;
-      
+
       // Type filter
       if (filterType !== 'all' && txn.type !== filterType) return false;
 
@@ -321,13 +335,48 @@ export const Transactions: React.FC = () => {
 
       // Supplier filter
       if (filterSupplier !== 'all' && txn.supplierId !== filterSupplier) return false;
-      
+
+      // Text Search Filter
+      if (searchTerm.trim() !== '') {
+        const query = searchTerm.toLowerCase();
+        const categoryName = getCategoryById(txn.categoryId)?.name || '';
+        const customerName = txn.customerId ? getCustomerById(txn.customerId)?.name || '' : '';
+        const supplierName = txn.supplierId ? getSupplierById(txn.supplierId)?.name || '' : '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matchesSearch =
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          customerName.toLowerCase().includes(query) ||
+          supplierName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matchesSearch) return false;
+      }
+
       return true;
     });
-  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod, filterCustomer, filterSupplier]);
+  }, [
+    transactions,
+    filterStartDate,
+    filterEndDate,
+    filterCategory,
+    filterType,
+    filterPaymentMethod,
+    filterCustomer,
+    filterSupplier,
+    searchTerm,
+    getCategoryById,
+    getCustomerById,
+    getSupplierById
+  ]);
 
   const sortedTransactions = useMemo(() => {
-    return [...filteredTransactions].sort((a, b) => 
+    return [...filteredTransactions].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }, [filteredTransactions]);
@@ -335,7 +384,7 @@ export const Transactions: React.FC = () => {
   // Transactions for selected calendar date
   const calendarDayTransactions = useMemo(() => {
     if (!selectedCalendarDate) return [];
-    return sortedTransactions.filter(txn => 
+    return sortedTransactions.filter(txn =>
       isSameDay(new Date(txn.date), selectedCalendarDate)
     );
   }, [sortedTransactions, selectedCalendarDate]);
@@ -374,7 +423,7 @@ export const Transactions: React.FC = () => {
         options: g.descriptions.map(d => d.description),
       }));
     }
-    
+
     // Filter to only show descriptions from the selected category
     const selectedGroup = descriptionGroups.find(g => g.categoryId === formData.categoryId);
     if (selectedGroup) {
@@ -383,7 +432,7 @@ export const Transactions: React.FC = () => {
         options: selectedGroup.descriptions.map(d => d.description),
       }];
     }
-    
+
     return [];
   }, [descriptionGroups, formData.categoryId]);
 
@@ -396,7 +445,7 @@ export const Transactions: React.FC = () => {
         options: g.references.map(r => r.reference),
       }));
     }
-    
+
     // Filter to only show references from the selected description
     const selectedGroup = referenceGroups.find(g => g.description === formData.description);
     if (selectedGroup) {
@@ -405,7 +454,7 @@ export const Transactions: React.FC = () => {
         options: selectedGroup.references.map(r => r.reference),
       }];
     }
-    
+
     return [];
   }, [referenceGroups, formData.description]);
 
@@ -417,6 +466,7 @@ export const Transactions: React.FC = () => {
     setFilterPaymentMethod('all');
     setFilterCustomer('all');
     setFilterSupplier('all');
+    setSearchTerm('');
   };
 
   const handleExportCsv = () => {
@@ -433,14 +483,14 @@ export const Transactions: React.FC = () => {
 
   const handleExportPdf = () => {
     if (!currentClient) return;
-    
+
     const filters = {
       startDate: filterStartDate,
       endDate: filterEndDate,
       category: filterCategory,
       type: filterType,
     };
-    
+
     if (viewMode === 'list') {
       exportListToPdf(
         sortedTransactions,
@@ -679,9 +729,9 @@ export const Transactions: React.FC = () => {
               <FileDown className="h-4 w-4" />
               <span>Exportar PDF</span>
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleExportCsv} 
+            <Button
+              variant="outline"
+              onClick={handleExportCsv}
               className="gap-2 group"
             >
               <Download className="h-4 w-4" />
@@ -703,29 +753,31 @@ export const Transactions: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="finance-card p-4">
-        <div className="flex items-center justify-between md:hidden mb-4">
-          <span className="text-sm font-semibold">Filtros</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
-          >
-            {showMobileFilters ? "Ocultar Filtros" : "Exibir Filtros"}
-          </Button>
-        </div>
+      <div className="finance-card p-4 space-y-4">
+        {/* Main Row: Search, Date Range, Toggle Advanced Filters, Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          {/* Search Field */}
+          <div className="space-y-1 flex-1 min-w-[240px]">
+            <Label className="text-xs text-muted-foreground">Buscar Lançamento</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por descrição, ref, valor, cliente..."
+                className="pl-8 h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <div className={cn(
-          "grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-end gap-4",
-          !showMobileFilters && "hidden md:flex"
-        )}>
-          {/* Date Range */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Date range & Main Filters Control */}
+          <div className="flex flex-wrap items-end gap-2 shrink-0">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">{t.from}</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
+                  <Button variant="outline" size="sm" className="gap-2 w-[130px] justify-start h-9">
                     <CalendarIcon className="h-4 w-4" />
                     {filterStartDate ? format(filterStartDate, 'dd/MM/yyyy', { locale }) : '-'}
                   </Button>
@@ -746,7 +798,7 @@ export const Transactions: React.FC = () => {
               <Label className="text-xs text-muted-foreground">{t.to}</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
+                  <Button variant="outline" size="sm" className="gap-2 w-[130px] justify-start h-9">
                     <CalendarIcon className="h-4 w-4" />
                     {filterEndDate ? format(filterEndDate, 'dd/MM/yyyy', { locale }) : '-'}
                   </Button>
@@ -762,162 +814,178 @@ export const Transactions: React.FC = () => {
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
 
-          {/* Type Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t.type}</Label>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.allTypes}</SelectItem>
-                <SelectItem value="income">{t.income}</SelectItem>
-                <SelectItem value="expense">{t.expenses}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Daily Filter */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                setFilterStartDate(today);
+                setFilterEndDate(today);
+              }}
+              className="gap-1 h-9"
+            >
+              <CalendarIcon className="h-4 w-4" />
+              Diário
+            </Button>
 
-          {/* Payment Method Filter */}
-          {userSettings.enablePaymentMethods && (
+            {/* Advanced Filters Trigger */}
+            <Button
+              variant={showAdvancedFilters ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="gap-2 h-9"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filtros</span>
+            </Button>
+
+            {/* Clear Filters */}
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1 h-9">
+              <X className="h-4 w-4" />
+              Limpar
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible Advanced Filters Row */}
+        {showAdvancedFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Type Filter */}
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.paymentMethod}</Label>
-              <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
-                <SelectTrigger className="w-[180px]">
+              <Label className="text-xs text-muted-foreground">{t.type}</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Formas</SelectItem>
-                  <SelectItem value="cash">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="h-4 w-4 text-emerald-500" />
-                      {t.cash}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="card">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-blue-500" />
-                      {t.card}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="pix">
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="h-4 w-4 text-purple-500" />
-                      {t.pix}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="boleto">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-cyan-500" />
-                      {t.boleto}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="pending">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-amber-500" />
-                      {t.pending}
-                    </div>
-                  </SelectItem>
-                  {customPaymentMethods.map((m) => (
-                    <SelectItem key={m.id} value={m.name}>
+                  <SelectItem value="all">{t.allTypes}</SelectItem>
+                  <SelectItem value="income">{t.income}</SelectItem>
+                  <SelectItem value="expense">{t.expenses}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Method Filter */}
+            {userSettings.enablePaymentMethods && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t.paymentMethod}</Label>
+                <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Formas</SelectItem>
+                    <SelectItem value="cash">
                       <div className="flex items-center gap-2">
-                        {getPaymentMethodIconLarge(m.parentType)}
-                        {m.name}
+                        <Banknote className="h-4 w-4 text-emerald-500" />
+                        {t.cash}
                       </div>
+                    </SelectItem>
+                    <SelectItem value="card">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-500" />
+                        {t.card}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pix">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-purple-500" />
+                        {t.pix}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="boleto">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-cyan-500" />
+                        {t.boleto}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-amber-500" />
+                        {t.pending}
+                      </div>
+                    </SelectItem>
+                    {customPaymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.name}>
+                        <div className="flex items-center gap-2">
+                          {getPaymentMethodIconLarge(m.parentType)}
+                          {m.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Category Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t.category}</Label>
+              <SearchableSelect
+                value={filterCategory === 'all' ? t.allCategories : (() => {
+                  const selectedCat = allSubcategories.find(c => c.id === filterCategory);
+                  return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
+                })()}
+                onChange={(val) => {
+                  if (val === t.allCategories || !val) {
+                    setFilterCategory('all');
+                  } else {
+                    const selectedCat = allSubcategories.find(c => `${c.code} - ${c.name}` === val);
+                    if (selectedCat) {
+                      setFilterCategory(selectedCat.id);
+                    } else {
+                      setFilterCategory('all');
+                    }
+                  }
+                }}
+                options={[t.allCategories, ...allSubcategories.map(cat => `${cat.code} - ${cat.name}`)]}
+                placeholder={t.category}
+                searchPlaceholder="Buscar categoria..."
+                emptyMessage="Nenhuma categoria encontrada."
+                allowAdd={false}
+                className="w-full h-9"
+              />
+            </div>
+
+            {/* Customer Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente</Label>
+              <Select value={filterCustomer} onValueChange={setFilterCustomer}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Clientes</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Category Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t.category}</Label>
-            <SearchableSelect
-              value={filterCategory === 'all' ? t.allCategories : (() => {
-                const selectedCat = allSubcategories.find(c => c.id === filterCategory);
-                return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
-              })()}
-              onChange={(val) => {
-                if (val === t.allCategories || !val) {
-                  setFilterCategory('all');
-                } else {
-                  const selectedCat = allSubcategories.find(c => `${c.code} - ${c.name}` === val);
-                  if (selectedCat) {
-                    setFilterCategory(selectedCat.id);
-                  } else {
-                    setFilterCategory('all');
-                  }
-                }
-              }}
-              options={[t.allCategories, ...allSubcategories.map(cat => `${cat.code} - ${cat.name}`)]}
-              placeholder={t.category}
-              searchPlaceholder="Buscar categoria..."
-              emptyMessage="Nenhuma categoria encontrada."
-              allowAdd={false}
-              className="w-[200px]"
-            />
+            {/* Supplier Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Fornecedor</Label>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Fornecedores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Fornecedores</SelectItem>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          {/* Customer Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Cliente</Label>
-            <Select value={filterCustomer} onValueChange={setFilterCustomer}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos os Clientes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Clientes</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Supplier Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Fornecedor</Label>
-            <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos os Fornecedores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Fornecedores</SelectItem>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Daily Filter */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              setFilterStartDate(today);
-              setFilterEndDate(today);
-            }}
-            className="gap-1"
-          >
-            <CalendarIcon className="h-4 w-4" />
-            Diário
-          </Button>
-
-          {/* Clear Filters */}
-          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1">
-            <X className="h-4 w-4" />
-            {t.clearFilters}
-          </Button>
-        </div>
+        )}
 
         {/* Summary */}
         <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t text-sm">
@@ -989,7 +1057,7 @@ export const Transactions: React.FC = () => {
       {/* Saldo Líquido Recente (Entradas - Saídas) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
-          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 30 Dias</span>
+          <span className="text-xs text-muted-foreground block font-medium">Saldo do Mês Atual (Total)</span>
           <span className={cn(
             "text-base font-bold font-mono mt-1 block",
             netBalances.bal30 >= 0 ? "text-income" : "text-expense"
@@ -998,7 +1066,7 @@ export const Transactions: React.FC = () => {
           </span>
         </div>
         <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
-          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 60 Dias</span>
+          <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias (Mês Atual + Anterior)</span>
           <span className={cn(
             "text-base font-bold font-mono mt-1 block",
             netBalances.bal60 >= 0 ? "text-income" : "text-expense"
@@ -1007,7 +1075,7 @@ export const Transactions: React.FC = () => {
           </span>
         </div>
         <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
-          <span className="text-xs text-muted-foreground block font-medium">Saldo dos Últimos 90 Dias</span>
+          <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias (Mês Atual + 2 Ant.)</span>
           <span className={cn(
             "text-base font-bold font-mono mt-1 block",
             netBalances.bal90 >= 0 ? "text-income" : "text-expense"
@@ -1343,7 +1411,7 @@ export const Transactions: React.FC = () => {
           <div className="finance-card">
             <div className="p-4 border-b border-border">
               <h3 className="font-semibold">
-                {selectedCalendarDate 
+                {selectedCalendarDate
                   ? format(selectedCalendarDate, 'dd MMMM yyyy', { locale })
                   : t.selectClient
                 }
@@ -1428,8 +1496,8 @@ export const Transactions: React.FC = () => {
               {editingTransaction ? t.editTransaction : t.addTransaction}
             </DialogTitle>
             <DialogDescription>
-              {editingTransaction 
-                ? "Altere os detalhes do lançamento abaixo." 
+              {editingTransaction
+                ? "Altere os detalhes do lançamento abaixo."
                 : "Preencha as informações para registrar um novo lançamento financeiro."
               }
             </DialogDescription>
@@ -1490,8 +1558,8 @@ export const Transactions: React.FC = () => {
             {/* Amount, Date and Payment Method */}
             <div className={cn(
               "grid gap-4",
-              userSettings.enablePaymentMethods 
-                ? "grid-cols-1 sm:grid-cols-3" 
+              userSettings.enablePaymentMethods
+                ? "grid-cols-1 sm:grid-cols-3"
                 : "grid-cols-1 sm:grid-cols-2"
             )}>
               <div className="space-y-2">
@@ -1672,9 +1740,9 @@ export const Transactions: React.FC = () => {
             {!editingTransaction && (
               <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="isRecurring" 
-                    checked={formData.isRecurring} 
+                  <Checkbox
+                    id="isRecurring"
+                    checked={formData.isRecurring}
                     onCheckedChange={(checked) => updateFormField('isRecurring', !!checked)}
                   />
                   <Label htmlFor="isRecurring" className="cursor-pointer font-semibold">Repetir lançamento mensalmente</Label>
@@ -1682,8 +1750,8 @@ export const Transactions: React.FC = () => {
 
                 {formData.isRecurring && (
                   <div className="pl-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <RadioGroup 
-                      value={formData.recurrenceType} 
+                    <RadioGroup
+                      value={formData.recurrenceType}
                       onValueChange={(val) => updateFormField('recurrenceType', val as 'count' | 'until')}
                       className="flex flex-col sm:flex-row gap-4"
                     >
@@ -1700,10 +1768,10 @@ export const Transactions: React.FC = () => {
                     {formData.recurrenceType === 'count' ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm">Repetir por</span>
-                        <Input 
-                          type="number" 
-                          className="w-20" 
-                          min={1} 
+                        <Input
+                          type="number"
+                          className="w-20"
+                          min={1}
                           max={60}
                           value={formData.repeatCount}
                           onChange={(e) => updateFormField('repeatCount', parseInt(e.target.value) || 1)}
@@ -1873,8 +1941,8 @@ export const Transactions: React.FC = () => {
               {deletingTransaction?.recurringId ? (
                 <div className="space-y-4">
                   <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
-                  <RadioGroup 
-                    value={recurringDeleteOption} 
+                  <RadioGroup
+                    value={recurringDeleteOption}
                     onValueChange={(val) => setRecurringDeleteOption(val as 'single' | 'future' | 'all')}
                     className="space-y-2"
                   >

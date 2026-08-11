@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { MoneyInput } from '@/components/ui/money-input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import {
   Dialog,
@@ -22,17 +22,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { 
-  HandCoins, 
-  Clock, 
-  ChevronDown, 
-  ChevronUp, 
-  CheckCircle2, 
-  Loader2, 
-  Banknote, 
-  CreditCard, 
-  Smartphone, 
-  FileText, 
+import {
+  HandCoins,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  Loader2,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  FileText,
   Wallet,
   CalendarDays,
   User,
@@ -104,14 +104,13 @@ export const Receivables: React.FC = () => {
   // Filter pending income transactions with customerId
   const pendingTransactions = useMemo(() => {
     return transactions.filter(
-      (txn) => 
-        txn.type === 'income' && 
-        txn.paymentMethod === 'pending' && 
+      (txn) =>
+        txn.type === 'income' &&
+        txn.paymentMethod === 'pending' &&
         txn.customerId
     );
   }, [transactions]);
-
-  // Group pending transactions by customer
+  // Group pending transactions by customer and filter by search query
   const groupedReceivables = useMemo(() => {
     const groups: Record<string, {
       customerId: string;
@@ -123,6 +122,28 @@ export const Receivables: React.FC = () => {
     }> = {};
 
     pendingTransactions.forEach((txn) => {
+      // Filter transactions by searchQuery if provided
+      if (searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        const cust = getCustomerById(txn.customerId!);
+        const customerName = cust?.name || 'Cliente Desconhecido';
+        const cat = getCategoryById(txn.categoryId);
+        const categoryName = cat?.name || '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matches = 
+          customerName.toLowerCase().includes(query) ||
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matches) return;
+      }
+
       const cId = txn.customerId!;
       if (!groups[cId]) {
         const cust = getCustomerById(cId);
@@ -139,13 +160,10 @@ export const Receivables: React.FC = () => {
       groups[cId].totalOwed += txn.amount;
     });
 
-    // Convert to array and filter by search query
+    // Convert to array
     return Object.values(groups)
-      .filter(group => 
-        group.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-      )
       .sort((a, b) => b.totalOwed - a.totalOwed); // Sort by highest debt first
-  }, [pendingTransactions, getCustomerById, searchQuery]);
+  }, [pendingTransactions, getCustomerById, getCategoryById, searchQuery]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -350,17 +368,17 @@ export const Receivables: React.FC = () => {
       {/* Search and Filters */}
       <div className="flex items-center gap-2 max-w-md bg-muted/30 px-3 py-1.5 rounded-lg border focus-within:border-primary/50 transition-colors">
         <Search className="h-4 w-4 text-muted-foreground" />
-        <Input 
-          type="text" 
-          placeholder="Buscar devedor pelo nome..."
+        <Input
+          type="text"
+          placeholder="Buscar cliente, descrição, ref, valor..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm w-full"
         />
         {searchQuery && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setSearchQuery('')}
             className="h-6 w-6 p-0 hover:bg-muted"
           >
@@ -379,8 +397,8 @@ export const Receivables: React.FC = () => {
           groupedReceivables.map((group) => {
             const isExpanded = !!expandedCustomers[group.customerId];
             return (
-              <div 
-                key={group.customerId} 
+              <div
+                key={group.customerId}
                 className="border rounded-lg bg-card overflow-hidden shadow-sm hover:border-border transition-all duration-200"
               >
                 {/* Accordion Header */}
@@ -421,8 +439,8 @@ export const Receivables: React.FC = () => {
                       {group.transactions.map((tx) => {
                         const cat = getCategoryById(tx.categoryId);
                         return (
-                          <div 
-                            key={tx.id} 
+                          <div
+                            key={tx.id}
                             className="flex flex-col sm:flex-row sm:items-center justify-between border p-3 rounded-lg bg-background shadow-2xs gap-3 hover:border-primary/20 transition-colors"
                           >
                             <div className="space-y-1">
@@ -489,7 +507,7 @@ export const Receivables: React.FC = () => {
               <div className="border p-3 rounded-lg bg-muted/30">
                 <div className="text-xs text-muted-foreground mb-1">Título / Descrição</div>
                 <div className="font-semibold text-sm">{selectedTx.description}</div>
-              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t">
+                <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t">
                   <div>
                     <span className="text-[10px] text-muted-foreground block uppercase">Data Original</span>
                     <span className="text-xs font-medium">{formatDate(selectedTx.date)}</span>
