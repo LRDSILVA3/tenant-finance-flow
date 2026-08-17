@@ -158,6 +158,17 @@ Demonstra a adaptabilidade responsiva do Previna em laptops, tablets e smartphon
   > *#Multiplataforma #SaaS #Mobilidade #ControleFinanceiro #Previna*
 ````
 
+### 🎨 Banners Premium Gerados por IA
+
+Para além das capturas de tela reais do aplicativo, geramos três imagens conceituais premium com estética moderna (modo escuro, glassmorphism e luzes neon) para destacar o apelo visual do Previna nas redes sociais:
+
+* **Conceito Premium 1: Finanças & Dashboard**
+  ![Novo Banner Financeiro](./marketing-assets/previna_novo_financeiro.png)
+* **Conceito Premium 2: Estoque & Varejo**
+  ![Novo Banner Estoque](./marketing-assets/previna_novo_estoque.png)
+* **Conceito Premium 3: Assistente de IA no WhatsApp**
+  ![Novo Banner WhatsApp](./marketing-assets/previna_novo_whatsapp.png)
+
 ---
 
 ## 📆 5. Cronograma de Ação Semanal (Lançamento da Campanha)
