@@ -15,9 +15,10 @@ import { Schedule } from '@/components/schedule/Schedule';
 import { Notifications } from '@/components/notifications/Notifications';
 import { Receivables } from '@/components/receivables/Receivables';
 import { Payables } from '@/components/payables/Payables';
+import { Suppliers } from '@/components/suppliers/Suppliers';
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -78,6 +79,8 @@ const Index: React.FC = () => {
         );
       case 'inventory':
         return <Inventory />;
+      case 'suppliers':
+        return <Suppliers />;
       case 'reports':
         return <Reports activeTab={activeReportTab} onTabChange={setActiveReportTab} />;
       case 'settings':

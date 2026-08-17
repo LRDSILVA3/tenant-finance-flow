@@ -143,8 +143,7 @@ interface CartItem {
 }
 
 export const Inventory: React.FC = () => {
-  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications } = useFinance();
-  const [activeTab, setActiveTab] = useState<'products' | 'suppliers'>('products');
+  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications, suppliers, loadSuppliers } = useFinance();
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
   const { referenceGroups } = useTransactionReferences(transactions);
@@ -155,7 +154,6 @@ export const Inventory: React.FC = () => {
 
   // Data States
   const [products, setProducts] = useState<Product[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,7 +161,6 @@ export const Inventory: React.FC = () => {
 
   // Modals States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
 
   // Realtime Scanner States
@@ -270,24 +267,6 @@ export const Inventory: React.FC = () => {
     expirationDate: '',
   });
 
-  // Fetch Suppliers
-  const loadSuppliers = useCallback(async () => {
-    if (!currentClient) return;
-    const { data, error } = await supabase
-      .from('suppliers')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .order('name');
-    
-    if (!error && data) {
-      setSuppliers(data.map((s: { id: string; name: string; contact_info: string | null }) => ({
-        id: s.id,
-        name: s.name,
-        contact_info: s.contact_info,
-      })));
-    }
-  }, [currentClient]);
-
   // Fetch Products
   const loadProducts = useCallback(async () => {
     if (!currentClient) return;
@@ -323,7 +302,7 @@ export const Inventory: React.FC = () => {
   useEffect(() => {
     if (currentClient) {
       loadProducts();
-      loadSuppliers();
+      loadSuppliers?.(currentClient.id);
     }
   }, [currentClient, loadProducts, loadSuppliers]);
 
@@ -795,40 +774,7 @@ export const Inventory: React.FC = () => {
     }
   };
 
-  // Save Supplier
-  const handleSaveSupplier = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentClient || !supplierForm.name.trim()) return;
 
-    try {
-      const { error } = await supabase.from('suppliers').insert({
-        client_id: currentClient.id,
-        name: supplierForm.name,
-        contact_info: supplierForm.contactInfo || null,
-      });
-
-      if (error) throw error;
-      toast({ title: 'Fornecedor cadastrado com sucesso!' });
-      setIsSupplierModalOpen(false);
-      loadSuppliers();
-    } catch (err) {
-      toast({ title: 'Erro ao salvar fornecedor', description: err instanceof Error ? err.message : 'Erro desconhecido', variant: 'destructive' });
-    }
-  };
-
-  // Delete Supplier
-  const handleDeleteSupplier = async (id: string) => {
-    if (!confirm('Deseja realmente remover este fornecedor? Produtos vinculados passarão a ter fornecedor nulo.')) return;
-    try {
-      const { error } = await supabase.from('suppliers').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: 'Fornecedor removido com sucesso!' });
-      loadSuppliers();
-      loadProducts();
-    } catch (err) {
-      toast({ title: 'Erro ao remover fornecedor', description: err instanceof Error ? err.message : 'Erro desconhecido', variant: 'destructive' });
-    }
-  };
 
   // Save Stock Adjustment
   const handleSaveAdjustment = async (e: React.FormEvent) => {
@@ -1033,29 +979,17 @@ export const Inventory: React.FC = () => {
             <Package className="h-6 w-6 text-primary" />
             Produtos e Estoque
           </h2>
-          <p className="page-subtitle">Controle o inventário, custos de aquisição e fornecedores.</p>
+          <p className="page-subtitle">Controle o inventário e custos de aquisição de produtos.</p>
         </div>
         <div className="flex gap-2">
-          {activeTab === 'products' && (
-            <Button onClick={openScanModal} variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 font-medium">
-              <Barcode className="h-4 w-4 text-emerald-600" />
-              Leitor de Código / Celular / USB
-            </Button>
-          )}
-          {activeTab === 'products' ? (
-            <Button onClick={openCreateProduct} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Produto
-            </Button>
-          ) : (
-            <Button onClick={() => {
-              setSupplierForm({ name: '', contactInfo: '' });
-              setIsSupplierModalOpen(true);
-            }} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Fornecedor
-            </Button>
-          )}
+          <Button onClick={openScanModal} variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 font-medium">
+            <Barcode className="h-4 w-4 text-emerald-600" />
+            Leitor de Código / Celular / USB
+          </Button>
+          <Button onClick={openCreateProduct} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Produto
+          </Button>
         </div>
       </div>
 
@@ -1072,21 +1006,7 @@ export const Inventory: React.FC = () => {
         </Card>
       )}
 
-      {/* Tabs */}
-      <Tabs defaultValue="products" className="w-full" onValueChange={(v) => setActiveTab(v as 'products' | 'suppliers')}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="products" className="gap-2">
-            <Package className="h-4 w-4" />
-            Produtos
-          </TabsTrigger>
-          <TabsTrigger value="suppliers" className="gap-2">
-            <Truck className="h-4 w-4" />
-            Fornecedores
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tab 1: Products */}
-        <TabsContent value="products" className="space-y-4">
+      <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1240,57 +1160,7 @@ export const Inventory: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Tab 2: Suppliers */}
-        <TabsContent value="suppliers" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Fornecedores Vinculados</CardTitle>
-              <CardDescription>Gerencie contatos de fornecedores e parceiros de abastecimento.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {suppliers.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nenhum fornecedor cadastrado.
-                </div>
-              ) : (
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead>Fornecedor</TableHead>
-                        <TableHead>Informações de Contato</TableHead>
-                        <TableHead className="text-right w-[100px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {suppliers.map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-semibold">{s.name}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{s.contact_info || '-'}</TableCell>
-                          <TableCell className="text-right">
-                            {s.name !== 'Fornecedor Padrão' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteSupplier(s.id)}
-                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Realtime Mobile Barcode Scanner Modal */}
       <Dialog open={isScanModalOpen} onOpenChange={setIsScanModalOpen}>
@@ -1856,7 +1726,7 @@ export const Inventory: React.FC = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {suppliers.map(s => (
+                      {(suppliers || []).map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1950,40 +1820,7 @@ export const Inventory: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Supplier Dialog */}
-      <Dialog open={isSupplierModalOpen} onOpenChange={setIsSupplierModalOpen}>
-        <DialogContent className="max-w-sm">
-          <form onSubmit={handleSaveSupplier}>
-            <DialogHeader>
-              <DialogTitle>Novo Fornecedor</DialogTitle>
-              <DialogDescription>Cadastre as informações básicas do fornecedor.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-1">
-                <Label htmlFor="sup-name">Nome da Empresa / Contato *</Label>
-                <Input
-                  id="sup-name"
-                  value={supplierForm.name}
-                  onChange={(e) => setSupplierForm(s => ({ ...s, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="sup-contact">Info Contato (Telefone/Email)</Label>
-                <Input
-                  id="sup-contact"
-                  value={supplierForm.contactInfo}
-                  onChange={(e) => setSupplierForm(s => ({ ...s, contactInfo: e.target.value }))}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsSupplierModalOpen(false)}>Cancelar</Button>
-              <Button type="submit">Salvar Fornecedor</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
 
       {/* Stock Adjustment Dialog */}
       <Dialog open={isAdjustmentModalOpen} onOpenChange={setIsAdjustmentModalOpen}>

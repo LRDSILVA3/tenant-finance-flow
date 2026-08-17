@@ -22,7 +22,8 @@ import {
   LineChart as LineChartIcon,
   Calculator,
   Layers,
-  Percent
+  Percent,
+  Truck
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
 interface NavigationProps {
   currentView?: View;
@@ -58,7 +59,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   // Helpers de estado ativo para grupos do menu suspenso
   const isFinanceActive = activeId === 'transactions' || activeId === 'receivables' || activeId === 'payables';
-  const isCadastrosActive = activeId === 'customers' || activeId === 'schedule' || activeId === 'inventory';
+  const isCadastrosActive = activeId === 'customers' || activeId === 'suppliers' || activeId === 'schedule' || activeId === 'inventory';
 
   const handleNavClick = (view: View | 'admin') => {
     if (view === 'admin') {
@@ -229,6 +230,16 @@ export const Navigation: React.FC<NavigationProps> = ({
                 >
                   <Users className="h-4 w-4 text-muted-foreground" />
                   Clientes
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('suppliers')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'suppliers' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Truck className="h-4 w-4 text-muted-foreground" />
+                  Fornecedores
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleNavClick('schedule')}
