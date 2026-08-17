@@ -28,5 +28,7 @@ A financial management multi-tenant system where each 'Client' represents a tena
 - **Usage Billing (Pay-as-you-go)**: Quotas and fees per invoice emission are defined in the plan features JSONB (`free_invoices`, `invoice_fee`). The system counts authorized, unbilled invoices at cycle end and adds extra charge items to the next Pagar.me subscription invoice.
 
 ## Important Lessons
+- **Separation of Payment Status and Method**: Previously, the value `'pending'` in `payment_method` was used to identify pending transactions. Now, transactions have a dedicated `status` column (`'paid' | 'pending'`), enabling unpaid transactions to have an associated payment method (e.g. `card` or `pix`). Only `'paid'` transactions affect current cash balances, while `'pending'` transactions represent accounts receivable/payable.
 - **Date Parsing**: Supabase `date` columns must be parsed using `new Date(`${t.date}T00:00:00`)` to prevent UTC shifts that change the day by -1.
 - **Collaborator Integration**: New collaborators must be returned as objects from the creation function to allow immediate UI selection.
+

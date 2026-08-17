@@ -5,7 +5,7 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useTransactions } from '@/contexts/TransactionContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Customer, Appointment, AppointmentStatus, ServiceType, PaymentMethod } from '@/types/finance';
+import { Customer, Appointment, AppointmentStatus, ServiceType, PaymentMethod, TransactionStatus } from '@/types/finance';
 import { format, startOfDay, endOfDay, addDays, subDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -143,6 +143,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
     date: new Date(),
     reference: '',
     paymentMethod: '' as PaymentMethod | '',
+    status: 'paid' as TransactionStatus,
   });
 
   // Busca de categoria padrão de receita
@@ -372,6 +373,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
       date: new Date(appt.scheduledAt),
       reference: customer?.name ?? '',
       paymentMethod: '',
+      status: 'paid',
     });
     
     setIsRevenueDialogOpen(true);
@@ -397,7 +399,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
           reference: revenueFormData.reference.trim() || null,
           date: format(revenueFormData.date, 'yyyy-MM-dd'),
           category_id: revenueFormData.categoryId,
-          payment_method: revenueFormData.paymentMethod || null,
+          payment_method: revenueFormData.paymentMethod === 'pending' ? null : (revenueFormData.paymentMethod || null),
+          status: revenueFormData.paymentMethod === 'pending' ? 'pending' : 'paid',
         })
         .select('id')
         .single();

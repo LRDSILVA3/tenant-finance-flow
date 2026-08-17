@@ -102,6 +102,7 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(now));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(now));
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // internal tabs state
   const [localActiveTab, setLocalActiveTab] = useState<string>('dre');
@@ -228,9 +229,10 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
       if (startDate && txnDate < startDate) return false;
       if (endDate && txnDate > endDate) return false;
       if (paymentMethodFilter !== 'all' && txn.paymentMethod !== paymentMethodFilter) return false;
+      if (statusFilter !== 'all' && txn.status !== statusFilter) return false;
       return true;
     });
-  }, [transactions, startDate, endDate, paymentMethodFilter]);
+  }, [transactions, startDate, endDate, paymentMethodFilter, statusFilter]);
 
   // 1. DRE Calculation
   const dreData = useMemo(() => {
@@ -492,13 +494,13 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
 
     filteredTransactions.forEach(txn => {
       if (txn.type === 'income') {
-        if (txn.paymentMethod === 'pending' || !txn.paymentMethod) {
+        if (txn.status === 'pending') {
           accountsReceivable += txn.amount;
         } else {
           confirmedIncome += txn.amount;
         }
       } else {
-        if (txn.paymentMethod === 'pending' || !txn.paymentMethod) {
+        if (txn.status === 'pending') {
           accountsPayable += txn.amount;
         } else {
           confirmedExpense += txn.amount;
@@ -964,7 +966,6 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                   <SelectItem value="card">Cartão</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
                   <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="pending">A Receber</SelectItem>
                   {customPaymentMethods.map((m) => (
                     <SelectItem key={m.id} value={m.name}>
                       {m.name}
@@ -974,6 +975,21 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
               </Select>
             </div>
           )}
+
+          {/* Status filter */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="paid">Pago / Recebido</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Print Only Header showing active filters */}
@@ -984,6 +1000,9 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
           </p>
           {paymentMethodFilter !== 'all' && (
             <p className="text-xs text-muted-foreground">Filtro de pagamento: {paymentMethodFilter.toUpperCase()}</p>
+          )}
+          {statusFilter !== 'all' && (
+            <p className="text-xs text-muted-foreground">Status: {statusFilter === 'paid' ? 'PAGO' : 'PENDENTE'}</p>
           )}
         </div>
       </div>

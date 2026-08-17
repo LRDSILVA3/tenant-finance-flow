@@ -317,7 +317,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         .from('transactions')
         .select('*')
         .eq('client_id', currentClient.id)
-        .eq('payment_method', 'pending');
+        .eq('status', 'pending');
 
       if (!txError && pendingTxData) {
         const today = new Date();
@@ -377,13 +377,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       // 5. Calculate current cash balance for balance alerts
       const { data: allTxData, error: allTxError } = await supabase
         .from('transactions')
-        .select('amount, type, payment_method')
+        .select('amount, type, payment_method, status')
         .eq('client_id', currentClient.id);
 
       if (!allTxError && allTxData) {
         let cashBalance = 0;
         allTxData.forEach((tx: any) => {
-          if (tx.payment_method !== 'pending') {
+          if (tx.status !== 'pending') {
             if (tx.type === 'income') {
               cashBalance += Number(tx.amount);
             } else if (tx.type === 'expense') {

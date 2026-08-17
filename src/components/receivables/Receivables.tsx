@@ -37,8 +37,10 @@ import {
   CalendarDays,
   User,
   Search,
-  X
+  X,
+  Plus
 } from 'lucide-react';
+import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 
@@ -74,6 +76,15 @@ const getPaymentMethodIcon = (method: string) => {
   return <Wallet className="h-4 w-4 text-slate-500" />;
 };
 
+const getPaymentMethodLabel = (method: string, t: any) => {
+  if (!method) return '-';
+  if (method === 'cash') return t?.cash || 'Dinheiro';
+  if (method === 'card') return t?.card || 'Cartão';
+  if (method === 'pix') return t?.pix || 'Pix';
+  if (method === 'boleto') return t?.boleto || 'Boleto';
+  return method;
+};
+
 export const Receivables: React.FC = () => {
   const {
     t,
@@ -91,6 +102,7 @@ export const Receivables: React.FC = () => {
   const [expandedCustomers, setExpandedCustomers] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [isNewTxDialogOpen, setIsNewTxDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -106,7 +118,7 @@ export const Receivables: React.FC = () => {
     return transactions.filter(
       (txn) =>
         txn.type === 'income' &&
-        txn.paymentMethod === 'pending' &&
+        txn.status === 'pending' &&
         txn.customerId
     );
   }, [transactions]);
@@ -191,8 +203,8 @@ export const Receivables: React.FC = () => {
 
   const handleOpenPaymentDialog = (tx: Transaction) => {
     setSelectedTx(tx);
-    // Set default values
-    setPaymentMethod('pix');
+    // Set default values from transaction's planned payment method if available
+    setPaymentMethod(tx.paymentMethod || 'pix');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaidAmount(tx.amount);
     setPartialAction('split');
@@ -227,6 +239,7 @@ export const Receivables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: splitOriginalNotes
         });
@@ -240,7 +253,8 @@ export const Receivables: React.FC = () => {
           amount: difference,
           description: `${selectedTx.description} (Saldo Remanescente)`,
           date: newDueDate,
-          paymentMethod: 'pending',
+          paymentMethod: selectedTx.paymentMethod || null,
+          status: 'pending',
           customerId: selectedTx.customerId,
           notes: `Saldo devedor restante do lançamento original de ${formatCurrency(originalAmount)} no qual foi pago ${formatCurrency(paidAmount)} em ${formatDate(selectedDate)}.`
         });
@@ -256,6 +270,7 @@ export const Receivables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: installmentsOriginalNotes
         });
@@ -278,7 +293,8 @@ export const Receivables: React.FC = () => {
             amount: finalInstallmentAmount,
             description: `${selectedTx.description} (Parc. ${i + 1}/${installmentCount})`,
             date: installmentDate,
-            paymentMethod: 'pending',
+            paymentMethod: selectedTx.paymentMethod || null,
+            status: 'pending',
             customerId: selectedTx.customerId,
             notes: `Parcela ${i + 1}/${installmentCount} referente ao saldo restante de ${formatCurrency(difference)} com juros de ${interestRate}% por parcela. Lançamento original: ${formatCurrency(originalAmount)}.`
           });
@@ -297,6 +313,7 @@ export const Receivables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: discountNotes
         });
@@ -329,6 +346,12 @@ export const Receivables: React.FC = () => {
             Contas a Receber
           </h2>
           <p className="page-subtitle">Acompanhe e dê baixa em débitos pendentes de seus clientes.</p>
+        </div>
+        <div>
+          <Button onClick={() => setIsNewTxDialogOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Conta a Receber
+          </Button>
         </div>
       </div>
 
@@ -450,11 +473,17 @@ export const Receivables: React.FC = () => {
                                   {cat?.name || '-'}
                                 </Badge>
                               </div>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <CalendarDays className="h-3 w-3" />
                                   {formatDate(tx.date)}
                                 </span>
+                                {tx.paymentMethod && (
+                                  <span className="flex items-center gap-1">
+                                    {getPaymentMethodIcon(tx.paymentMethod)}
+                                    {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                  </span>
+                                )}
                                 {tx.reference && (
                                   <span className="font-mono bg-muted px-1 rounded text-[10px]">
                                     Ref: {tx.reference}
@@ -725,6 +754,14 @@ export const Receivables: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TransactionDialog
+        open={isNewTxDialogOpen}
+        onOpenChange={setIsNewTxDialogOpen}
+        defaultType="income"
+        defaultStatus="pending"
+        disabledType={true}
+      />
     </div>
   );
 };

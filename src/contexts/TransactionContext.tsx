@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice, Supplier } from '@/types/finance';
+import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, TransactionStatus, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice, Supplier } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 
 interface TransactionContextType {
@@ -31,7 +31,7 @@ interface TransactionContextType {
   deleteCustomPaymentMethod: (id: string) => Promise<void>;
 }
 
-const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
+export const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
 
 export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -100,6 +100,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       amount: Number(t.amount), description: t.description, date: new Date(`${t.date}T00:00:00`),
       reference: t.reference || undefined, notes: t.notes || undefined,
       paymentMethod: t.payment_method as PaymentMethod,
+      status: (t.status || 'paid') as TransactionStatus,
       collaboratorId: t.transaction_commissions?.[0]?.collaborator_id || undefined,
       commissionAmount: t.transaction_commissions?.[0]?.commission_amount ? Number(t.transaction_commissions[0].commission_amount) : undefined,
       commissions: t.transaction_commissions ? t.transaction_commissions.map((tc: any) => ({
@@ -155,6 +156,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       reference: transaction.reference || null,
       notes: transaction.notes || null,
       payment_method: transaction.paymentMethod || null,
+      status: transaction.status || 'paid',
       customer_id: transaction.customerId || null,
       supplier_id: transaction.supplierId || null,
       recurring_id: recurringId
@@ -202,6 +204,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
     if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
+    if (updates.status !== undefined) updateData.status = updates.status;
     if (updates.customerId !== undefined) updateData.customer_id = updates.customerId || null;
     if (updates.supplierId !== undefined) updateData.supplier_id = updates.supplierId || null;
 

@@ -22,8 +22,10 @@ import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
 import { useTransactionCsvExport } from '@/hooks/useTransactionCsvExport';
+import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { UpgradeBadge } from '@/components/ui/upgrade-badge';
+import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -80,6 +82,7 @@ import {
   CreditCard,
   Smartphone,
   Clock,
+  CheckCircle2,
   Download,
   Lock,
   ChevronLeft,
@@ -234,9 +237,7 @@ export const Transactions: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
-  const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const lastScrollY = React.useRef(0);
@@ -274,6 +275,7 @@ export const Transactions: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCustomer, setFilterCustomer] = useState<string>('all');
   const [filterSupplier, setFilterSupplier] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -281,26 +283,6 @@ export const Transactions: React.FC = () => {
 
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
-
-  const [formData, setFormData] = useState({
-    type: 'income' as TransactionType,
-    categoryId: '',
-    amount: 0,
-    description: '',
-    date: new Date(),
-    reference: '',
-    notes: '',
-    paymentMethod: '' as PaymentMethod | '',
-    collaboratorId: '',
-    commissionAmount: 0,
-    commissions: [] as Array<{ collaboratorId: string; commissionAmount: number }>,
-    customerId: '',
-    supplierId: '',
-    isRecurring: false,
-    recurrenceType: 'count' as 'count' | 'until',
-    repeatCount: 1,
-    repeatUntil: undefined as Date | undefined,
-  });
 
   const locale = language === 'pt' ? ptBR : language === 'es' ? es : enUS;
 
@@ -329,6 +311,9 @@ export const Transactions: React.FC = () => {
 
       // Payment Method filter
       if (filterPaymentMethod !== 'all' && txn.paymentMethod !== filterPaymentMethod) return false;
+
+      // Status filter
+      if (filterStatus !== 'all' && txn.status !== filterStatus) return false;
 
       // Customer filter
       if (filterCustomer !== 'all' && txn.customerId !== filterCustomer) return false;
@@ -367,6 +352,7 @@ export const Transactions: React.FC = () => {
     filterCategory,
     filterType,
     filterPaymentMethod,
+    filterStatus,
     filterCustomer,
     filterSupplier,
     searchTerm,
@@ -406,67 +392,26 @@ export const Transactions: React.FC = () => {
     return dates;
   }, [filteredTransactions]);
 
-  const availableCategories = useMemo(() => {
-    const cats = getCategoriesByType(formData.type);
-    const parentIdsWithChildren = new Set(
-      cats.filter(c => c.parentId !== null).map(c => c.parentId)
-    );
-    return cats.filter((c) => c.parentId !== null || !parentIdsWithChildren.has(c.id));
-  }, [formData.type, getCategoriesByType]);
-
-  // Filter descriptions by selected category (extract just the description strings, already sorted by frequency)
-  const filteredDescriptionOptions = useMemo(() => {
-    if (!formData.categoryId) {
-      // No category selected, show all grouped
-      return descriptionGroups.map(g => ({
-        label: `${g.categoryCode} - ${g.categoryName}`,
-        options: g.descriptions.map(d => d.description),
-      }));
-    }
-
-    // Filter to only show descriptions from the selected category
-    const selectedGroup = descriptionGroups.find(g => g.categoryId === formData.categoryId);
-    if (selectedGroup) {
-      return [{
-        label: `${selectedGroup.categoryCode} - ${selectedGroup.categoryName}`,
-        options: selectedGroup.descriptions.map(d => d.description),
-      }];
-    }
-
-    return [];
-  }, [descriptionGroups, formData.categoryId]);
-
-  // Filter references by selected description (sorted by frequency)
-  const filteredReferenceOptions = useMemo(() => {
-    if (!formData.description) {
-      // No description selected, show all grouped
-      return referenceGroups.map(g => ({
-        label: g.description,
-        options: g.references.map(r => r.reference),
-      }));
-    }
-
-    // Filter to only show references from the selected description
-    const selectedGroup = referenceGroups.find(g => g.description === formData.description);
-    if (selectedGroup) {
-      return [{
-        label: selectedGroup.description,
-        options: selectedGroup.references.map(r => r.reference),
-      }];
-    }
-
-    return [];
-  }, [referenceGroups, formData.description]);
-
   const handleClearFilters = () => {
     setFilterStartDate(startOfMonth(now));
     setFilterEndDate(endOfMonth(now));
     setFilterCategory('all');
     setFilterType('all');
     setFilterPaymentMethod('all');
+    setFilterStatus('all');
     setFilterCustomer('all');
     setFilterSupplier('all');
     setSearchTerm('');
+  };
+
+  const handleOpenCreate = () => {
+    setEditingTransaction(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setIsDialogOpen(true);
   };
 
   const handleExportCsv = () => {
@@ -511,141 +456,6 @@ export const Transactions: React.FC = () => {
         userSettings
       );
     }
-  };
-
-  const updateFormField = (field: keyof typeof formData, value: typeof formData[keyof typeof formData]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleOpenCreate = () => {
-    setEditingTransaction(null);
-    setErrors({});
-    setFormData({
-      type: 'income',
-      categoryId: '',
-      amount: 0,
-      description: '',
-      date: selectedCalendarDate || new Date(),
-      reference: '',
-      notes: '',
-      paymentMethod: '',
-      collaboratorId: '',
-      commissionAmount: 0,
-      commissions: [],
-      customerId: '',
-      supplierId: '',
-      isRecurring: false,
-      recurrenceType: 'count' as 'count' | 'until',
-      repeatCount: 1,
-      repeatUntil: undefined as Date | undefined,
-    });
-    setIsDialogOpen(true);
-  };
-
-
-
-  const handleOpenEdit = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setErrors({});
-    setFormData({
-      type: transaction.type,
-      categoryId: transaction.categoryId,
-      amount: transaction.amount,
-      description: transaction.description,
-      date: new Date(transaction.date),
-      reference: transaction.reference || '',
-      notes: transaction.notes || '',
-      paymentMethod: transaction.paymentMethod || '',
-      collaboratorId: transaction.collaboratorId || '',
-      commissionAmount: transaction.commissionAmount || 0,
-      commissions: transaction.commissions ? transaction.commissions.map(c => ({
-        collaboratorId: c.collaboratorId,
-        commissionAmount: c.commissionAmount
-      })) : [],
-      customerId: transaction.customerId || '',
-      supplierId: transaction.supplierId || '',
-      isRecurring: !!transaction.recurringId,
-      recurrenceType: 'count',
-      repeatCount: 1,
-      repeatUntil: undefined,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.type) newErrors.type = t.required;
-    if (!formData.categoryId) newErrors.categoryId = t.required;
-    if (formData.amount <= 0) newErrors.amount = t.required;
-    if (!formData.description) newErrors.description = t.required;
-    if (!formData.date) newErrors.date = t.required;
-
-    // Validar se há comissões sem colaborador selecionado
-    if (formData.commissions && formData.commissions.length > 0) {
-      const hasInvalidComm = formData.commissions.some(c => !c.collaboratorId || c.commissionAmount <= 0);
-      if (hasInvalidComm) {
-        toast({ title: "Verifique as comissões", description: "Todos os colaboradores de comissão devem ser selecionados com valores maiores que zero.", variant: "destructive" });
-        return;
-      }
-    }
-
-    if (Object.keys(newErrors).length > 0 || !currentClient) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setSaving(true);
-
-    const paymentMethod = formData.paymentMethod || undefined;
-    const commissions = formData.commissions || [];
-    const customerId = formData.customerId && formData.customerId !== 'none' ? formData.customerId : undefined;
-    const supplierId = formData.supplierId && formData.supplierId !== 'none' ? formData.supplierId : undefined;
-
-    if (editingTransaction) {
-      await updateTransaction(editingTransaction.id, {
-        type: formData.type,
-        categoryId: formData.categoryId,
-        amount: formData.amount,
-        description: formData.description,
-        date: formData.date,
-        reference: formData.reference || undefined,
-        notes: formData.notes || undefined,
-        paymentMethod,
-        commissions,
-        customerId,
-        supplierId,
-      });
-    } else {
-      const recurrence = formData.isRecurring ? {
-        count: formData.recurrenceType === 'count' ? formData.repeatCount : undefined,
-        until: formData.recurrenceType === 'until' ? formData.repeatUntil : undefined,
-      } : undefined;
-
-      await addTransaction({
-        clientId: currentClient.id,
-        type: formData.type,
-        categoryId: formData.categoryId,
-        amount: formData.amount,
-        description: formData.description,
-        date: formData.date,
-        reference: formData.reference || undefined,
-        notes: formData.notes || undefined,
-        paymentMethod,
-        commissions,
-        customerId,
-        supplierId,
-      }, recurrence);
-    }
-
-    setSaving(false);
-    setIsDialogOpen(false);
   };
 
   const handleDelete = async () => {
@@ -901,12 +711,6 @@ export const Transactions: React.FC = () => {
                         {t.boleto}
                       </div>
                     </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-amber-500" />
-                        {t.pending}
-                      </div>
-                    </SelectItem>
                     {customPaymentMethods.map((m) => (
                       <SelectItem key={m.id} value={m.name}>
                         <div className="flex items-center gap-2">
@@ -919,6 +723,21 @@ export const Transactions: React.FC = () => {
                 </Select>
               </div>
             )}
+
+            {/* Status Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="paid">Pago / Recebido</SelectItem>
+                  <SelectItem value="pending">Pendente (Em Aberto)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Category Filter */}
             <div className="space-y-1">
@@ -1017,7 +836,7 @@ export const Transactions: React.FC = () => {
         {userSettings.enablePaymentMethods && (
           <div className="flex flex-wrap gap-x-8 gap-y-3 mt-3 pt-3 border-t text-sm">
             {(() => {
-              const defaultMethods = ['cash', 'card', 'pix', 'boleto', 'pending'];
+              const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
               const customUsedMethods = Array.from(new Set(
                 filteredTransactions
                   .map(txn => txn.paymentMethod)
@@ -1026,13 +845,13 @@ export const Transactions: React.FC = () => {
 
               const allMethods = [...defaultMethods, ...customUsedMethods];
 
-              return allMethods.map(method => {
+              const methodsRender = allMethods.map(method => {
                 const incomeTotal = filteredTransactions
-                  .filter(txn => txn.type === 'income' && txn.paymentMethod === method)
+                  .filter(txn => txn.type === 'income' && txn.status !== 'pending' && txn.paymentMethod === method)
                   .reduce((s, txn) => s + txn.amount, 0);
 
                 const expenseTotal = filteredTransactions
-                  .filter(txn => txn.type === 'expense' && txn.paymentMethod === method)
+                  .filter(txn => txn.type === 'expense' && txn.status !== 'pending' && txn.paymentMethod === method)
                   .reduce((s, txn) => s + txn.amount, 0);
 
                 if (incomeTotal === 0 && expenseTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
@@ -1049,6 +868,27 @@ export const Transactions: React.FC = () => {
                   </div>
                 );
               });
+
+              // Add special pending calculation
+              const pendingIncome = filteredTransactions
+                .filter(txn => txn.type === 'income' && txn.status === 'pending')
+                .reduce((s, txn) => s + txn.amount, 0);
+
+              const pendingExpense = filteredTransactions
+                .filter(txn => txn.type === 'expense' && txn.status === 'pending')
+                .reduce((s, txn) => s + txn.amount, 0);
+
+              const pendingRender = (pendingIncome > 0 || pendingExpense > 0) ? (
+                <div key="pending" className="flex items-center gap-2 border-l pl-4 border-dashed">
+                  <Clock className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-muted-foreground">Total Pendente:</span>
+                  <span className="font-semibold money-font text-amber-600">
+                    {formatCurrency(pendingIncome - pendingExpense)}
+                  </span>
+                </div>
+              ) : null;
+
+              return [...methodsRender, pendingRender];
             })()}
           </div>
         )}
@@ -1152,9 +992,16 @@ export const Transactions: React.FC = () => {
                               )}
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-medium">{transaction.description}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{transaction.description}</span>
+                                {transaction.status === 'pending' && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-amber-500/5 text-amber-700 border-amber-500/30 font-medium h-4 shrink-0">
+                                    Pendente
+                                  </Badge>
+                                )}
+                              </div>
                               {transaction.customerId && (
-                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium">
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium mt-1">
                                   Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
                                 </span>
                               )}
@@ -1488,449 +1335,11 @@ export const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-none !top-0 !left-0 !right-0 !bottom-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-4xl sm:h-[95vh] sm:max-h-[95vh] sm:rounded-lg rounded-none !flex !flex-col !p-0 !gap-0 overflow-hidden">
-          <DialogHeader className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:pt-6 pb-2 border-b">
-            <DialogTitle>
-              {editingTransaction ? t.editTransaction : t.addTransaction}
-            </DialogTitle>
-            <DialogDescription>
-              {editingTransaction
-                ? "Altere os detalhes do lançamento abaixo."
-                : "Preencha as informações para registrar um novo lançamento financeiro."
-              }
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {/* Type and Category */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={cn(errors.type && "text-destructive")}>{t.type}</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(val) => {
-                    updateFormField('type', val as TransactionType);
-                    updateFormField('categoryId', '');
-                    if (userSettings.enablePaymentMethods) {
-                      updateFormField('paymentMethod', '');
-                    }
-                  }}
-                >
-                  <SelectTrigger className={cn(errors.type && "border-destructive")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">{t.income}</SelectItem>
-                    <SelectItem value="expense">{t.expenses}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label className={cn(errors.categoryId && "text-destructive")}>{t.category}</Label>
-                <SearchableSelect
-                  value={(() => {
-                    const selectedCat = availableCategories.find(c => c.id === formData.categoryId);
-                    return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
-                  })()}
-                  onChange={(val) => {
-                    const selectedCat = availableCategories.find(c => `${c.code} - ${c.name}` === val);
-                    if (selectedCat) {
-                      updateFormField('categoryId', selectedCat.id);
-                    } else {
-                      updateFormField('categoryId', '');
-                    }
-                  }}
-                  options={availableCategories.map(cat => `${cat.code} - ${cat.name}`)}
-                  placeholder={t.category}
-                  searchPlaceholder="Buscar categoria..."
-                  emptyMessage="Nenhuma categoria encontrada."
-                  allowAdd={false}
-                  className={cn(errors.categoryId && "border-destructive")}
-                />
-                {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
-              </div>
-            </div>
-
-            {/* Amount, Date and Payment Method */}
-            <div className={cn(
-              "grid gap-4",
-              userSettings.enablePaymentMethods
-                ? "grid-cols-1 sm:grid-cols-3"
-                : "grid-cols-1 sm:grid-cols-2"
-            )}>
-              <div className="space-y-2">
-                <Label htmlFor="amount" className={cn(errors.amount && "text-destructive")}>{t.amount}</Label>
-                <MoneyInput
-                  id="amount"
-                  value={formData.amount}
-                  onChange={(value) => updateFormField('amount', value)}
-                  className={cn(errors.amount && "border-destructive")}
-                />
-                {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label className={cn(errors.date && "text-destructive")}>{t.date}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formData.date && "text-muted-foreground",
-                        errors.date && "border-destructive"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.date ? format(formData.date, 'dd/MM/yyyy', { locale }) : t.date}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.date}
-                      onSelect={(date) => date && updateFormField('date', date)}
-                      locale={locale}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
-              </div>
-              {userSettings.enablePaymentMethods && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    {formData.type === 'income' ? t.paymentMethod : 'Forma de Pagamento'}
-                    <UpgradeBadge />
-                  </Label>
-                  <Select
-                    value={formData.paymentMethod}
-                    onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
-                    disabled={!hasFeature('payment_methods')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : (formData.type === 'income' ? t.paymentMethod : 'Forma de Pagamento')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4 text-emerald-500" />
-                          <span>{t.cash}</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="card">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-blue-500" />
-                          <span>{t.card}</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="pix">
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4 text-purple-500" />
-                          <span>{t.pix}</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="boleto">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-cyan-500" />
-                          <span>{t.boleto}</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="pending">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-amber-500" />
-                          <span>{t.pending}</span>
-                        </div>
-                      </SelectItem>
-                      {customPaymentMethods.map((method) => (
-                        <SelectItem key={method.id} value={method.name}>
-                          <div className="flex items-center gap-2">
-                            {getPaymentMethodIconLarge(method.parentType)}
-                            <span>{method.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {formData.type === 'income' ? (
-              <div className="space-y-2">
-                <Label htmlFor="customerId">Cliente (Opcional)</Label>
-                <Select
-                  value={formData.customerId || 'none'}
-                  onValueChange={(val) => updateFormField('customerId', val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum cliente</SelectItem>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} {c.document ? `(${c.document})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="supplierId">Fornecedor (Opcional)</Label>
-                <Select
-                  value={formData.supplierId || 'none'}
-                  onValueChange={(val) => updateFormField('supplierId', val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um fornecedor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum fornecedor</SelectItem>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Description and Reference */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="description" className={cn(errors.description && "text-destructive")}>{t.description}</Label>
-                <SearchableSelect
-                  value={formData.description}
-                  onChange={(value) => {
-                    updateFormField('description', value);
-                    updateFormField('reference', '');
-                  }}
-                  groupedOptions={filteredDescriptionOptions}
-                  placeholder={t.description}
-                  searchPlaceholder="Buscar descrição..."
-                  emptyMessage="Nenhuma descrição encontrada."
-                  addNewLabel="Adicionar"
-                  className={cn(errors.description && "border-destructive")}
-                />
-                {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reference">{t.reference} (Opcional)</Label>
-                <SearchableSelect
-                  value={formData.reference}
-                  onChange={(value) => updateFormField('reference', value)}
-                  groupedOptions={filteredReferenceOptions}
-                  placeholder={t.reference}
-                  searchPlaceholder="Buscar referência..."
-                  emptyMessage="Nenhuma referência encontrada."
-                  addNewLabel="Adicionar"
-                  className=""
-                />
-              </div>
-            </div>
-
-            {/* Recurrence Section - Only for new transactions or showing status for existing */}
-            {!editingTransaction && (
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isRecurring"
-                    checked={formData.isRecurring}
-                    onCheckedChange={(checked) => updateFormField('isRecurring', !!checked)}
-                  />
-                  <Label htmlFor="isRecurring" className="cursor-pointer font-semibold">Repetir lançamento mensalmente</Label>
-                </div>
-
-                {formData.isRecurring && (
-                  <div className="pl-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <RadioGroup
-                      value={formData.recurrenceType}
-                      onValueChange={(val) => updateFormField('recurrenceType', val as 'count' | 'until')}
-                      className="flex flex-col sm:flex-row gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="count" id="type-count" />
-                        <Label htmlFor="type-count" className="cursor-pointer">Por quantidade</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="until" id="type-until" />
-                        <Label htmlFor="type-until" className="cursor-pointer">Até uma data</Label>
-                      </div>
-                    </RadioGroup>
-
-                    {formData.recurrenceType === 'count' ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm">Repetir por</span>
-                        <Input
-                          type="number"
-                          className="w-20"
-                          min={1}
-                          max={60}
-                          value={formData.repeatCount}
-                          onChange={(e) => updateFormField('repeatCount', parseInt(e.target.value) || 1)}
-                        />
-                        <span className="text-sm">meses (além do atual)</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm whitespace-nowrap">Repetir até</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "w-[160px] justify-start text-left font-normal",
-                                !formData.repeatUntil && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.repeatUntil ? format(formData.repeatUntil, 'dd/MM/yyyy', { locale }) : "Selecionar data"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={formData.repeatUntil}
-                              onSelect={(date) => updateFormField('repeatUntil', date)}
-                              locale={locale}
-                              initialFocus
-                              disabled={(date) => date < formData.date}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {editingTransaction && editingTransaction.recurringId && (
-              <div className="p-3 border border-amber-200 bg-amber-50 rounded-lg text-amber-800 text-sm flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0" />
-                Este lançamento faz parte de uma recorrência mensal.
-              </div>
-            )}
-
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">{t.notes}</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => updateFormField('notes', e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-1 font-semibold text-sm">
-                    Comissões de Colaboradores
-                    {isCommissionsLocked && <UpgradeBadge />}
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1"
-                    disabled={isCommissionsLocked}
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        commissions: [...(prev.commissions || []), { collaboratorId: '', commissionAmount: 0 }]
-                      }));
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Adicionar
-                  </Button>
-                </div>
-
-                {(!formData.commissions || formData.commissions.length === 0) && (
-                  <p className="text-xs text-muted-foreground italic">Nenhuma comissão adicionada a este lançamento.</p>
-                )}
-
-                {(formData.commissions || []).map((comm, idx) => (
-                  <div key={idx} className="flex flex-col sm:flex-row gap-3 items-end border p-3 rounded-lg relative bg-muted/20">
-                    <div className="flex-1 space-y-2 w-full">
-                      <Label className="text-xs">Colaborador</Label>
-                      <CollaboratorSelect
-                        value={comm.collaboratorId}
-                        onChange={(val) => {
-                          const updated = [...(formData.commissions || [])];
-                          updated[idx].collaboratorId = val;
-                          setFormData(prev => ({ ...prev, commissions: updated }));
-                        }}
-                        collaborators={collaborators}
-                        disabled={isCommissionsLocked}
-                        onAddNew={async (name) => {
-                          const newCollaborator = await addCollaborator(name);
-                          if (newCollaborator) {
-                            const updated = [...(formData.commissions || [])];
-                            updated[idx].collaboratorId = newCollaborator.id;
-                            setFormData(prev => ({ ...prev, commissions: updated }));
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2 w-full sm:w-[150px]">
-                      <Label className="text-xs">Valor (R$)</Label>
-                      <MoneyInput
-                        value={comm.commissionAmount}
-                        onChange={(val) => {
-                          const updated = [...(formData.commissions || [])];
-                          updated[idx].commissionAmount = val;
-                          setFormData(prev => ({ ...prev, commissions: updated }));
-                        }}
-                        disabled={isCommissionsLocked}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 h-10 w-10 shrink-0"
-                      disabled={isCommissionsLocked}
-                      onClick={() => {
-                        const updated = (formData.commissions || []).filter((_, i) => i !== idx);
-                        setFormData(prev => ({ ...prev, commissions: updated }));
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="p-6 pt-3 border-t bg-muted/30">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              {t.cancel}
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                t.save
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingTransaction={editingTransaction}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpenState}>

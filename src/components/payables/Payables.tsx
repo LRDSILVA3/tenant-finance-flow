@@ -37,8 +37,10 @@ import {
   CalendarDays,
   User,
   Search,
-  X
+  X,
+  Plus
 } from 'lucide-react';
+import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 
@@ -74,6 +76,15 @@ const getPaymentMethodIcon = (method: string) => {
   return <Wallet className="h-4 w-4 text-slate-500" />;
 };
 
+const getPaymentMethodLabel = (method: string, t: any) => {
+  if (!method) return '-';
+  if (method === 'cash') return t?.cash || 'Dinheiro';
+  if (method === 'card') return t?.card || 'Cartão';
+  if (method === 'pix') return t?.pix || 'Pix';
+  if (method === 'boleto') return t?.boleto || 'Boleto';
+  return method;
+};
+
 export const Payables: React.FC = () => {
   const {
     t,
@@ -91,6 +102,7 @@ export const Payables: React.FC = () => {
   const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [isNewTxDialogOpen, setIsNewTxDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -106,7 +118,7 @@ export const Payables: React.FC = () => {
     return transactions.filter(
       (txn) =>
         txn.type === 'expense' &&
-        txn.paymentMethod === 'pending'
+        txn.status === 'pending'
     );
   }, [transactions]);
   // Agrupar despesas pendentes por fornecedor (ou Sem Fornecedor se sId for indefinido) e filtrar por busca
@@ -190,8 +202,8 @@ export const Payables: React.FC = () => {
 
   const handleOpenPaymentDialog = (tx: Transaction) => {
     setSelectedTx(tx);
-    // Definir valores padrão
-    setPaymentMethod('pix');
+    // Definir valores padrão com base na forma planejada se disponível
+    setPaymentMethod(tx.paymentMethod || 'pix');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaidAmount(tx.amount);
     setPartialAction('split');
@@ -226,6 +238,7 @@ export const Payables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: splitOriginalNotes
         });
@@ -239,7 +252,8 @@ export const Payables: React.FC = () => {
           amount: difference,
           description: `${selectedTx.description} (Saldo Remanescente)`,
           date: newDueDate,
-          paymentMethod: 'pending',
+          paymentMethod: selectedTx.paymentMethod || null,
+          status: 'pending',
           supplierId: selectedTx.supplierId,
           notes: `Saldo devedor restante do lançamento original de ${formatCurrency(originalAmount)} no qual foi pago ${formatCurrency(paidAmount)} em ${formatDate(selectedDate)}.`
         });
@@ -255,6 +269,7 @@ export const Payables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: installmentsOriginalNotes
         });
@@ -277,7 +292,8 @@ export const Payables: React.FC = () => {
             amount: finalInstallmentAmount,
             description: `${selectedTx.description} (Parc. ${i + 1}/${installmentCount})`,
             date: installmentDate,
-            paymentMethod: 'pending',
+            paymentMethod: selectedTx.paymentMethod || null,
+            status: 'pending',
             supplierId: selectedTx.supplierId,
             notes: `Parcela ${i + 1}/${installmentCount} referente ao saldo restante de ${formatCurrency(difference)} com juros de ${interestRate}% por parcela. Lançamento original: ${formatCurrency(originalAmount)}.`
           });
@@ -296,6 +312,7 @@ export const Payables: React.FC = () => {
         await updateTransaction(selectedTx.id, {
           amount: paidAmount,
           paymentMethod: paymentMethod,
+          status: 'paid',
           date: selectedDate,
           notes: discountNotes
         });
@@ -340,6 +357,12 @@ export const Payables: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Contas a Pagar</h1>
           <p className="text-sm text-muted-foreground">Gerencie as saídas pendentes agrupadas por fornecedor.</p>
+        </div>
+        <div>
+          <Button onClick={() => setIsNewTxDialogOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Conta a Pagar
+          </Button>
         </div>
       </div>
 
@@ -453,6 +476,7 @@ export const Payables: React.FC = () => {
                             <th className="py-2 px-1">Descrição</th>
                             <th className="py-2 px-1">Categoria</th>
                             <th className="py-2 px-1">Vencimento</th>
+                            <th className="py-2 px-1">Forma</th>
                             <th className="py-2 px-1">Referência</th>
                             <th className="py-2 px-1 text-right">Valor</th>
                             <th className="py-2 px-1 text-right">Ação</th>
@@ -467,6 +491,16 @@ export const Payables: React.FC = () => {
                                 <td className="py-2 px-1 text-muted-foreground">{cat?.name || '—'}</td>
                                 <td className="py-2 px-1 font-medium text-muted-foreground">
                                   {formatDate(tx.date)}
+                                </td>
+                                <td className="py-2 px-1">
+                                  {tx.paymentMethod ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                      {getPaymentMethodIcon(tx.paymentMethod)}
+                                      {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground/60">—</span>
+                                  )}
                                 </td>
                                 <td className="py-2 px-1 text-muted-foreground">{tx.reference || '—'}</td>
                                 <td className="py-2 px-1 text-right font-bold text-rose-600 money-font">
@@ -705,6 +739,14 @@ export const Payables: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <TransactionDialog
+        open={isNewTxDialogOpen}
+        onOpenChange={setIsNewTxDialogOpen}
+        defaultType="expense"
+        defaultStatus="pending"
+        disabledType={true}
+      />
     </div>
   );
 };

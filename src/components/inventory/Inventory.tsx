@@ -752,7 +752,7 @@ export const Inventory: React.FC = () => {
         if (error) throw error;
         toast({ title: 'Produto atualizado com sucesso!' });
       } else {
-        payload.current_stock = productForm.initialStock;
+        payload.current_stock = 0;
         const { data: newProd, error } = await supabase
           .from('products')
           .insert(payload)

@@ -4,6 +4,8 @@ export type Language = 'pt' | 'en' | 'es';
 
 export type TransactionType = 'income' | 'expense';
 
+export type TransactionStatus = 'paid' | 'pending';
+
 export type PaymentMethod = string;
 
 export interface CustomPaymentMethod {
@@ -84,6 +86,7 @@ export interface Transaction {
   reference?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
+  status: TransactionStatus;
   collaboratorId?: string; // Legado
   commissionAmount?: number; // Legado
   commissions?: TransactionCommission[];

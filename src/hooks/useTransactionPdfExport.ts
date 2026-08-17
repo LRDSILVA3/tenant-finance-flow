@@ -130,10 +130,10 @@ export const useTransactionPdfExport = () => {
     // Payment method breakdown
     if (userSettings.enablePaymentMethods) {
       const incomeTransactions = transactions.filter(t => t.type === 'income');
-      const cashTotal = incomeTransactions.filter(t => t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
-      const cardTotal = incomeTransactions.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
-      const pixTotal = incomeTransactions.filter(t => t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
-      const pendingTotal = incomeTransactions.filter(t => t.paymentMethod === 'pending').reduce((s, t) => s + t.amount, 0);
+      const cashTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
+      const cardTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
+      const pixTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
+      const pendingTotal = incomeTransactions.filter(t => t.status === 'pending').reduce((s, t) => s + t.amount, 0);
       const receivedTotal = cashTotal + cardTotal + pixTotal;
 
       doc.setFont('helvetica', 'bold');
@@ -426,10 +426,10 @@ export const useTransactionPdfExport = () => {
     // Payment method breakdown
     if (userSettings.enablePaymentMethods) {
       const incomeTransactions = transactions.filter(t => t.type === 'income');
-      const cashTotal = incomeTransactions.filter(t => t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
-      const cardTotal = incomeTransactions.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
-      const pixTotal = incomeTransactions.filter(t => t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
-      const pendingTotal = incomeTransactions.filter(t => t.paymentMethod === 'pending').reduce((s, t) => s + t.amount, 0);
+      const cashTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'cash').reduce((s, t) => s + t.amount, 0);
+      const cardTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
+      const pixTotal = incomeTransactions.filter(t => t.status !== 'pending' && t.paymentMethod === 'pix').reduce((s, t) => s + t.amount, 0);
+      const pendingTotal = incomeTransactions.filter(t => t.status === 'pending').reduce((s, t) => s + t.amount, 0);
       const receivedTotal = cashTotal + cardTotal + pixTotal;
 
       doc.setFont('helvetica', 'bold');

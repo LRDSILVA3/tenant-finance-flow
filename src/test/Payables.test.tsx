@@ -19,7 +19,8 @@ const mockTransactions: Transaction[] = [
     amount: 150.00,
     description: 'Compra de Insumos A',
     date: new Date('2026-08-01T12:00:00'),
-    paymentMethod: 'pending',
+    paymentMethod: 'pix',
+    status: 'pending',
     supplierId: 'sup-1',
     createdAt: new Date(),
   },
@@ -31,7 +32,8 @@ const mockTransactions: Transaction[] = [
     amount: 50.00,
     description: 'Frete de Mercadoria B',
     date: new Date('2026-08-02T12:00:00'),
-    paymentMethod: 'pending',
+    paymentMethod: 'card',
+    status: 'pending',
     supplierId: 'sup-1',
     createdAt: new Date(),
   },
@@ -44,6 +46,7 @@ const mockTransactions: Transaction[] = [
     description: 'Aluguel do Galpão C',
     date: new Date('2026-08-03T12:00:00'),
     paymentMethod: 'pix', // Já paga - não deve constar nas contas a pagar
+    status: 'paid',
     supplierId: 'sup-2',
     createdAt: new Date(),
   },
@@ -55,7 +58,8 @@ const mockTransactions: Transaction[] = [
     amount: 80.00,
     description: 'Venda Pendente D',
     date: new Date('2026-08-04T12:00:00'),
-    paymentMethod: 'pending',
+    paymentMethod: 'pix',
+    status: 'pending',
     createdAt: new Date(),
   },
   {
@@ -66,7 +70,8 @@ const mockTransactions: Transaction[] = [
     amount: 120.00,
     description: 'Gasto Sem Fornecedor E', // Sem fornecedor - não agrupa em contas a pagar
     date: new Date('2026-08-05T12:00:00'),
-    paymentMethod: 'pending',
+    paymentMethod: 'pix',
+    status: 'pending',
     createdAt: new Date(),
   }
 ];
@@ -208,16 +213,49 @@ describe('Payables Component', () => {
       // Deve atualizar a despesa original para o valor pago
       expect(mockUpdateTransaction).toHaveBeenCalledWith('tx-1', expect.objectContaining({
         amount: 100,
-        paymentMethod: 'pix'
+        paymentMethod: 'pix',
+        status: 'paid'
       }));
 
       // Deve criar um novo lançamento de despesa (type === 'expense') com a diferença (50 reais)
       expect(mockAddTransaction).toHaveBeenCalledWith(expect.objectContaining({
         amount: 50,
-        paymentMethod: 'pending',
+        paymentMethod: 'pix',
+        status: 'pending',
         type: 'expense',
         supplierId: 'sup-1'
       }));
+    });
+  });
+
+  it('deve suportar pagamento parcial aplicando desconto (baixa total)', async () => {
+    render(<Payables />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuidora Alpha/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /Baixar/i })[0]);
+
+    const amountInput = screen.getByLabelText(/Valor Pago/i);
+    // Alterar valor pago de 150 para 100
+    fireEvent.change(amountInput, { target: { value: '10000' } });
+
+    // Selecionar a opção "Desconto"
+    const discountButton = screen.getByRole('button', { name: /Desconto/i });
+    fireEvent.click(discountButton);
+
+    // Confirmar o pagamento
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Pagamento/i }));
+
+    await waitFor(() => {
+      // Deve atualizar a despesa original para o valor pago (100 reais) e quitá-la
+      expect(mockUpdateTransaction).toHaveBeenCalledWith('tx-1', expect.objectContaining({
+        amount: 100,
+        paymentMethod: 'pix',
+        status: 'paid',
+        notes: expect.stringContaining('baixado com desconto/baixa total')
+      }));
+
+      // Não deve ter criado nenhuma nova transação
+      expect(mockAddTransaction).not.toHaveBeenCalled();
     });
   });
 });
