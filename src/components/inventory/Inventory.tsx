@@ -40,6 +40,7 @@ import {
   ArrowDownRight,
   RefreshCw,
   CheckCircle2,
+  Clock,
   Copy,
   Minus,
   Wifi,
@@ -143,7 +144,7 @@ interface CartItem {
 }
 
 export const Inventory: React.FC = () => {
-  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications, suppliers, loadSuppliers } = useFinance();
+  const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications, suppliers, loadSuppliers, customPaymentMethods = [], userSettings } = useFinance();
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
   const { referenceGroups } = useTransactionReferences(transactions);
@@ -175,6 +176,7 @@ export const Inventory: React.FC = () => {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [saleCustomerId, setSaleCustomerId] = useState<string>('');
   const [salePaymentMethod, setSalePaymentMethod] = useState<string>('cash');
+  const [saleStatus, setSaleStatus] = useState<'paid' | 'pending'>('paid');
   const [saleCategoryId, setSaleCategoryId] = useState<string>('');
   const [saleCustomTotal, setSaleCustomTotal] = useState<number>(0);
   const [saleDescription, setSaleDescription] = useState<string>('');
@@ -886,6 +888,8 @@ export const Inventory: React.FC = () => {
     setSaleCustomTotal(cartSubtotal);
     setSaleDescription('');
     setSaleReference('');
+    setSalePaymentMethod('cash');
+    setSaleStatus('paid');
     // Busca inteligente da categoria "Venda de Produtos" / "Venda" ou primeira de receita
     const incomeCats = categories.filter(c => c.type === 'income');
     const vendaCat = incomeCats.find(c => c.name.toLowerCase().includes('venda')) || incomeCats[0];
@@ -936,6 +940,7 @@ export const Inventory: React.FC = () => {
           reference: saleReference.trim() || undefined,
           notes: `Itens vendidos: ${itemsSummary}`,
           paymentMethod: (salePaymentMethod as any) || 'cash',
+          status: saleStatus,
           customerId: saleCustomerId && saleCustomerId !== 'none' ? saleCustomerId : undefined,
         });
       }
@@ -1571,35 +1576,68 @@ export const Inventory: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="sale-category">Categoria Financeira</Label>
+              <Select value={saleCategoryId} onValueChange={setSaleCategoryId}>
+                <SelectTrigger id="sale-category">
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.filter(c => c.type === 'income').map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className={cn(
+              "grid gap-4",
+              (!userSettings || userSettings.enablePaymentMethods) ? "grid-cols-2" : "grid-cols-1"
+            )}>
               <div className="space-y-1">
-                <Label htmlFor="sale-category">Categoria Financeira</Label>
-                <Select value={saleCategoryId} onValueChange={setSaleCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Categoria" />
+                <Label htmlFor="sale-status">Status do Recebimento</Label>
+                <Select value={saleStatus} onValueChange={(val) => setSaleStatus(val as 'paid' | 'pending')}>
+                  <SelectTrigger id="sale-status">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.filter(c => c.type === 'income').map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
+                    <SelectItem value="paid">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span>Recebido (Pago)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-amber-500" />
+                        <span>Pendente</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="sale-payment">Forma de Pagamento</Label>
-                <Select value={salePaymentMethod} onValueChange={setSalePaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Dinheiro</SelectItem>
-                    <SelectItem value="card">Cartão</SelectItem>
-                    <SelectItem value="pix">Pix</SelectItem>
-                    <SelectItem value="pending">A Prazo / Pendente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {(!userSettings || userSettings.enablePaymentMethods) && (
+                <div className="space-y-1">
+                  <Label htmlFor="sale-payment">Forma de Pagamento</Label>
+                  <Select value={salePaymentMethod} onValueChange={setSalePaymentMethod}>
+                    <SelectTrigger id="sale-payment">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Dinheiro</SelectItem>
+                      <SelectItem value="card">Cartão</SelectItem>
+                      <SelectItem value="pix">Pix</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      {customPaymentMethods.map((m) => (
+                        <SelectItem key={m.id} value={m.name}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">

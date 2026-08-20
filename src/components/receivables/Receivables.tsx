@@ -43,6 +43,16 @@ import {
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  LabelList,
+} from 'recharts';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -131,6 +141,7 @@ export const Receivables: React.FC = () => {
       customerEmail?: string;
       transactions: Transaction[];
       totalOwed: number;
+      nearestDueDate: Date | null;
     }> = {};
 
     pendingTransactions.forEach((txn) => {
@@ -166,15 +177,21 @@ export const Receivables: React.FC = () => {
           customerEmail: cust?.email,
           transactions: [],
           totalOwed: 0,
+          nearestDueDate: null,
         };
       }
       groups[cId].transactions.push(txn);
       groups[cId].totalOwed += txn.amount;
+
+      const txDate = new Date(txn.date);
+      if (!groups[cId].nearestDueDate || txDate < groups[cId].nearestDueDate) {
+        groups[cId].nearestDueDate = txDate;
+      }
     });
 
-    // Convert to array
+    // Convert to array and sort alphabetically by customer name
     return Object.values(groups)
-      .sort((a, b) => b.totalOwed - a.totalOwed); // Sort by highest debt first
+      .sort((a, b) => a.customerName.localeCompare(b.customerName, 'pt-BR', { sensitivity: 'base' }));
   }, [pendingTransactions, getCustomerById, getCategoryById, searchQuery]);
 
   // Statistics
@@ -192,6 +209,33 @@ export const Receivables: React.FC = () => {
       debtorCount,
       pendingCount: pendingTransactions.length
     };
+  }, [pendingTransactions]);
+
+  // Agrupamento mensal para o gráfico
+  const chartData = useMemo(() => {
+    const monthlySums: Record<string, number> = {};
+    
+    pendingTransactions.forEach((txn) => {
+      const d = new Date(txn.date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const key = `${year}-${month}`; // YYYY-MM
+      monthlySums[key] = (monthlySums[key] || 0) + txn.amount;
+    });
+
+    // Converter para array e ordenar cronologicamente
+    return Object.keys(monthlySums)
+      .sort()
+      .map((key) => {
+        const [year, month] = key.split('-');
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const label = `${monthNames[Number(month) - 1]}/${year.substring(2)}`;
+        return {
+          key,
+          month: label,
+          value: monthlySums[key],
+        };
+      });
   }, [pendingTransactions]);
 
   const toggleExpand = (customerId: string) => {
@@ -388,6 +432,59 @@ export const Receivables: React.FC = () => {
         </Card>
       </div>
 
+      {/* Gráfico de Lançamentos por Mês */}
+      {chartData.length > 0 && (
+        <Card className="animate-fade-in">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Previsão de Recebimento por Mês</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[220px] pb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  tickFormatter={(val) => `R$ ${val}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  }}
+                  formatter={(value: number) => [
+                    formatCurrency(value),
+                    'Total Pendente'
+                  ]}
+                />
+                <Bar 
+                  dataKey="value" 
+                  fill="#f59e0b" 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={45}
+                >
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    formatter={(val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val)}
+                    style={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search and Filters */}
       <div className="flex items-center gap-2 max-w-md bg-muted/30 px-3 py-1.5 rounded-lg border focus-within:border-primary/50 transition-colors">
         <Search className="h-4 w-4 text-muted-foreground" />
@@ -435,9 +532,14 @@ export const Receivables: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-semibold text-sm truncate text-foreground">{group.customerName}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {group.customerPhone && <span className="mr-3">{group.customerPhone}</span>}
+                      <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
+                        {group.customerPhone && <span>{group.customerPhone}</span>}
                         <span>{group.transactions.length} {group.transactions.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}</span>
+                        {group.nearestDueDate && (
+                          <span>
+                            • Vencimento mais próximo: {formatDate(group.nearestDueDate)}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

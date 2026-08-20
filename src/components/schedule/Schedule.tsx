@@ -619,17 +619,17 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
             <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => subDays(d, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2 min-w-[180px]">
-                  <CalendarIcon className="h-4 w-4" />
-                  {isToday(selectedDay) ? 'Hoje — ' : ''}{format(selectedDay, 'dd MMM yyyy', { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={selectedDay} onSelect={(d) => d && setSelectedDay(d)} locale={ptBR} initialFocus />
-              </PopoverContent>
-            </Popover>
+            <Input
+              type="date"
+              value={selectedDay ? new Date(selectedDay.getTime() - selectedDay.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  setSelectedDay(new Date(val + 'T12:00:00'));
+                }
+              }}
+              className="w-[150px] h-9 text-sm"
+            />
             <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => addDays(d, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -848,24 +848,18 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
             {/* Data e Hora */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Data</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start gap-2 font-normal">
-                      <CalendarIcon className="h-4 w-4" />
-                      {format(apptForm.scheduledDate, 'dd/MM/yyyy')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={apptForm.scheduledDate}
-                      onSelect={(d) => d && setApptForm(f => ({ ...f, scheduledDate: d }))}
-                      locale={ptBR}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="appt-date">Data</Label>
+                <Input
+                  id="appt-date"
+                  type="date"
+                  value={apptForm.scheduledDate ? new Date(apptForm.scheduledDate.getTime() - apptForm.scheduledDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setApptForm(f => ({ ...f, scheduledDate: new Date(val + 'T12:00:00') }));
+                    }
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="appt-time" className={cn(apptErrors.time && 'text-destructive')}>Hora *</Label>
@@ -1123,24 +1117,18 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
 
             {/* Data */}
             <div className="space-y-1.5">
-              <Label>Data do Lançamento</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start gap-2 font-normal">
-                    <CalendarIcon className="h-4 w-4" />
-                    {format(revenueFormData.date, 'dd/MM/yyyy')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={revenueFormData.date}
-                    onSelect={(d) => d && setRevenueFormData(f => ({ ...f, date: d }))}
-                    locale={ptBR}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="rev-date">Data do Lançamento</Label>
+              <Input
+                id="rev-date"
+                type="date"
+                value={revenueFormData.date ? new Date(revenueFormData.date.getTime() - revenueFormData.date.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setRevenueFormData(f => ({ ...f, date: new Date(val + 'T12:00:00') }));
+                  }
+                }}
+              />
             </div>
           </div>
           <DialogFooter className="p-6 pt-3 border-t bg-muted/30">

@@ -584,45 +584,31 @@ export const Transactions: React.FC = () => {
           {/* Date range & Main Filters Control */}
           <div className="flex flex-wrap items-end gap-2 shrink-0">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.from}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[130px] justify-start h-9">
-                    <CalendarIcon className="h-4 w-4" />
-                    {filterStartDate ? format(filterStartDate, 'dd/MM/yyyy', { locale }) : '-'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filterStartDate}
-                    onSelect={setFilterStartDate}
-                    locale={locale}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="filter-from" className="text-xs text-muted-foreground">{t.from}</Label>
+              <Input
+                id="filter-from"
+                type="date"
+                value={filterStartDate ? new Date(filterStartDate.getTime() - filterStartDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterStartDate(val ? new Date(val + 'T12:00:00') : undefined);
+                }}
+                className="h-9 text-xs w-[155px]"
+              />
             </div>
             
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.to}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[130px] justify-start h-9">
-                    <CalendarIcon className="h-4 w-4" />
-                    {filterEndDate ? format(filterEndDate, 'dd/MM/yyyy', { locale }) : '-'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filterEndDate}
-                    onSelect={setFilterEndDate}
-                    locale={locale}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="filter-to" className="text-xs text-muted-foreground">{t.to}</Label>
+              <Input
+                id="filter-to"
+                type="date"
+                value={filterEndDate ? new Date(filterEndDate.getTime() - filterEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterEndDate(val ? new Date(val + 'T12:00:00') : undefined);
+                }}
+                className="h-9 text-xs w-[155px]"
+              />
             </div>
 
             {/* Daily Filter */}
@@ -994,9 +980,13 @@ export const Transactions: React.FC = () => {
                             <div className="flex flex-col">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{transaction.description}</span>
-                                {transaction.status === 'pending' && (
+                                {transaction.status === 'pending' ? (
                                   <Badge variant="outline" className="text-[10px] py-0 px-1 bg-amber-500/5 text-amber-700 border-amber-500/30 font-medium h-4 shrink-0">
                                     Pendente
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-500/5 text-emerald-700 border-emerald-500/30 font-medium h-4 shrink-0">
+                                    {transaction.type === 'income' ? 'Recebido' : 'Pago'}
                                   </Badge>
                                 )}
                               </div>

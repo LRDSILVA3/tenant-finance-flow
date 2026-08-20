@@ -5,6 +5,7 @@ import { useFinance, Transaction } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, ArrowDownRight, CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
@@ -72,43 +73,31 @@ export const DateRangeTransactions: React.FC<DateRangeTransactionsProps> = ({
         
         {/* Date Range Selectors */}
         <div className="flex flex-wrap items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                {format(startDate, 'dd/MM/yyyy', { locale })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDate}
-                onSelect={(date) => date && setStartDate(date)}
-                locale={locale}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <Input
+            type="date"
+            value={startDate ? new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val) {
+                setStartDate(new Date(val + 'T12:00:00'));
+              }
+            }}
+            className="h-8 text-xs w-[155px]"
+          />
           
           <span className="text-muted-foreground">{t.to || 'até'}</span>
           
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                {format(endDate, 'dd/MM/yyyy', { locale })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={endDate}
-                onSelect={(date) => date && setEndDate(date)}
-                locale={locale}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <Input
+            type="date"
+            value={endDate ? new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val) {
+                setEndDate(new Date(val + 'T12:00:00'));
+              }
+            }}
+            className="h-8 text-xs w-[155px]"
+          />
         </div>
 
         {/* Summary for period */}

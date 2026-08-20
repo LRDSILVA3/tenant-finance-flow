@@ -37,7 +37,7 @@ import {
   AlertTriangle,
   Truck
 } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,9 +97,9 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
   const isAdvancedReportsLocked = !hasFeature('advanced_reports');
 
   // Filters State
-  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [periodType, setPeriodType] = useState<PeriodType>('quarter');
   const now = new Date();
-  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(now));
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(subMonths(now, 2)));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(now));
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -517,6 +517,113 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
     };
   }, [filteredTransactions]);
 
+  // Gráfico do contas a pagar/receber (Provisões)
+  const isWithinSingleMonth = useMemo(() => {
+    if (!startDate || !endDate) return true;
+    return startDate.getFullYear() === endDate.getFullYear() && 
+           startDate.getMonth() === endDate.getMonth();
+  }, [startDate, endDate]);
+
+  const payablesChartData = useMemo(() => {
+    if (!startDate || !endDate) return [];
+
+    const pendingTxns = filteredTransactions.filter(txn => txn.status === 'pending');
+
+    if (isWithinSingleMonth) {
+      // Agrupar por dia
+      const dailyData: Record<string, { dayLabel: string; dateObj: Date; receber: number; pagar: number }> = {};
+      
+      // Inicializar todos os dias do intervalo
+      let current = new Date(startDate);
+      const end = new Date(endDate);
+      while (current <= end) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
+        const dayLabel = `${day}`;
+        const key = `${year}-${month}-${day}`;
+        dailyData[key] = {
+          dayLabel,
+          dateObj: new Date(current),
+          receber: 0,
+          pagar: 0
+        };
+        current.setDate(current.getDate() + 1);
+      }
+
+      // Preencher com as transações
+      pendingTxns.forEach(txn => {
+        const d = txn.date instanceof Date ? txn.date : new Date(txn.date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const key = `${year}-${month}-${day}`;
+        if (dailyData[key]) {
+          if (txn.type === 'income') {
+            dailyData[key].receber += txn.amount;
+          } else {
+            dailyData[key].pagar += txn.amount;
+          }
+        }
+      });
+
+      return Object.keys(dailyData)
+        .sort()
+        .map(key => ({
+          label: dailyData[key].dayLabel,
+          receber: dailyData[key].receber,
+          pagar: dailyData[key].pagar,
+        }));
+    } else {
+      // Agrupar por mês
+      const monthlyData: Record<string, { label: string; receber: number; pagar: number }> = {};
+
+      // Inicializar todos os meses do intervalo
+      let current = new Date(startDate);
+      const end = new Date(endDate);
+      current.setDate(1); // evitar pulos de mês
+      
+      while (current <= end || (current.getMonth() === end.getMonth() && current.getFullYear() === end.getFullYear())) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const key = `${year}-${month}`;
+        
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        monthlyData[key] = {
+          label: `${monthNames[current.getMonth()]}/${String(year).substring(2)}`,
+          receber: 0,
+          pagar: 0
+        };
+        
+        current.setMonth(current.getMonth() + 1);
+      }
+
+      // Preencher com as transações
+      pendingTxns.forEach(txn => {
+        const d = txn.date instanceof Date ? txn.date : new Date(txn.date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const key = `${year}-${month}`;
+        
+        if (monthlyData[key]) {
+          if (txn.type === 'income') {
+            monthlyData[key].receber += txn.amount;
+          } else {
+            monthlyData[key].pagar += txn.amount;
+          }
+        }
+      });
+
+      return Object.keys(monthlyData)
+        .sort()
+        .map(key => ({
+          label: monthlyData[key].label,
+          receber: monthlyData[key].receber,
+          pagar: monthlyData[key].pagar,
+        }));
+    }
+  }, [filteredTransactions, startDate, endDate, isWithinSingleMonth]);
+
   // 7. Margin Analysis by Category
   const marginsByCategory = useMemo(() => {
     const report: Record<string, { name: string; revenue: number; commissions: number; code: string }> = {};
@@ -910,44 +1017,30 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
           {periodType === 'custom' && (
             <div className="flex items-center gap-2">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">De</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                      <CalendarIcon className="h-4 w-4" />
-                      {startDate ? format(startDate, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      locale={ptBR}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="rep-from" className="text-xs text-muted-foreground">De</Label>
+                <Input
+                  id="rep-from"
+                  type="date"
+                  value={startDate ? new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStartDate(val ? new Date(val + 'T12:00:00') : undefined);
+                  }}
+                  className="h-9 text-xs w-[155px]"
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Até</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                      <CalendarIcon className="h-4 w-4" />
-                      {endDate ? format(endDate, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      locale={ptBR}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="rep-to" className="text-xs text-muted-foreground">Até</Label>
+                <Input
+                  id="rep-to"
+                  type="date"
+                  value={endDate ? new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEndDate(val ? new Date(val + 'T12:00:00') : undefined);
+                  }}
+                  className="h-9 text-xs w-[155px]"
+                />
               </div>
             </div>
           )}
@@ -1522,6 +1615,73 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                     </p>
                   </div>
                 </div>
+
+                {payablesChartData.length > 0 && (
+                  <div className="h-[280px] w-full border rounded-lg p-4 bg-card">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      {isWithinSingleMonth ? 'Provisões Diárias (Este Mês)' : 'Provisões Mensais por Período'}
+                    </p>
+                    <ResponsiveContainer width="100%" height="90%">
+                      <BarChart data={payablesChartData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                        <XAxis 
+                          dataKey="label" 
+                          axisLine={false} 
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                          tickFormatter={(val) => `R$ ${val}`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                          }}
+                          formatter={(value: number, name: string) => [
+                            formatCurrency(value),
+                            name === 'receber' ? 'A Receber' : 'A Pagar'
+                          ]}
+                        />
+                        <Legend 
+                          formatter={(value) => (value === 'receber' ? 'A Receber' : 'A Pagar')}
+                          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                        />
+                        <Bar 
+                          dataKey="receber" 
+                          fill="#f59e0b" 
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={30}
+                        >
+                          <LabelList
+                            dataKey="receber"
+                            position="top"
+                            formatter={(val: number) => val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                            style={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8, fontWeight: 500 }}
+                          />
+                        </Bar>
+                        <Bar 
+                          dataKey="pagar" 
+                          fill="#f43f5e" 
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={30}
+                        >
+                          <LabelList
+                            dataKey="pagar"
+                            position="top"
+                            formatter={(val: number) => val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                            style={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8, fontWeight: 500 }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
 
                 <div className="overflow-hidden border rounded-lg">
                   <Table>

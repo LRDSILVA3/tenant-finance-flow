@@ -427,31 +427,19 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
               {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
             </div>
             <div className="space-y-2">
-              <Label className={cn("flex items-center h-5", errors.date && "text-destructive")}>{t.date}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.date && "text-muted-foreground",
-                      errors.date && "border-destructive"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.date ? format(formData.date, 'dd/MM/yyyy', { locale }) : t.date}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.date}
-                    onSelect={(date) => date && updateFormField('date', date)}
-                    locale={locale}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="date" className={cn("flex items-center h-5", errors.date && "text-destructive")}>{t.date}</Label>
+              <Input
+                id="date"
+                type="date"
+                value={formData.date ? new Date(formData.date.getTime() - formData.date.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    updateFormField('date', new Date(val + 'T12:00:00'));
+                  }
+                }}
+                className={cn(errors.date && "border-destructive")}
+              />
               {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
             </div>
 
@@ -657,31 +645,17 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label>Repetir até</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !formData.repeatUntil && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.repeatUntil ? format(formData.repeatUntil, 'dd/MM/yyyy', { locale }) : "Selecionar data"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={formData.repeatUntil}
-                            onSelect={(date) => updateFormField('repeatUntil', date)}
-                            locale={locale}
-                            initialFocus
-                            disabled={(date) => date < formData.date}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <Label htmlFor="repeatUntil">Repetir até</Label>
+                      <Input
+                        id="repeatUntil"
+                        type="date"
+                        min={formData.date ? new Date(formData.date.getTime() - formData.date.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined}
+                        value={formData.repeatUntil ? new Date(formData.repeatUntil.getTime() - formData.repeatUntil.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateFormField('repeatUntil', val ? new Date(val + 'T12:00:00') : undefined);
+                        }}
+                      />
                     </div>
                   )}
                 </div>
