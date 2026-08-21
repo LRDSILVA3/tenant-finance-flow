@@ -25,6 +25,12 @@ export const ClientOverview: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Subscription edit states
+  const [plans, setPlans] = useState<any[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+
   const fetchAllClients = async () => {
     setLoading(true);
     try {
@@ -36,10 +42,13 @@ export const ClientOverview: React.FC = () => {
           user_id,
           created_at,
           subscriptions (
+            id,
             status,
             trial_end,
             current_period_end,
+            plan_id,
             plans (
+              id,
               name
             )
           )
@@ -72,8 +81,19 @@ export const ClientOverview: React.FC = () => {
     }
   };
 
+  const fetchPlans = async () => {
+    const { data, error } = await supabase
+      .from('plans')
+      .select('id, name')
+      .eq('is_active', true);
+    if (!error && data) {
+      setPlans(data);
+    }
+  };
+
   useEffect(() => {
     fetchAllClients();
+    fetchPlans();
   }, []);
 
   const handleOpenEdit = (client: any) => {
@@ -81,6 +101,21 @@ export const ClientOverview: React.FC = () => {
     setCompanyName(client.name);
     setOwnerEmail(client.ownerEmail);
     setNewPassword('');
+    
+    const sub = client.subscriptions?.[0];
+    if (sub) {
+      setSelectedPlanId(sub.plan_id || '');
+      setSelectedStatus(sub.status || 'trialing');
+      const dateVal = sub.status === 'trialing' ? sub.trial_end : sub.current_period_end;
+      setExpirationDate(dateVal ? format(new Date(dateVal), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
+    } else {
+      setSelectedPlanId(plans[0]?.id || '');
+      setSelectedStatus('trialing');
+      const oneMonthLater = new Date();
+      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+      setExpirationDate(format(oneMonthLater, 'yyyy-MM-dd'));
+    }
+    
     setIsEditModalOpen(true);
   };
 
@@ -93,6 +128,7 @@ export const ClientOverview: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Administrador não autenticado");
 
+      // 1. Update company name, email, and password via the Edge Function
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user-auth`, {
         method: 'POST',
         headers: {
@@ -114,9 +150,42 @@ export const ClientOverview: React.FC = () => {
         throw new Error(data.error || "Erro ao atualizar acessos do cliente.");
       }
 
+      // 2. Update/Insert Subscription details directly
+      const sub = selectedClient.subscriptions?.[0];
+      const formattedDate = new Date(expirationDate).toISOString();
+
+      if (sub) {
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .update({
+            plan_id: selectedPlanId,
+            status: selectedStatus,
+            trial_end: formattedDate,
+            current_period_end: formattedDate,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', sub.id);
+
+        if (subError) throw subError;
+      } else {
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .insert({
+            client_id: selectedClient.id,
+            plan_id: selectedPlanId,
+            status: selectedStatus,
+            trial_start: new Date().toISOString(),
+            trial_end: formattedDate,
+            current_period_start: new Date().toISOString(),
+            current_period_end: formattedDate,
+          });
+
+        if (subError) throw subError;
+      }
+
       toast({
         title: "Sucesso!",
-        description: "Os dados de acesso do cliente foram atualizados.",
+        description: "Os dados do cliente e da assinatura foram atualizados.",
       });
 
       setIsEditModalOpen(false);
@@ -199,7 +268,7 @@ export const ClientOverview: React.FC = () => {
               <DialogHeader>
                 <DialogTitle>Editar Acesso do Cliente</DialogTitle>
                 <DialogDescription>
-                  Altere os dados de login e nome de empresa para {selectedClient.name}.
+                  Altere os dados de login, empresa e assinatura para {selectedClient.name}.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -231,6 +300,51 @@ export const ClientOverview: React.FC = () => {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Mantenha em branco para não alterar"
                   />
+                </div>
+
+                <div className="border-t pt-4 mt-2">
+                  <h4 className="font-semibold text-sm mb-3">Dados de Assinatura</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="adminPlan">Plano</Label>
+                      <select
+                        id="adminPlan"
+                        value={selectedPlanId}
+                        onChange={(e) => setSelectedPlanId(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {plans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="adminStatus">Status</Label>
+                      <select
+                        id="adminStatus"
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="trialing">Trialing</option>
+                        <option value="active">Active</option>
+                        <option value="past_due">Past Due</option>
+                        <option value="canceled">Canceled</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 mt-3">
+                    <Label htmlFor="adminExpDate">Data de Expiração</Label>
+                    <Input
+                      id="adminExpDate"
+                      type="date"
+                      value={expirationDate}
+                      onChange={(e) => setExpirationDate(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
