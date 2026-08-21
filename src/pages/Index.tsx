@@ -17,6 +17,7 @@ import { Receivables } from '@/components/receivables/Receivables';
 import { Payables } from '@/components/payables/Payables';
 import { Suppliers } from '@/components/suppliers/Suppliers';
 import { Loader2 } from 'lucide-react';
+import { SystemTour } from '@/components/layout/SystemTour';
 
 type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
 
@@ -35,6 +36,7 @@ const Index: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [scheduleCustomerId, setScheduleCustomerId] = useState<string | undefined>(undefined);
   const [activeReportTab, setActiveReportTab] = useState<string>('dre');
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !loadingClients) {
@@ -50,6 +52,16 @@ const Index: React.FC = () => {
       }
     }
   }, [isAuthenticated, authLoading, loadingClients, userProfile, clients, currentSubscription, loadingSubscription, navigate]);
+
+  useEffect(() => {
+    if (!authLoading && !loadingClients && isAuthenticated && clients.length > 0) {
+      const hasSeenTour = localStorage.getItem('has_seen_tour');
+      if (!hasSeenTour) {
+        setIsTourOpen(true);
+        localStorage.setItem('has_seen_tour', 'true');
+      }
+    }
+  }, [isAuthenticated, authLoading, loadingClients, clients]);
 
   if (authLoading) {
     return (
@@ -115,7 +127,7 @@ const Index: React.FC = () => {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-background">
-      <Header onViewChange={setCurrentView} />
+      <Header onViewChange={setCurrentView} onStartTour={() => setIsTourOpen(true)} />
       <Navigation 
         currentView={currentView} 
         onViewChange={setCurrentView} 
@@ -123,6 +135,7 @@ const Index: React.FC = () => {
         onReportTabChange={setActiveReportTab}
       />
       <main className="flex-1 overflow-y-auto container px-4 sm:px-6 py-6">{renderView()}</main>
+      <SystemTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
     </div>
   );
 };

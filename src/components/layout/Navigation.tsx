@@ -147,6 +147,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             {/* Dashboard */}
             <button
               onClick={() => handleNavClick('dashboard')}
+              data-tour="nav-dashboard"
               className={cn(
                 'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative',
                 activeId === 'dashboard'
@@ -161,6 +162,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             {/* Menu Financeiro (Dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger
+                data-tour="nav-financeiro"
                 className={cn(
                   'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
                   isFinanceActive
@@ -209,6 +211,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             {/* Menu Cadastros (Dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger
+                data-tour="nav-cadastros"
                 className={cn(
                   'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
                   isCadastrosActive
@@ -267,6 +270,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             {/* Menu Relatórios (Dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger
+                data-tour="nav-relatorios"
                 className={cn(
                   'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
                   activeId === 'reports'

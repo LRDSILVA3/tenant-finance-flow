@@ -49,6 +49,7 @@
 - [x] **Inputs de Data com Digitação Direta**: Ajuste geral de todos os seletores de data em popovers do projeto, convertendo-os em inputs de data nativos para permitir que o usuário digite as informações pelo teclado além de interagir com o calendário visual.
 - [x] **Gráficos de Fluxo de Caixa Mensal em Contas a Receber/Pagar**: Adicionado um gráfico de barras (`BarChart`) em ambas as telas agrupando e somando os valores de lançamentos pendentes cronologicamente por mês de vencimento.
 - [x] **Gráfico Dinâmico Diário/Mensal no Relatório de Provisões**: Integração de um gráfico comparativo dinâmico na aba de Contas a Pagar/Receber nos Relatórios, agrupando automaticamente por dias do mês (se o filtro for de um único mês) ou por meses (se o período for maior).
+- [x] **Tutorial Interativo Onboarding (Tour do Sistema)**: Implementação de um assistente interativo com efeito visual de holofote (spotlight) destacando as principais áreas do painel para novos usuários (e acionável via botão no cabeçalho).
 
 ## 🟡 In Progress
 - [ ] Refine Gemini CLI Context and Rules.

@@ -64,9 +64,10 @@ const languageFlags: Record<Language, string> = {
 
 interface HeaderProps {
   onViewChange?: (view: any) => void;
+  onStartTour?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
+export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => {
   const { 
     language, 
     setLanguage, 
@@ -153,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
               }}
               disabled={loadingClients}
             >
-              <SelectTrigger className="w-[160px] sm:w-[200px] bg-background">
+              <SelectTrigger data-tour="client-select" className="w-[160px] sm:w-[200px] bg-background">
                 {loadingClients ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -189,6 +190,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
+                  data-tour="notifications-bell"
                   className="relative hover:bg-muted/60 transition-all rounded-full duration-300 h-9 w-9"
                   title="Notificações"
                 >
@@ -312,6 +314,20 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange }) => {
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Tour do Sistema */}
+          {onStartTour && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onStartTour}
+              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted mr-1 animate-fade-in"
+              title="Iniciar tutorial do sistema"
+            >
+              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+              <span className="hidden sm:inline">Tutorial</span>
+            </Button>
+          )}
 
           {/* Dark Mode Toggle */}
           <Button
