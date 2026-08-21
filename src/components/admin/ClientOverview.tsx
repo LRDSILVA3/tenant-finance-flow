@@ -13,6 +13,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Loader2, Settings } from 'lucide-react';
 
+const translateStatus = (status: string) => {
+  switch (status) {
+    case 'trialing': return 'Período de Teste';
+    case 'active': return 'Ativo';
+    case 'past_due': return 'Atrasado';
+    case 'canceled': return 'Cancelado';
+    default: return status || 'Sem Assinatura';
+  }
+};
+
 export const ClientOverview: React.FC = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +244,7 @@ export const ClientOverview: React.FC = () => {
                   <TableCell>{planName}</TableCell>
                   <TableCell>
                     <Badge variant={sub?.status === 'active' ? 'default' : sub?.status === 'trialing' ? 'secondary' : 'outline'}>
-                      {sub?.status || 'N/A'}
+                      {translateStatus(sub?.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -328,10 +338,10 @@ export const ClientOverview: React.FC = () => {
                         onChange={(e) => setSelectedStatus(e.target.value)}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <option value="trialing">Trialing</option>
-                        <option value="active">Active</option>
-                        <option value="past_due">Past Due</option>
-                        <option value="canceled">Canceled</option>
+                        <option value="trialing">Período de Teste</option>
+                        <option value="active">Ativo</option>
+                        <option value="past_due">Atrasado</option>
+                        <option value="canceled">Cancelado</option>
                       </select>
                     </div>
                   </div>
