@@ -471,7 +471,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
               </p>
             </div>
 
-            {/* WhatsApp */}
+            {/* WhatsApp - Oculto temporariamente porque essa função não está disponível ainda
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="whatsapp">Número de WhatsApp (IA)</Label>
@@ -495,6 +495,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
                 Informe o número com DDI e DDD (ex: 5511999999999) para integração com a IA via WhatsApp.
               </p>
             </div>
+            */}
 
             <div className="border-t border-border/60 my-2 pt-4 space-y-4">
               <h4 className="text-sm font-semibold text-foreground">Alterar Senha</h4>
