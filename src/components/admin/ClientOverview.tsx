@@ -1,6 +1,6 @@
 // Admin: Client Overview Component
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +13,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Loader2, Settings } from 'lucide-react';
 
-const translateStatus = (status: string) => {
-  switch (status) {
+const translateStatus = (status: string | null | undefined) => {
+  if (!status) return 'Sem Assinatura';
+  const normalized = status.toLowerCase().trim();
+  switch (normalized) {
     case 'trialing': return 'Período de Teste';
     case 'active': return 'Ativo';
     case 'past_due': return 'Atrasado';
     case 'canceled': return 'Cancelado';
-    default: return status || 'Sem Assinatura';
+    default: return status;
   }
 };
 
@@ -34,6 +36,28 @@ export const ClientOverview: React.FC = () => {
   const [ownerEmail, setOwnerEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Search & Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Filter clients dynamically
+  const filteredClients = useMemo(() => {
+    return clients.filter((client) => {
+      const sub = client.subscriptions?.[0];
+      const status = sub?.status ? sub.status.toLowerCase().trim() : 'none';
+
+      // Matches search term (case-insensitive)
+      const matchesSearch =
+        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.ownerEmail.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Matches status filter
+      const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [clients, searchTerm, statusFilter]);
 
   // Subscription edit states
   const [plans, setPlans] = useState<any[]>([]);
@@ -220,6 +244,32 @@ export const ClientOverview: React.FC = () => {
         <CardTitle>Visão Geral de Clientes</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Search & Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <Input
+              placeholder="Buscar por empresa ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="w-full sm:w-[200px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="all">Todos os Status</option>
+              <option value="active">Ativo</option>
+              <option value="trialing">Período de Teste</option>
+              <option value="past_due">Atrasado</option>
+              <option value="canceled">Cancelado</option>
+              <option value="none">Sem Assinatura</option>
+            </select>
+          </div>
+        </div>
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -233,7 +283,7 @@ export const ClientOverview: React.FC = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client) => {
+            {filteredClients.map((client) => {
               const sub = client.subscriptions?.[0];
               const planName = sub?.plans?.name || 'Sem Assinatura';
               
