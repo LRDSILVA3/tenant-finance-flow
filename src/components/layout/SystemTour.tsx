@@ -23,8 +23,8 @@ export const SystemTour: React.FC<SystemTourProps> = ({ open, onClose }) => {
 
   const steps: Step[] = [
     {
-      title: "Bem-vindo ao Tenant Finance Flow! 🚀",
-      description: "Este é o seu painel de controle financeiro multi-tenant. Vamos fazer um tour rápido de 1 minuto para te mostrar onde tudo fica e como começar com o pé direito!",
+      title: "Bem-vindo ao Previna! 🚀",
+      description: "Este é o seu novo painel de controle financeiro. Vamos fazer um tour rápido de 1 minuto para te mostrar onde tudo fica e como começar com o pé direito!",
       icon: <Sparkles className="h-8 w-8 text-primary animate-bounce" />
     },
     {
