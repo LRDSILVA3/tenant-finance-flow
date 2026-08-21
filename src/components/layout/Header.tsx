@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Language } from '@/types/finance';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import {
   Select,
   SelectContent,
@@ -99,6 +101,8 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
   const [whatsappNumber, setWhatsappNumber] = useState(userProfile?.whatsappNumber || '');
   const [addingClient, setAddingClient] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const canUseIA = userSettings.enableWhatsappIA || userProfile?.isAdmin;
 
@@ -117,13 +121,69 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
   };
 
   const handleUpdateProfile = async () => {
-    if (!canUseIA) return;
     setUpdatingProfile(true);
-    // Remove tudo que não for número antes de salvar
-    const cleanNumber = whatsappNumber.replace(/\D/g, '');
-    await updateProfile({ whatsappNumber: cleanNumber || undefined });
-    setUpdatingProfile(false);
-    setIsProfileOpen(false);
+    try {
+      // 1. Atualizar WhatsApp se modificado
+      const cleanNumber = whatsappNumber.replace(/\D/g, '');
+      const originalNumber = userProfile?.whatsappNumber || '';
+      
+      if (cleanNumber !== originalNumber) {
+        await updateProfile({ whatsappNumber: cleanNumber || undefined });
+      }
+
+      // 2. Atualizar senha se preenchido
+      if (newPassword) {
+        if (newPassword !== confirmPassword) {
+          toast({
+            title: "Erro ao atualizar senha",
+            description: "As senhas digitadas não coincidem.",
+            variant: "destructive"
+          });
+          setUpdatingProfile(false);
+          return;
+        }
+        if (newPassword.length < 6) {
+          toast({
+            title: "Erro ao atualizar senha",
+            description: "A senha deve ter pelo menos 6 caracteres.",
+            variant: "destructive"
+          });
+          setUpdatingProfile(false);
+          return;
+        }
+
+        const { error: authError } = await supabase.auth.updateUser({
+          password: newPassword
+        });
+
+        if (authError) {
+          toast({
+            title: "Erro ao atualizar senha",
+            description: authError.message,
+            variant: "destructive"
+          });
+          setUpdatingProfile(false);
+          return;
+        } else {
+          toast({
+            title: "Senha atualizada",
+            description: "Sua senha foi alterada com sucesso."
+          });
+        }
+      }
+
+      setIsProfileOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast({
+        title: "Erro ao atualizar perfil",
+        description: err.message || "Ocorreu um erro inesperado.",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingProfile(false);
+    }
   };
 
   const formatPhoneNumber = (value: string) => {
@@ -370,14 +430,16 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {/* <DropdownMenuItem onClick={() => {
+              <DropdownMenuItem onClick={() => {
                 setWhatsappNumber(userProfile?.whatsappNumber || '');
+                setNewPassword('');
+                setConfirmPassword('');
                 setIsProfileOpen(true);
               }}>
                 <User className="mr-2 h-4 w-4" />
                 Meu Perfil
               </DropdownMenuItem>
-              <DropdownMenuSeparator /> */}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
@@ -387,19 +449,39 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
         </div>
       </div>
 
-      {/* Profile Dialog (Commented out because WhatsApp IA is not ready to sell yet) */}
-      {/* <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent>
+      {/* Profile Dialog */}
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Meu Perfil</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className={cn("space-y-2", !canUseIA && "opacity-60")}>
+            {/* E-mail (Somente leitura) */}
+            <div className="space-y-2">
+              <Label htmlFor="profile-email">E-mail de Login</Label>
+              <Input
+                id="profile-email"
+                type="email"
+                value={userProfile?.email || ''}
+                disabled
+                className="bg-muted text-muted-foreground select-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                O e-mail de login é o identificador exclusivo da sua conta e não pode ser alterado.
+              </p>
+            </div>
+
+            {/* WhatsApp */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="whatsapp">Número de WhatsApp (IA)</Label>
-                {!canUseIA && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 gap-1">
-                    <Sparkles className="h-3 w-3" /> Requer Plano Avançado
+                {canUseIA ? (
+                  <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 gap-1 text-[10px]">
+                    <Sparkles className="h-3 w-3" /> IA Habilitada
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-muted-foreground border-border bg-muted gap-1 text-[10px]">
+                    IA Opcional
                   </Badge>
                 )}
               </div>
@@ -408,25 +490,45 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
                 value={formatPhoneNumber(whatsappNumber)}
                 onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
                 placeholder="+55 (11) 99999-9999"
-                disabled={!canUseIA}
               />
               <p className="text-xs text-muted-foreground">
-                Informe seu número com DDI e DDD (somente números) para testar a integração com a IA via WhatsApp.
+                Informe o número com DDI e DDD (ex: 5511999999999) para integração com a IA via WhatsApp.
               </p>
-              {!canUseIA && (
-                <div className="mt-2 p-3 bg-amber-50 rounded border border-amber-100">
-                  <p className="text-xs text-amber-700 font-medium">
-                    Funcionalidade exclusiva do plano Avançado. Faça um upgrade para habilitar o lançamento automático via WhatsApp.
-                  </p>
-                </div>
-              )}
+            </div>
+
+            <div className="border-t border-border/60 my-2 pt-4 space-y-4">
+              <h4 className="text-sm font-semibold text-foreground">Alterar Senha</h4>
+              
+              {/* Nova Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova Senha</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+
+              {/* Confirmar Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirme a nova senha"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsProfileOpen(false)}>
               {t.cancel}
             </Button>
-            <Button onClick={handleUpdateProfile} disabled={updatingProfile || !canUseIA}>
+            <Button onClick={handleUpdateProfile} disabled={updatingProfile}>
               {updatingProfile ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -438,7 +540,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog> */}
+      </Dialog>
 
       {/* Add Client Dialog */}
       <Dialog open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
