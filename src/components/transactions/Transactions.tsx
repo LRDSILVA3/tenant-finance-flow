@@ -820,62 +820,108 @@ export const Transactions: React.FC = () => {
 
         {/* Payment Method Breakdown */}
         {userSettings.enablePaymentMethods && (
-          <div className="flex flex-wrap gap-x-8 gap-y-3 mt-3 pt-3 border-t text-sm">
-            {(() => {
-              const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
-              const customUsedMethods = Array.from(new Set(
-                filteredTransactions
-                  .map(txn => txn.paymentMethod)
-                  .filter(m => m && !defaultMethods.includes(m))
-              )) as string[];
+          <div className="flex flex-col gap-3 mt-3 pt-3 border-t text-sm">
+            {/* ROW 1: Entradas */}
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <span className="text-xs font-bold text-income uppercase tracking-wider min-w-[70px]">Entradas:</span>
+              {(() => {
+                const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
+                const customUsedMethods = Array.from(new Set(
+                  filteredTransactions
+                    .map(txn => txn.paymentMethod)
+                    .filter(m => m && !defaultMethods.includes(m))
+                )) as string[];
 
-              const allMethods = [...defaultMethods, ...customUsedMethods];
+                const allMethods = [...defaultMethods, ...customUsedMethods];
 
-              const methodsRender = allMethods.map(method => {
-                const incomeTotal = filteredTransactions
-                  .filter(txn => txn.type === 'income' && txn.status !== 'pending' && txn.paymentMethod === method)
+                const methodsRender = allMethods.map(method => {
+                  const incomeTotal = filteredTransactions
+                    .filter(txn => txn.type === 'income' && txn.status !== 'pending' && txn.paymentMethod === method)
+                    .reduce((s, txn) => s + txn.amount, 0);
+
+                  if (incomeTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`income-${method}`} className="flex items-center gap-2">
+                      {getPaymentMethodIcon(method)}
+                      <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
+                      <span className="font-semibold money-font text-income">
+                        {formatCurrency(incomeTotal)}
+                      </span>
+                    </div>
+                  );
+                });
+
+                const pendingIncome = filteredTransactions
+                  .filter(txn => txn.type === 'income' && txn.status === 'pending')
                   .reduce((s, txn) => s + txn.amount, 0);
 
-                const expenseTotal = filteredTransactions
-                  .filter(txn => txn.type === 'expense' && txn.status !== 'pending' && txn.paymentMethod === method)
-                  .reduce((s, txn) => s + txn.amount, 0);
-
-                if (incomeTotal === 0 && expenseTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
-                  return null;
-                }
-
-                return (
-                  <div key={method} className="flex items-center gap-2">
-                    {getPaymentMethodIcon(method)}
-                    <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
-                    <span className="font-semibold money-font">
-                      {formatCurrency(incomeTotal - expenseTotal)}
+                const pendingRender = pendingIncome > 0 ? (
+                  <div key="pending-income" className="flex items-center gap-2 border-l pl-4 border-dashed">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-muted-foreground">Pendente:</span>
+                    <span className="font-semibold money-font text-amber-600">
+                      {formatCurrency(pendingIncome)}
                     </span>
                   </div>
-                );
-              });
+                ) : null;
 
-              // Add special pending calculation
-              const pendingIncome = filteredTransactions
-                .filter(txn => txn.type === 'income' && txn.status === 'pending')
-                .reduce((s, txn) => s + txn.amount, 0);
+                return [...methodsRender, pendingRender];
+              })()}
+            </div>
 
-              const pendingExpense = filteredTransactions
-                .filter(txn => txn.type === 'expense' && txn.status === 'pending')
-                .reduce((s, txn) => s + txn.amount, 0);
+            {/* ROW 2: Saídas */}
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2 border-t border-dashed">
+              <span className="text-xs font-bold text-expense uppercase tracking-wider min-w-[70px]">Saídas:</span>
+              {(() => {
+                const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
+                const customUsedMethods = Array.from(new Set(
+                  filteredTransactions
+                    .map(txn => txn.paymentMethod)
+                    .filter(m => m && !defaultMethods.includes(m))
+                )) as string[];
 
-              const pendingRender = (pendingIncome > 0 || pendingExpense > 0) ? (
-                <div key="pending" className="flex items-center gap-2 border-l pl-4 border-dashed">
-                  <Clock className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-muted-foreground">Total Pendente:</span>
-                  <span className="font-semibold money-font text-amber-600">
-                    {formatCurrency(pendingIncome - pendingExpense)}
-                  </span>
-                </div>
-              ) : null;
+                const allMethods = [...defaultMethods, ...customUsedMethods];
 
-              return [...methodsRender, pendingRender];
-            })()}
+                const methodsRender = allMethods.map(method => {
+                  const expenseTotal = filteredTransactions
+                    .filter(txn => txn.type === 'expense' && txn.status !== 'pending' && txn.paymentMethod === method)
+                    .reduce((s, txn) => s + txn.amount, 0);
+
+                  if (expenseTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`expense-${method}`} className="flex items-center gap-2">
+                      {getPaymentMethodIcon(method)}
+                      <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
+                      <span className="font-semibold money-font text-expense">
+                        {formatCurrency(expenseTotal)}
+                      </span>
+                    </div>
+                  );
+                });
+
+                const pendingExpense = filteredTransactions
+                  .filter(txn => txn.type === 'expense' && txn.status === 'pending')
+                  .reduce((s, txn) => s + txn.amount, 0);
+
+                const pendingRender = pendingExpense > 0 ? (
+                  <div key="pending-expense" className="flex items-center gap-2 border-l pl-4 border-dashed">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-muted-foreground">Pendente:</span>
+                    <span className="font-semibold money-font text-amber-600">
+                      {formatCurrency(pendingExpense)}
+                    </span>
+                  </div>
+                ) : null;
+
+                return [...methodsRender, pendingRender];
+              })()}
+            </div>
           </div>
         )}
       </div>

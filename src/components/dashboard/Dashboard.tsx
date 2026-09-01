@@ -119,25 +119,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
   const paymentMethodBreakdown = useMemo(() => {
     if (!userSettings.enablePaymentMethods) return null;
 
-    const incomeTransactions = filteredTransactionsForPeriod.filter(txn => txn.type === 'income');
+    const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
     
-    const breakdown: Record<string, number> = {
-      cash: 0,
-      card: 0,
-      pix: 0,
-      pending: 0,
-    };
+    // Find all custom payment methods in transactions for this period
+    const customUsedMethods = Array.from(new Set(
+      filteredTransactionsForPeriod
+        .map(txn => txn.paymentMethod)
+        .filter(m => m && !defaultMethods.includes(m))
+    )) as string[];
 
-    incomeTransactions.forEach(txn => {
-      if (txn.paymentMethod) {
-        if (breakdown[txn.paymentMethod] === undefined) {
-          breakdown[txn.paymentMethod] = 0;
-        }
-        breakdown[txn.paymentMethod] += txn.amount;
-      }
+    const allMethods = [...defaultMethods, ...customUsedMethods];
+
+    const incomeBreakdown: Record<string, number> = {};
+    const expenseBreakdown: Record<string, number> = {};
+
+    allMethods.forEach(method => {
+      incomeBreakdown[method] = 0;
+      expenseBreakdown[method] = 0;
     });
 
-    return breakdown;
+    // Incomes
+    filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'income' && txn.status !== 'pending')
+      .forEach(txn => {
+        if (txn.paymentMethod) {
+          if (incomeBreakdown[txn.paymentMethod] === undefined) {
+            incomeBreakdown[txn.paymentMethod] = 0;
+          }
+          incomeBreakdown[txn.paymentMethod] += txn.amount;
+        }
+      });
+
+    const pendingIncome = filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'income' && txn.status === 'pending')
+      .reduce((s, txn) => s + txn.amount, 0);
+
+    // Expenses
+    filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'expense' && txn.status !== 'pending')
+      .forEach(txn => {
+        if (txn.paymentMethod) {
+          if (expenseBreakdown[txn.paymentMethod] === undefined) {
+            expenseBreakdown[txn.paymentMethod] = 0;
+          }
+          expenseBreakdown[txn.paymentMethod] += txn.amount;
+        }
+      });
+
+    const pendingExpense = filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'expense' && txn.status === 'pending')
+      .reduce((s, txn) => s + txn.amount, 0);
+
+    return {
+      income: incomeBreakdown,
+      expense: expenseBreakdown,
+      pendingIncome,
+      pendingExpense
+    };
   }, [filteredTransactionsForPeriod, userSettings.enablePaymentMethods]);
 
   const monthlyFlowData: MonthlyFlowData[] = useMemo(() => {
@@ -265,35 +303,96 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
       {/* Payment Method Breakdown */}
       {paymentMethodBreakdown && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">{t.paymentMethodBreakdown}</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">{t.paymentMethodBreakdown}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(Object.keys(paymentMethodBreakdown) as string[]).map((method) => {
-                const config = paymentMethodConfig[method] || {
-                  icon: <Wallet className="h-4 w-4" />,
-                  color: 'text-indigo-600'
-                };
-                const value = paymentMethodBreakdown[method];
-                
-                // If it is a custom payment method with 0 value, do not render it
-                if (value === 0 && !['cash', 'card', 'pix', 'pending'].includes(method)) {
-                  return null;
-                }
+          <CardContent className="space-y-6">
+            {/* Entradas */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b pb-1">
+                <span className="text-xs font-bold text-income uppercase tracking-wider">Entradas</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {(Object.keys(paymentMethodBreakdown.income) as string[]).map((method) => {
+                  const config = paymentMethodConfig[method] || {
+                    icon: <Wallet className="h-4 w-4" />,
+                    color: 'text-indigo-600'
+                  };
+                  const value = paymentMethodBreakdown.income[method];
+                  
+                  if (value === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
 
-                return (
-                  <div key={method} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <div className={`p-2 rounded-full bg-background ${config.color}`}>
-                      {config.icon}
+                  return (
+                    <div key={`income-${method}`} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-muted-foreground/5">
+                      <div className={`p-2 rounded-full bg-background ${config.color}`}>
+                        {config.icon}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
+                        <p className="font-semibold money-font text-income">{formatCurrency(value)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {paymentMethodBreakdown.pendingIncome > 0 && (
+                  <div key="pending-income" className="flex items-center gap-3 p-3 rounded-lg bg-amber-50/20 border border-amber-200/20">
+                    <div className="p-2 rounded-full bg-background text-amber-600">
+                      <Clock className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
-                      <p className="font-semibold money-font">{formatCurrency(value)}</p>
+                      <p className="text-xs text-muted-foreground">Pendente</p>
+                      <p className="font-semibold money-font text-amber-600">{formatCurrency(paymentMethodBreakdown.pendingIncome)}</p>
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
+            </div>
+
+            {/* Saídas */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b pb-1">
+                <span className="text-xs font-bold text-expense uppercase tracking-wider">Saídas</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {(Object.keys(paymentMethodBreakdown.expense) as string[]).map((method) => {
+                  const config = paymentMethodConfig[method] || {
+                    icon: <Wallet className="h-4 w-4" />,
+                    color: 'text-indigo-600'
+                  };
+                  const value = paymentMethodBreakdown.expense[method];
+                  
+                  if (value === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`expense-${method}`} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-muted-foreground/5">
+                      <div className={`p-2 rounded-full bg-background ${config.color}`}>
+                        {config.icon}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
+                        <p className="font-semibold money-font text-expense">{formatCurrency(value)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {paymentMethodBreakdown.pendingExpense > 0 && (
+                  <div key="pending-expense" className="flex items-center gap-3 p-3 rounded-lg bg-amber-50/20 border border-amber-200/20">
+                    <div className="p-2 rounded-full bg-background text-amber-600">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pendente</p>
+                      <p className="font-semibold money-font text-amber-600">{formatCurrency(paymentMethodBreakdown.pendingExpense)}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
