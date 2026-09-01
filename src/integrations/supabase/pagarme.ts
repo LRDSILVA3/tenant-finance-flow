@@ -5,7 +5,8 @@ interface PagarmeSubscriptionPayload {
   planId: string;
   planName: string;
   amount: number; // in cents
-  cardToken: string;
+  cardToken?: string;
+  paymentMethod?: 'credit_card' | 'pix';
   customer: {
     name: string;
     email: string;
@@ -27,6 +28,8 @@ interface PagarmeSubscriptionResponse {
   success: boolean;
   pagarmeSubscriptionId: string;
   status: string;
+  qrCode?: string;
+  qrCodeUrl?: string;
   error?: string;
 }
 
@@ -74,4 +77,34 @@ export async function cancelPagarmeSubscription(subscriptionId: string): Promise
   }
 
   return await response.json();
+}
+
+export function translatePagarmeError(message: string): string {
+  if (!message) return "Erro no faturamento. Verifique os dados do seu cartão.";
+
+  const msgLower = message.toLowerCase();
+  
+  if (msgLower.includes("card verification failed") || msgLower.includes("could not create credit card")) {
+    return "A verificação do cartão falhou. Verifique os dados do seu cartão (número, validade, CVV) ou tente outro cartão.";
+  }
+  if (msgLower.includes("brand is not supported")) {
+    return "A bandeira deste cartão não é aceita. Tente com outro cartão.";
+  }
+  if (msgLower.includes("expired")) {
+    return "O cartão digitado está expirado. Verifique a data de validade.";
+  }
+  if (msgLower.includes("holder_name") || msgLower.includes("holder name")) {
+    return "O nome do titular do cartão está incorreto ou incompleto.";
+  }
+  if (msgLower.includes("invalid card number") || msgLower.includes("number is invalid")) {
+    return "O número do cartão de crédito digitado é inválido.";
+  }
+  if (msgLower.includes("cvv") || msgLower.includes("security code")) {
+    return "O código de segurança (CVV) digitado é inválido.";
+  }
+  if (msgLower.includes("transaction") && msgLower.includes("declined")) {
+    return "Transação recusada pelo banco. Verifique o limite disponível ou tente outro cartão.";
+  }
+  
+  return message;
 }

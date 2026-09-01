@@ -68,8 +68,8 @@ serve(async (req) => {
     const providerId = sub.provider_subscription_id;
 
     // 2. Call Pagar.me to cancel
-    if (providerId.startsWith('sub_test_')) {
-      console.log("Mock cancellation detected...");
+    if (providerId.startsWith('sub_test_') || providerId.startsWith('or_')) {
+      console.log(`Mock or one-time payment cancelation detected for provider ID: ${providerId}`);
     } else {
       const response = await fetch(`https://api.pagar.me/core/v5/subscriptions/${providerId}`, {
         method: "DELETE",

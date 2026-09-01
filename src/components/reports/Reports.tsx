@@ -37,7 +37,7 @@ import {
   AlertTriangle,
   Truck
 } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,11 +70,17 @@ interface Product {
   sale_price: number;
   current_stock: number;
   min_stock: number;
+  expiration_date: string | null;
 }
 
 type PeriodType = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
 
-export const Reports: React.FC = () => {
+interface ReportsProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
   const {
     t,
     currentClient,
@@ -84,20 +90,24 @@ export const Reports: React.FC = () => {
     getCategoryById,
     getCollaboratorById,
     userSettings,
+    customPaymentMethods = [],
   } = useFinance();
 
   const { hasFeature } = useFeatureAccess();
   const isAdvancedReportsLocked = !hasFeature('advanced_reports');
 
   // Filters State
-  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [periodType, setPeriodType] = useState<PeriodType>('quarter');
   const now = new Date();
-  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(now));
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(subMonths(now, 2)));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(now));
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // internal tabs state
-  const [activeReportTab, setActiveReportTab] = useState<string>('dre');
+  const [localActiveTab, setLocalActiveTab] = useState<string>('dre');
+  const activeReportTab = activeTab || localActiveTab;
+  const setActiveReportTab = onTabChange || setLocalActiveTab;
 
   // Inventory State
   const [products, setProducts] = useState<Product[]>([]);
@@ -219,15 +229,22 @@ export const Reports: React.FC = () => {
       if (startDate && txnDate < startDate) return false;
       if (endDate && txnDate > endDate) return false;
       if (paymentMethodFilter !== 'all' && txn.paymentMethod !== paymentMethodFilter) return false;
+      if (statusFilter !== 'all' && txn.status !== statusFilter) return false;
       return true;
     });
-  }, [transactions, startDate, endDate, paymentMethodFilter]);
+  }, [transactions, startDate, endDate, paymentMethodFilter, statusFilter]);
 
   // 1. DRE Calculation
   const dreData = useMemo(() => {
     let incomeTotal = 0;
     let expenseTotal = 0;
-    const categoryTotals: Record<string, { name: string; amount: number; code: string }> = {};
+    const categoryTree: Record<string, {
+      id: string;
+      name: string;
+      code: string;
+      amount: number;
+      subcategories: { id: string; name: string; code: string; amount: number }[];
+    }> = {};
 
     filteredTransactions.forEach(txn => {
       if (txn.type === 'income') {
@@ -237,20 +254,48 @@ export const Reports: React.FC = () => {
         const cat = getCategoryById(txn.categoryId);
         if (cat) {
           let rootCat = cat;
+          let isSub = false;
           if (cat.parentId) {
             const parent = categories.find(c => c.id === cat.parentId);
-            if (parent) rootCat = parent;
+            if (parent) {
+              rootCat = parent;
+              isSub = true;
+            }
           }
           
-          if (!categoryTotals[rootCat.id]) {
-            categoryTotals[rootCat.id] = { name: rootCat.name, amount: 0, code: rootCat.code };
+          if (!categoryTree[rootCat.id]) {
+            categoryTree[rootCat.id] = {
+              id: rootCat.id,
+              name: rootCat.name,
+              code: rootCat.code,
+              amount: 0,
+              subcategories: []
+            };
           }
-          categoryTotals[rootCat.id].amount += txn.amount;
+          categoryTree[rootCat.id].amount += txn.amount;
+
+          if (isSub) {
+            const existingSubIndex = categoryTree[rootCat.id].subcategories.findIndex(s => s.id === cat.id);
+            if (existingSubIndex > -1) {
+              categoryTree[rootCat.id].subcategories[existingSubIndex].amount += txn.amount;
+            } else {
+              categoryTree[rootCat.id].subcategories.push({
+                id: cat.id,
+                name: cat.name,
+                code: cat.code,
+                amount: txn.amount
+              });
+            }
+          }
         }
       }
     });
 
-    const operatingExpensesList = Object.values(categoryTotals).sort((a, b) => b.amount - a.amount);
+    const operatingExpensesList = Object.values(categoryTree).sort((a, b) => b.amount - a.amount);
+    operatingExpensesList.forEach(root => {
+      root.subcategories.sort((a, b) => b.amount - a.amount);
+    });
+
     const netProfit = incomeTotal - expenseTotal;
     const grossMarginPercent = incomeTotal > 0 ? (netProfit / incomeTotal) * 100 : 0;
 
@@ -272,19 +317,39 @@ export const Reports: React.FC = () => {
     });
 
     filteredTransactions.forEach(txn => {
-      if (txn.collaboratorId && txn.type === 'income') {
-        if (!report[txn.collaboratorId]) {
-          const col = getCollaboratorById(txn.collaboratorId);
-          report[txn.collaboratorId] = { 
-            name: col?.name || 'Desconhecido', 
-            totalSales: 0, 
-            totalCommissions: 0, 
-            txCount: 0 
-          };
+      if (txn.type === 'income') {
+        const commissionsList = txn.commissions || [];
+        if (commissionsList.length > 0) {
+          commissionsList.forEach(comm => {
+            const collabId = comm.collaboratorId;
+            if (!report[collabId]) {
+              const col = getCollaboratorById(collabId);
+              report[collabId] = { 
+                name: col?.name || 'Desconhecido', 
+                totalSales: 0, 
+                totalCommissions: 0, 
+                txCount: 0 
+              };
+            }
+            report[collabId].totalSales += txn.amount;
+            report[collabId].totalCommissions += comm.commissionAmount;
+            report[collabId].txCount += 1;
+          });
+        } else if (txn.collaboratorId) {
+          const collabId = txn.collaboratorId;
+          if (!report[collabId]) {
+            const col = getCollaboratorById(collabId);
+            report[collabId] = { 
+              name: col?.name || 'Desconhecido', 
+              totalSales: 0, 
+              totalCommissions: 0, 
+              txCount: 0 
+            };
+          }
+          report[collabId].totalSales += txn.amount;
+          report[collabId].totalCommissions += txn.commissionAmount || 0;
+          report[collabId].txCount += 1;
         }
-        report[txn.collaboratorId].totalSales += txn.amount;
-        report[txn.collaboratorId].totalCommissions += txn.commissionAmount || 0;
-        report[txn.collaboratorId].txCount += 1;
       }
     });
 
@@ -429,13 +494,13 @@ export const Reports: React.FC = () => {
 
     filteredTransactions.forEach(txn => {
       if (txn.type === 'income') {
-        if (txn.paymentMethod === 'pending' || !txn.paymentMethod) {
+        if (txn.status === 'pending') {
           accountsReceivable += txn.amount;
         } else {
           confirmedIncome += txn.amount;
         }
       } else {
-        if (txn.paymentMethod === 'pending' || !txn.paymentMethod) {
+        if (txn.status === 'pending') {
           accountsPayable += txn.amount;
         } else {
           confirmedExpense += txn.amount;
@@ -451,6 +516,113 @@ export const Reports: React.FC = () => {
       netPending: accountsReceivable - accountsPayable
     };
   }, [filteredTransactions]);
+
+  // Gráfico do contas a pagar/receber (Provisões)
+  const isWithinSingleMonth = useMemo(() => {
+    if (!startDate || !endDate) return true;
+    return startDate.getFullYear() === endDate.getFullYear() && 
+           startDate.getMonth() === endDate.getMonth();
+  }, [startDate, endDate]);
+
+  const payablesChartData = useMemo(() => {
+    if (!startDate || !endDate) return [];
+
+    const pendingTxns = filteredTransactions.filter(txn => txn.status === 'pending');
+
+    if (isWithinSingleMonth) {
+      // Agrupar por dia
+      const dailyData: Record<string, { dayLabel: string; dateObj: Date; receber: number; pagar: number }> = {};
+      
+      // Inicializar todos os dias do intervalo
+      let current = new Date(startDate);
+      const end = new Date(endDate);
+      while (current <= end) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
+        const dayLabel = `${day}`;
+        const key = `${year}-${month}-${day}`;
+        dailyData[key] = {
+          dayLabel,
+          dateObj: new Date(current),
+          receber: 0,
+          pagar: 0
+        };
+        current.setDate(current.getDate() + 1);
+      }
+
+      // Preencher com as transações
+      pendingTxns.forEach(txn => {
+        const d = txn.date instanceof Date ? txn.date : new Date(txn.date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const key = `${year}-${month}-${day}`;
+        if (dailyData[key]) {
+          if (txn.type === 'income') {
+            dailyData[key].receber += txn.amount;
+          } else {
+            dailyData[key].pagar += txn.amount;
+          }
+        }
+      });
+
+      return Object.keys(dailyData)
+        .sort()
+        .map(key => ({
+          label: dailyData[key].dayLabel,
+          receber: dailyData[key].receber,
+          pagar: dailyData[key].pagar,
+        }));
+    } else {
+      // Agrupar por mês
+      const monthlyData: Record<string, { label: string; receber: number; pagar: number }> = {};
+
+      // Inicializar todos os meses do intervalo
+      let current = new Date(startDate);
+      const end = new Date(endDate);
+      current.setDate(1); // evitar pulos de mês
+      
+      while (current <= end || (current.getMonth() === end.getMonth() && current.getFullYear() === end.getFullYear())) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const key = `${year}-${month}`;
+        
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        monthlyData[key] = {
+          label: `${monthNames[current.getMonth()]}/${String(year).substring(2)}`,
+          receber: 0,
+          pagar: 0
+        };
+        
+        current.setMonth(current.getMonth() + 1);
+      }
+
+      // Preencher com as transações
+      pendingTxns.forEach(txn => {
+        const d = txn.date instanceof Date ? txn.date : new Date(txn.date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const key = `${year}-${month}`;
+        
+        if (monthlyData[key]) {
+          if (txn.type === 'income') {
+            monthlyData[key].receber += txn.amount;
+          } else {
+            monthlyData[key].pagar += txn.amount;
+          }
+        }
+      });
+
+      return Object.keys(monthlyData)
+        .sort()
+        .map(key => ({
+          label: monthlyData[key].label,
+          receber: monthlyData[key].receber,
+          pagar: monthlyData[key].pagar,
+        }));
+    }
+  }, [filteredTransactions, startDate, endDate, isWithinSingleMonth]);
 
   // 7. Margin Analysis by Category
   const marginsByCategory = useMemo(() => {
@@ -540,20 +712,35 @@ export const Reports: React.FC = () => {
       const tableRows: string[][] = [];
       tableRows.push(['1. RECEITA OPERACIONAL BRUTA', formatCurrency(dreData.grossRevenue), '100.0%']);
 
-      categories.filter(c => c.parentId === null && c.type === 'income').forEach(rootCat => {
-        const amount = filteredTransactions
+      categories.filter(c => c.parentId === null && c.type === 'income').forEach((rootCat, rootIdx) => {
+        const rootAmount = filteredTransactions
           .filter(t => {
             const cat = getCategoryById(t.categoryId);
             return cat && (cat.id === rootCat.id || cat.parentId === rootCat.id);
           })
           .reduce((s, t) => s + t.amount, 0);
 
-        if (amount > 0) {
+        if (rootAmount > 0) {
           tableRows.push([
-            `   1.1. ${rootCat.name}`,
-            formatCurrency(amount),
-            `${dreData.grossRevenue > 0 ? ((amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+            `   1.1.${rootIdx+1}. ${rootCat.name}`,
+            formatCurrency(rootAmount),
+            `${dreData.grossRevenue > 0 ? ((rootAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
           ]);
+
+          const subCats = categories.filter(c => c.parentId === rootCat.id);
+          subCats.forEach((subCat, subIdx) => {
+            const subAmount = filteredTransactions
+              .filter(t => t.categoryId === subCat.id)
+              .reduce((s, t) => s + t.amount, 0);
+
+            if (subAmount > 0) {
+              tableRows.push([
+                `      1.1.${rootIdx+1}.${subIdx+1}. ${subCat.name}`,
+                formatCurrency(subAmount),
+                `${dreData.grossRevenue > 0 ? ((subAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+              ]);
+            }
+          });
         }
       });
 
@@ -565,6 +752,14 @@ export const Reports: React.FC = () => {
           `(${formatCurrency(exp.amount)})`,
           `${dreData.grossRevenue > 0 ? ((-exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
         ]);
+
+        exp.subcategories.forEach((sub, subIdx) => {
+          tableRows.push([
+            `      2.${idx+1}.${subIdx+1}. ${sub.name}`,
+            `(${formatCurrency(sub.amount)})`,
+            `${dreData.grossRevenue > 0 ? ((-sub.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%`
+          ]);
+        });
       });
 
       tableRows.push(['RESULTADO LIQUIDO DO EXERCICIO', formatCurrency(dreData.netResult), `${dreData.marginPercent.toFixed(1)}%`]);
@@ -822,44 +1017,30 @@ export const Reports: React.FC = () => {
           {periodType === 'custom' && (
             <div className="flex items-center gap-2">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">De</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                      <CalendarIcon className="h-4 w-4" />
-                      {startDate ? format(startDate, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      locale={ptBR}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="rep-from" className="text-xs text-muted-foreground">De</Label>
+                <Input
+                  id="rep-from"
+                  type="date"
+                  value={startDate ? new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStartDate(val ? new Date(val + 'T12:00:00') : undefined);
+                  }}
+                  className="h-9 text-xs w-[155px]"
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Até</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                      <CalendarIcon className="h-4 w-4" />
-                      {endDate ? format(endDate, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      locale={ptBR}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="rep-to" className="text-xs text-muted-foreground">Até</Label>
+                <Input
+                  id="rep-to"
+                  type="date"
+                  value={endDate ? new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEndDate(val ? new Date(val + 'T12:00:00') : undefined);
+                  }}
+                  className="h-9 text-xs w-[155px]"
+                />
               </div>
             </div>
           )}
@@ -877,11 +1058,31 @@ export const Reports: React.FC = () => {
                   <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="card">Cartão</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="pending">A Receber</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                  {customPaymentMethods.map((m) => (
+                    <SelectItem key={m.id} value={m.name}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           )}
+
+          {/* Status filter */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="paid">Pago / Recebido</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Print Only Header showing active filters */}
@@ -892,6 +1093,9 @@ export const Reports: React.FC = () => {
           </p>
           {paymentMethodFilter !== 'all' && (
             <p className="text-xs text-muted-foreground">Filtro de pagamento: {paymentMethodFilter.toUpperCase()}</p>
+          )}
+          {statusFilter !== 'all' && (
+            <p className="text-xs text-muted-foreground">Status: {statusFilter === 'paid' ? 'PAGO' : 'PENDENTE'}</p>
           )}
         </div>
       </div>
@@ -989,23 +1193,45 @@ export const Reports: React.FC = () => {
                       </TableRow>
 
                       {/* Detail Income categories if they have values */}
-                      {categories.filter(c => c.parentId === null && c.type === 'income').map(rootCat => {
-                        const amount = filteredTransactions
+                      {categories.filter(c => c.parentId === null && c.type === 'income').map((rootCat, rootIdx) => {
+                        const rootAmount = filteredTransactions
                           .filter(t => {
                             const cat = getCategoryById(t.categoryId);
                             return cat && (cat.id === rootCat.id || cat.parentId === rootCat.id);
                           })
                           .reduce((s, t) => s + t.amount, 0);
 
-                        if (amount === 0) return null;
+                        if (rootAmount === 0) return null;
+
+                        const subCats = categories.filter(c => c.parentId === rootCat.id);
+
                         return (
-                          <TableRow key={rootCat.id} className="hover:bg-transparent text-sm text-muted-foreground pl-4">
-                            <TableCell className="pl-8">1.1. {rootCat.name}</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(amount)}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {dreData.grossRevenue > 0 ? ((amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={rootCat.id}>
+                            <TableRow className="hover:bg-transparent text-sm font-medium text-foreground">
+                              <TableCell className="pl-8">1.1.{rootIdx+1}. {rootCat.name}</TableCell>
+                              <TableCell className="text-right font-mono">{formatCurrency(rootAmount)}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {dreData.grossRevenue > 0 ? ((rootAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                            {subCats.map((subCat, subIdx) => {
+                              const subAmount = filteredTransactions
+                                .filter(t => t.categoryId === subCat.id)
+                                .reduce((s, t) => s + t.amount, 0);
+                              
+                              if (subAmount === 0) return null;
+                              
+                              return (
+                                <TableRow key={subCat.id} className="hover:bg-transparent text-xs text-muted-foreground/80">
+                                  <TableCell className="pl-14">1.1.{rootIdx+1}.{subIdx+1}. {subCat.name}</TableCell>
+                                  <TableCell className="text-right font-mono">{formatCurrency(subAmount)}</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {dreData.grossRevenue > 0 ? ((subAmount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </React.Fragment>
                         );
                       })}
 
@@ -1026,13 +1252,26 @@ export const Reports: React.FC = () => {
                       {/* Detail Expense categories */}
                       {dreData.operatingExpenses.map((exp, idx) => {
                         return (
-                          <TableRow key={idx} className="hover:bg-transparent text-sm text-muted-foreground">
-                            <TableCell className="pl-8">2.{idx+1}. {exp.name}</TableCell>
-                            <TableCell className="text-right font-mono text-expense">({formatCurrency(exp.amount)})</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {dreData.grossRevenue > 0 ? ((exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={idx}>
+                            <TableRow className="hover:bg-transparent text-sm font-medium text-foreground">
+                              <TableCell className="pl-8">2.{idx+1}. {exp.name}</TableCell>
+                              <TableCell className="text-right font-mono text-expense">({formatCurrency(exp.amount)})</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {dreData.grossRevenue > 0 ? ((exp.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                            {exp.subcategories.map((sub, subIdx) => {
+                              return (
+                                <TableRow key={sub.id} className="hover:bg-transparent text-xs text-muted-foreground/80">
+                                  <TableCell className="pl-14">2.{idx+1}.{subIdx+1}. {sub.name}</TableCell>
+                                  <TableCell className="text-right font-mono text-expense">({formatCurrency(sub.amount)})</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {dreData.grossRevenue > 0 ? ((sub.amount / dreData.grossRevenue) * 100).toFixed(1) : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </React.Fragment>
                         );
                       })}
 
@@ -1376,6 +1615,73 @@ export const Reports: React.FC = () => {
                     </p>
                   </div>
                 </div>
+
+                {payablesChartData.length > 0 && (
+                  <div className="h-[280px] w-full border rounded-lg p-4 bg-card">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      {isWithinSingleMonth ? 'Provisões Diárias (Este Mês)' : 'Provisões Mensais por Período'}
+                    </p>
+                    <ResponsiveContainer width="100%" height="90%">
+                      <BarChart data={payablesChartData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                        <XAxis 
+                          dataKey="label" 
+                          axisLine={false} 
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                          tickFormatter={(val) => `R$ ${val}`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                          }}
+                          formatter={(value: number, name: string) => [
+                            formatCurrency(value),
+                            name === 'receber' ? 'A Receber' : 'A Pagar'
+                          ]}
+                        />
+                        <Legend 
+                          formatter={(value) => (value === 'receber' ? 'A Receber' : 'A Pagar')}
+                          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                        />
+                        <Bar 
+                          dataKey="receber" 
+                          fill="#f59e0b" 
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={30}
+                        >
+                          <LabelList
+                            dataKey="receber"
+                            position="top"
+                            formatter={(val: number) => val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                            style={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8, fontWeight: 500 }}
+                          />
+                        </Bar>
+                        <Bar 
+                          dataKey="pagar" 
+                          fill="#f43f5e" 
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={30}
+                        >
+                          <LabelList
+                            dataKey="pagar"
+                            position="top"
+                            formatter={(val: number) => val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                            style={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8, fontWeight: 500 }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
 
                 <div className="overflow-hidden border rounded-lg">
                   <Table>

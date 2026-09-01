@@ -218,7 +218,8 @@ serve(async (req) => {
         amount: transactionData.amount || 0,
         type: transactionData.type || 'expense',
         date: txDate,
-        payment_method: 'pending', // Default
+        payment_method: null,
+        status: 'pending',
         is_recurring: false
       });
 

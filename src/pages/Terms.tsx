@@ -30,7 +30,7 @@ export default function Terms() {
 
         <h2>1. Objeto</h2>
         <p>
-          O Previna é uma plataforma online (SaaS - Software as a Service) desenvolvida para auxiliar empresas na gestão de fluxo de caixa, controle de comissões, gerenciamento de múltiplos CNPJs (multi-tenant) e recebimentos.
+          O Previna é uma plataforma online (SaaS - Software as a Service) desenvolvida para auxiliar empresas na gestão de fluxo de caixa, controle de comissões, gerenciamento de múltiplos CNPJs (multi-empresas) e recebimentos.
         </p>
 
         <h2>2. Responsabilidades do Usuário</h2>

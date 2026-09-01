@@ -2,13 +2,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Language, UserProfile, Client, UserRole, Address } from '@/types/finance';
+import { Language, UserProfile, Client, UserRole, Address, CustomPaymentMethod, ClientAsaasConfig, Invoice } from '@/types/finance';
 import { translations, Translations } from '@/i18n/translations';
 import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 
-import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType } from '@/types/finance';
+import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier } from '@/types/finance';
 
 interface UserSettings {
   enablePaymentMethods: boolean;
@@ -17,6 +17,8 @@ interface UserSettings {
 }
 
 interface FinanceContextType {
+
+
   // Auth & Profile
   isAuthenticated: boolean;
   authLoading: boolean;
@@ -34,7 +36,7 @@ interface FinanceContextType {
   clients: Client[];
   currentClient: Client | null;
   setCurrentClient: (client: Client | null) => void;
-  addClient: (client: { name: string; taxId?: string }) => Promise<string | undefined>;
+  addClient: (client: { name: string; taxId?: string }, userId?: string) => Promise<string | undefined>;
   loadingClients: boolean;
 
   // Addresses
@@ -51,7 +53,7 @@ interface FinanceContextType {
   currentSubscription: Subscription | null;
   currentPlan: Plan | null;
   loadingSubscription: boolean;
-  subscribeWithPagarme: (clientId: string, planId: string, cardToken: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>) => Promise<boolean>;
+  subscribeWithPagarme: (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod?: 'credit_card' | 'pix') => Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }>;
   cancelSubscription: (subscriptionId: string) => Promise<boolean>;
   changePlan: (clientId: string, planId: string) => Promise<void>;
   updatePlan: (planId: string, updates: Partial<Plan>) => Promise<void>;
@@ -60,6 +62,8 @@ interface FinanceContextType {
   categories: Category[];
   transactions: Transaction[];
   collaborators: Collaborator[];
+  customers: Customer[];
+  customPaymentMethods: CustomPaymentMethod[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
@@ -69,9 +73,24 @@ interface FinanceContextType {
   addCollaborator: (name: string) => Promise<Collaborator | null>;
   updateCollaborator: (id: string, name: string) => Promise<void>;
   deleteCollaborator: (id: string) => Promise<void>;
+  addCustomPaymentMethod: (name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => Promise<CustomPaymentMethod | null>;
+  deleteCustomPaymentMethod: (id: string) => Promise<void>;
   getCategoriesByType: (type: TransactionType) => Category[];
   getCategoryById: (id: string) => Category | undefined;
   getCollaboratorById: (id: string) => Collaborator | undefined;
+  getCustomerById: (id: string) => Customer | undefined;
+  loadCustomers: (clientId: string) => Promise<void>;
+  suppliers: Supplier[];
+  loadSuppliers: (clientId: string) => Promise<void>;
+  getSupplierById: (id: string) => Supplier | undefined;
+
+  // Notifications
+  notifications: SystemNotification[];
+  unreadNotificationsCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotification: (id: string) => void;
+  refreshNotifications: () => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -90,7 +109,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const { 
     loadCategories, 
     loadTransactions, 
-    loadCollaborators 
+    loadCollaborators,
+    loadCustomers,
+    loadCustomPaymentMethods,
+    loadSuppliers
   } = tx;
 
   const [language, setLanguage] = useState<Language>('pt');
@@ -105,6 +127,35 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
 
+  // Notifications states
+  const [rawAlerts, setRawAlerts] = useState<Omit<SystemNotification, 'read'>[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('read_notification_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [clearedNotificationIds, setClearedNotificationIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('cleared_notification_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Reset context states when user changes/logs out
+  useEffect(() => {
+    setClients([]);
+    setCurrentClient(null);
+    setUserProfile(null);
+    setUserRole(null);
+    setCurrentAddress(null);
+    setRawAlerts([]);
+  }, [user?.id]);
+
   const t = translations[language];
   const isAuthenticated = !!user;
 
@@ -116,12 +167,303 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const status = currentSubscription.status;
     if (status === 'active') return new Date(currentSubscription.currentPeriodEnd) > now;
     if (status === 'trialing') return new Date(currentSubscription.trialEnd) > now;
+    if (status === 'pending') return new Date(currentSubscription.trialEnd) > now;
     if (status === 'canceled') {
       const endDate = currentSubscription.currentPeriodEnd || currentSubscription.trialEnd;
       return new Date(endDate) > now;
     }
     return false;
   }, [userProfile, currentSubscription, currentPlan]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!currentClient) {
+      setRawAlerts([]);
+      return;
+    }
+
+    try {
+      const list: Omit<SystemNotification, 'read'>[] = [];
+
+      // 1. Plan warning notification
+      if (currentSubscription && !userProfile?.isAdmin) {
+        const now = new Date();
+        const trialEnd = currentSubscription.trialEnd ? new Date(currentSubscription.trialEnd) : null;
+        const periodEnd = currentSubscription.currentPeriodEnd ? new Date(currentSubscription.currentPeriodEnd) : new Date();
+
+        const endDate = (currentSubscription.status === 'trialing' || currentSubscription.status === 'pending' || currentSubscription.status === 'future' || (currentSubscription.status === 'canceled' && trialEnd && trialEnd > now)) 
+          ? (trialEnd || periodEnd) 
+          : periodEnd;
+
+        const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining < 0) {
+          list.push({
+            id: 'plan-expired',
+            type: 'plan_expiration',
+            title: 'Assinatura Expirada',
+            message: 'Sua conta está em modo de leitura. Renove sua assinatura para adicionar novos lançamentos.',
+            date: new Date(),
+          });
+        } else if (daysRemaining <= 3) {
+          const msg = (currentSubscription.status === 'trialing' || currentSubscription.status === 'future') 
+            ? `Seu período de teste grátis termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
+            : currentSubscription.status === 'canceled'
+              ? `Seu acesso à conta termina em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}.`
+              : `Sua assinatura expira em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}. Verifique seu método de pagamento.`;
+          list.push({
+            id: `plan-warning-${daysRemaining}`,
+            type: 'plan_expiration',
+            title: 'Assinatura Expirando em Breve',
+            message: msg,
+            date: new Date(),
+          });
+        }
+      }
+
+      // 2. Fetch products for low stock and expiration
+      const { data: productsData, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('client_id', currentClient.id);
+
+      if (!error && productsData) {
+        productsData.forEach((p: any) => {
+          // Low stock alert
+          if (p.current_stock <= p.min_stock) {
+            list.push({
+              id: `low_stock-${p.id}`,
+              type: 'low_stock',
+              title: `Estoque Baixo: ${p.name}`,
+              message: `Produto possui apenas ${p.current_stock} ${p.unit || 'UN'} em estoque (mínimo de ${p.min_stock}).`,
+              date: new Date(p.updated_at || p.created_at),
+              referenceId: p.id,
+            });
+          }
+
+          // Negative margin alert (cost_price > sale_price)
+          if (p.cost_price && p.sale_price && Number(p.cost_price) > Number(p.sale_price)) {
+            list.push({
+              id: `negative_margin-${p.id}`,
+              type: 'margin_warning',
+              title: `Margem Negativa: ${p.name}`,
+              message: `Atenção: O preço de custo (R$ ${Number(p.cost_price).toFixed(2)}) é maior que o preço de venda (R$ ${Number(p.sale_price).toFixed(2)}).`,
+              date: new Date(p.updated_at || p.created_at),
+              referenceId: p.id,
+            });
+          }
+
+          // Expiration alert
+          if (p.expiration_date) {
+            const expDate = new Date(`${p.expiration_date}T00:00:00`);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffTime = expDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const formattedExp = new Intl.DateTimeFormat('pt-BR').format(expDate);
+
+            if (diffDays < 0) {
+              list.push({
+                id: `expired-${p.id}-${p.expiration_date}`,
+                type: 'expired_product',
+                title: `Produto Vencido: ${p.name}`,
+                message: `O lote deste produto venceu no dia ${formattedExp}.`,
+                date: expDate,
+                referenceId: p.id,
+              });
+            } else if (diffDays <= 30) {
+              list.push({
+                id: `expiring-${p.id}-${p.expiration_date}`,
+                type: 'expiring_product',
+                title: `Produto Próximo ao Vencimento: ${p.name}`,
+                message: `O produto vence em ${diffDays} ${diffDays === 1 ? 'dia' : 'dias'} (${formattedExp}).`,
+                date: expDate,
+                referenceId: p.id,
+              });
+            }
+          }
+        });
+      }
+
+      // 3. Fetch customers for birthday alerts
+      const { data: customersData, error: custError } = await supabase
+        .from('customers')
+        .select('id, name, birth_date')
+        .eq('client_id', currentClient.id);
+
+      if (!custError && customersData) {
+        const today = new Date();
+        const todayMonth = today.getMonth() + 1; // 1-12
+        const todayDay = today.getDate(); // 1-31
+
+        customersData.forEach((c: any) => {
+          if (c.birth_date) {
+            const [bYear, bMonth, bDay] = c.birth_date.split('-').map(Number);
+            if (bMonth === todayMonth && bDay === todayDay) {
+              list.push({
+                id: `birthday-${c.id}-${todayMonth}-${todayDay}`,
+                type: 'birthday',
+                title: `🎉 Aniversário Hoje: ${c.name}`,
+                message: `Hoje é aniversário do cliente ${c.name}! Entre em contato para parabenizá-lo ou oferecer uma oferta especial.`,
+                date: new Date(),
+                referenceId: c.id,
+              });
+            }
+          }
+        });
+      }
+
+      // 4. Fetch pending transactions (Receivables and Payables) for alerts
+      const { data: pendingTxData, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('client_id', currentClient.id)
+        .eq('status', 'pending');
+
+      if (!txError && pendingTxData) {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        pendingTxData.forEach((tx: any) => {
+          if (tx.date) {
+            const txDate = new Date(`${tx.date}T00:00:00`);
+            const diffTime = txDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (tx.type === 'income') {
+              if (diffDays < 0) {
+                list.push({
+                  id: `overdue-receivable-${tx.id}`,
+                  type: 'invoice_error',
+                  title: `Conta a Receber Atrasada: ${tx.description}`,
+                  message: `A receita de R$ ${Number(tx.amount).toFixed(2)} está atrasada desde o dia ${new Intl.DateTimeFormat('pt-BR').format(txDate)}.`,
+                  date: txDate,
+                  referenceId: tx.id,
+                });
+              } else if (diffDays === 0) {
+                list.push({
+                  id: `today-receivable-${tx.id}`,
+                  type: 'low_stock',
+                  title: `Conta a Receber Vence Hoje: ${tx.description}`,
+                  message: `A receita de R$ ${Number(tx.amount).toFixed(2)} vence hoje. Verifique com o cliente.`,
+                  date: today,
+                  referenceId: tx.id,
+                });
+              }
+            } else if (tx.type === 'expense') {
+              if (diffDays < 0) {
+                list.push({
+                  id: `overdue-payable-${tx.id}`,
+                  type: 'invoice_error',
+                  title: `Conta a Pagar Atrasada: ${tx.description}`,
+                  message: `A despesa de R$ ${Number(tx.amount).toFixed(2)} está atrasada desde o dia ${new Intl.DateTimeFormat('pt-BR').format(txDate)}.`,
+                  date: txDate,
+                  referenceId: tx.id,
+                });
+              } else if (diffDays === 0) {
+                list.push({
+                  id: `today-payable-${tx.id}`,
+                  type: 'low_stock',
+                  title: `Conta a Pagar Vence Hoje: ${tx.description}`,
+                  message: `A despesa de R$ ${Number(tx.amount).toFixed(2)} vence hoje. Realize o pagamento para evitar juros.`,
+                  date: today,
+                  referenceId: tx.id,
+                });
+              }
+            }
+          }
+        });
+      }
+
+      // 5. Calculate current cash balance for balance alerts
+      const { data: allTxData, error: allTxError } = await supabase
+        .from('transactions')
+        .select('amount, type, payment_method, status')
+        .eq('client_id', currentClient.id);
+
+      if (!allTxError && allTxData) {
+        let cashBalance = 0;
+        allTxData.forEach((tx: any) => {
+          if (tx.status !== 'pending') {
+            if (tx.type === 'income') {
+              cashBalance += Number(tx.amount);
+            } else if (tx.type === 'expense') {
+              cashBalance -= Number(tx.amount);
+            }
+          }
+        });
+
+        if (cashBalance < 0) {
+          list.push({
+            id: 'cash-balance-negative',
+            type: 'invoice_error',
+            title: 'Caixa Geral Negativo!',
+            message: `Atenção: O saldo do seu fluxo de caixa geral está negativo: R$ ${cashBalance.toFixed(2)}.`,
+            date: new Date(),
+          });
+        } else if (cashBalance < 500) {
+          list.push({
+            id: 'cash-balance-critical',
+            type: 'low_stock',
+            title: 'Saldo de Caixa Baixo',
+            message: `Atenção: Seu saldo de caixa geral está abaixo de R$ 500,00 (Saldo atual: R$ ${cashBalance.toFixed(2)}).`,
+            date: new Date(),
+          });
+        }
+      }
+
+      // Sort notifications by date (newest first)
+      list.sort((a, b) => b.date.getTime() - a.date.getTime());
+      setRawAlerts(list);
+    } catch (err) {
+      console.error('Error generating notifications:', err);
+    }
+  }, [currentClient, currentSubscription, userProfile]);
+
+  // Generate final notifications list by mapping read and filtering cleared
+  const notifications = React.useMemo(() => {
+    return rawAlerts
+      .filter(n => !clearedNotificationIds.includes(n.id))
+      .map(n => ({
+        ...n,
+        read: readNotificationIds.includes(n.id)
+      }));
+  }, [rawAlerts, readNotificationIds, clearedNotificationIds]);
+
+  const unreadNotificationsCount = React.useMemo(() => {
+    return notifications.filter(n => !n.read).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setReadNotificationIds(prev => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem('read_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    const idsToMark = notifications.map(n => n.id);
+    setReadNotificationIds(prev => {
+      const next = Array.from(new Set([...prev, ...idsToMark]));
+      localStorage.setItem('read_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, [notifications]);
+
+  const clearNotification = useCallback((id: string) => {
+    setClearedNotificationIds(prev => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem('cleared_notification_ids', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // Load notifications
+  useEffect(() => {
+    if (currentClient) {
+      refreshNotifications();
+    }
+  }, [currentClient?.id, currentSubscription?.id, refreshNotifications]);
 
   const loadAddress = useCallback(async (clientId: string) => {
     const { data } = await supabase
@@ -189,6 +531,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (data) setUserProfile({ 
           id: data.id, 
           isAdmin: data.is_admin, 
+          email: data.email || user.email || undefined,
           whatsappNumber: data.whatsapp_number,
           updatedAt: new Date(data.updated_at) 
         });
@@ -228,9 +571,31 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const loadClients = useCallback(async () => {
     if (!user) return;
     setLoadingClients(true);
-    const { data } = await supabase.from('clients').select('*').order('created_at');
-    if (data) {
-      const mapped = data.map((c: any) => ({ id: c.id, name: c.name, taxId: c.tax_id, createdAt: new Date(c.created_at) }));
+    
+    // Fetch all clients
+    const { data: clientsData } = await supabase.from('clients').select('*').order('created_at');
+    
+    // Fetch user memberships
+    const { data: membersData } = await supabase.from('client_members').select('client_id').eq('user_id', user.id);
+
+    if (clientsData) {
+      const joinedClientIds = new Set<string>();
+      if (membersData && Array.isArray(membersData)) {
+        membersData.forEach((m: any) => {
+          if (m.client_id) joinedClientIds.add(m.client_id);
+        });
+      }
+
+      // Filter: user must be the owner (user_id === user.id) OR must be a collaborator (joinedClientIds.has(id))
+      const filtered = clientsData.filter((c: any) => c.user_id === user.id || joinedClientIds.has(c.id));
+
+      const mapped = filtered.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        taxId: c.tax_id,
+        createdAt: new Date(c.created_at)
+      }));
+
       setClients(mapped);
       if (mapped.length > 0 && !currentClient) setCurrentClient(mapped[0]);
     }
@@ -245,8 +610,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadCategories(currentClient.id);
       loadTransactions(currentClient.id);
       loadCollaborators(currentClient.id);
+      loadCustomers(currentClient.id);
+      loadCustomPaymentMethods(currentClient.id);
+      loadSuppliers(currentClient.id);
     }
-  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators]);
+  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers]);
 
   // Sync settings with plan and subscription status
   useEffect(() => {
@@ -260,9 +628,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, [currentPlan, isSubscriptionActive, userProfile?.isAdmin]);
 
-  const addClient = useCallback(async (client: { name: string; taxId?: string }) => {
-    if (!user) return;
-    const { data } = await supabase.from('clients').insert({ user_id: user.id, name: client.name, tax_id: client.taxId }).select().single();
+  const addClient = useCallback(async (client: { name: string; taxId?: string }, userId?: string) => {
+    const targetUserId = userId || user?.id;
+    if (!targetUserId) return;
+    const { data } = await supabase.from('clients').insert({ user_id: targetUserId, name: client.name, tax_id: client.taxId }).select().single();
     if (data) {
       const newC = { id: data.id, name: data.name, taxId: data.tax_id, createdAt: new Date(data.created_at) };
       setClients(prev => [...prev, newC]);
@@ -316,15 +685,34 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
     updateCollaborator: withSubscriptionCheck(tx.updateCollaborator),
     deleteCollaborator: withSubscriptionCheck(tx.deleteCollaborator),
+    addCustomPaymentMethod: (name: string, parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other') => {
+      if (!isSubscriptionActive()) {
+        toast({ title: "Acesso Limitado", variant: 'destructive' });
+        return null;
+      }
+      return tx.addCustomPaymentMethod(currentClient?.id || '', name, parentType);
+    },
+    deleteCustomPaymentMethod: withSubscriptionCheck(tx.deleteCustomPaymentMethod),
     
     getCategoriesByType: (type: TransactionType) => tx.categories.filter(c => c.type === type),
     getCategoryById: (id: string) => tx.categories.find(c => c.id === id),
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
+    getCustomerById: (id: string) => tx.customers.find(c => c.id === id),
+    getSupplierById: (id: string) => tx.suppliers.find(s => s.id === id),
+    
+    // Notifications
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
+    refreshNotifications,
   }), [
     isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,
     userSettings, updateUserSettings,
-    sub, tx, isSubscriptionActive, withSubscriptionCheck, currentPlan?.features.max_collaborators
+    sub, tx, isSubscriptionActive, withSubscriptionCheck, currentPlan?.features.max_collaborators,
+    notifications, unreadNotificationsCount, markNotificationAsRead, markAllNotificationsAsRead, clearNotification, refreshNotifications
   ]);
 
   return (

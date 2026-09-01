@@ -22,8 +22,10 @@ import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
 import { useTransactionCsvExport } from '@/hooks/useTransactionCsvExport';
+import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { UpgradeBadge } from '@/components/ui/upgrade-badge';
+import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
@@ -33,6 +35,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -58,13 +66,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Loader2, 
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2,
   CalendarIcon,
   List,
   CalendarDays,
@@ -74,11 +82,17 @@ import {
   CreditCard,
   Smartphone,
   Clock,
+  CheckCircle2,
   Download,
   Lock,
   ChevronLeft,
   ChevronRight,
-  Upload
+  Upload,
+  MoreHorizontal,
+  FileText,
+  Wallet,
+  Search,
+  SlidersHorizontal
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -97,11 +111,56 @@ const formatDate = (date: Date) => {
 
 type ViewMode = 'list' | 'calendar';
 
-const paymentMethodIcons: Record<PaymentMethod, React.ReactNode> = {
-  cash: <Banknote className="h-3 w-3" />,
-  card: <CreditCard className="h-3 w-3" />,
-  pix: <Smartphone className="h-3 w-3" />,
-  pending: <Clock className="h-3 w-3" />,
+const getPaymentMethodIcon = (method: string) => {
+  if (!method) return null;
+  const mLower = method.toLowerCase();
+  if (mLower === 'cash' || mLower.includes('dinheiro') || mLower.includes('espécie')) {
+    return <Banknote className="h-3 w-3 text-emerald-500" />;
+  }
+  if (mLower === 'card' || mLower.includes('cartão') || mLower.includes('crédito') || mLower.includes('débito') || mLower.includes('card')) {
+    return <CreditCard className="h-3 w-3 text-blue-500" />;
+  }
+  if (mLower === 'pix') {
+    return <Smartphone className="h-3 w-3 text-purple-500" />;
+  }
+  if (mLower === 'boleto') {
+    return <FileText className="h-3 w-3 text-cyan-500" />;
+  }
+  if (mLower === 'pending' || mLower.includes('pendente')) {
+    return <Clock className="h-3 w-3 text-amber-500" />;
+  }
+  return <Wallet className="h-3 w-3 text-slate-500" />;
+};
+
+const getPaymentMethodIconLarge = (method: string) => {
+  if (!method) return null;
+  const mLower = method.toLowerCase();
+  if (mLower === 'cash' || mLower.includes('dinheiro') || mLower.includes('espécie')) {
+    return <Banknote className="h-4 w-4 text-emerald-500" />;
+  }
+  if (mLower === 'card' || mLower.includes('cartão') || mLower.includes('crédito') || mLower.includes('débito') || mLower.includes('card')) {
+    return <CreditCard className="h-4 w-4 text-blue-500" />;
+  }
+  if (mLower === 'pix') {
+    return <Smartphone className="h-4 w-4 text-purple-500" />;
+  }
+  if (mLower === 'boleto') {
+    return <FileText className="h-4 w-4 text-cyan-500" />;
+  }
+  if (mLower === 'pending' || mLower.includes('pendente')) {
+    return <Clock className="h-4 w-4 text-amber-500" />;
+  }
+  return <Wallet className="h-4 w-4 text-slate-500" />;
+};
+
+const getPaymentMethodLabel = (method: string, t: any) => {
+  if (!method) return '-';
+  if (method === 'cash') return t.cash;
+  if (method === 'card') return t.card;
+  if (method === 'pix') return t.pix;
+  if (method === 'boleto') return t.boleto;
+  if (method === 'pending') return t.pending;
+  return method;
 };
 
 export const Transactions: React.FC = () => {
@@ -111,15 +170,20 @@ export const Transactions: React.FC = () => {
     transactions,
     categories,
     collaborators,
+    customers,
     getCategoriesByType,
     getCategoryById,
     getCollaboratorById,
+    getCustomerById,
     addTransaction,
     updateTransaction,
     deleteTransaction,
     addCollaborator,
     language,
     userSettings,
+    customPaymentMethods = [],
+    suppliers,
+    getSupplierById,
   } = useFinance();
   const { loadTransactions } = useTransactions();
 
@@ -133,16 +197,77 @@ export const Transactions: React.FC = () => {
   const { exportListToPdf, exportCalendarToPdf } = useTransactionPdfExport();
   const { exportToCsv } = useTransactionCsvExport();
 
+  const netBalances = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let bal30 = 0; // Mês Atual
+    let bal60 = 0; // Últimos 60 Dias (Mês Atual + Mês Anterior)
+    let bal90 = 0; // Últimos 90 Dias (Mês Atual + 2 Meses Anteriores)
+
+    transactions.forEach((txn) => {
+      const txnDate = new Date(txn.date);
+      const value = txn.type === 'income' ? txn.amount : -txn.amount;
+
+      // Calcular a diferença de meses entre a transação e o mês atual
+      const monthDiff = (currentYear - txnDate.getFullYear()) * 12 + (currentMonth - txnDate.getMonth());
+
+      if (monthDiff === 0) {
+        // Mês Atual (completo, incluindo lançamentos futuros deste mês)
+        bal30 += value;
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 1) {
+        // Mês Anterior
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 2) {
+        // 2 meses atrás
+        bal90 += value;
+      }
+    });
+
+    return { bal30, bal60, bal90 };
+  }, [transactions]);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpenState] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
-  const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  const lastScrollY = React.useRef(0);
+  React.useEffect(() => {
+    if (isDialogOpen) {
+      const scrollY = window.scrollY;
+      lastScrollY.current = scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      const scrollY = lastScrollY.current;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      if (scrollY > 0) {
+        window.scrollTo(0, scrollY);
+        lastScrollY.current = 0;
+      }
+    }
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, [isDialogOpen]);
+
   // Filter states
   const now = new Date();
   const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(startOfMonth(now));
@@ -150,66 +275,102 @@ export const Transactions: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
-  
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCustomer, setFilterCustomer] = useState<string>('all');
+  const [filterSupplier, setFilterSupplier] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   // Calendar view state
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
-
-  const [formData, setFormData] = useState({
-    type: 'income' as TransactionType,
-    categoryId: '',
-    amount: 0,
-    description: '',
-    date: new Date(),
-    reference: '',
-    notes: '',
-    paymentMethod: '' as PaymentMethod | '',
-    collaboratorId: '',
-    commissionAmount: 0,
-    isRecurring: false,
-    recurrenceType: 'count' as 'count' | 'until',
-    repeatCount: 1,
-    repeatUntil: undefined as Date | undefined,
-  });
 
   const locale = language === 'pt' ? ptBR : language === 'es' ? es : enUS;
 
   // Get all subcategories for filter dropdown
   const allSubcategories = useMemo(() => {
-    return categories.filter(c => c.parentId !== null);
+    const parentIdsWithChildren = new Set(
+      categories.filter(c => c.parentId !== null).map(c => c.parentId)
+    );
+    return categories.filter(c => c.parentId !== null || !parentIdsWithChildren.has(c.id));
   }, [categories]);
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
     return transactions.filter((txn) => {
       const txnDate = new Date(txn.date);
-      
+
       // Date filter
       if (filterStartDate && txnDate < startOfDay(filterStartDate)) return false;
       if (filterEndDate && txnDate > endOfDay(filterEndDate)) return false;
-      
+
       // Category filter
       if (filterCategory !== 'all' && txn.categoryId !== filterCategory) return false;
-      
+
       // Type filter
       if (filterType !== 'all' && txn.type !== filterType) return false;
 
       // Payment Method filter
       if (filterPaymentMethod !== 'all' && txn.paymentMethod !== filterPaymentMethod) return false;
-      
+
+      // Status filter
+      if (filterStatus !== 'all' && txn.status !== filterStatus) return false;
+
+      // Customer filter
+      if (filterCustomer !== 'all' && txn.customerId !== filterCustomer) return false;
+
+      // Supplier filter
+      if (filterSupplier !== 'all' && txn.supplierId !== filterSupplier) return false;
+
+      // Text Search Filter
+      if (searchTerm.trim() !== '') {
+        const query = searchTerm.toLowerCase();
+        const categoryName = getCategoryById(txn.categoryId)?.name || '';
+        const customerName = txn.customerId ? getCustomerById(txn.customerId)?.name || '' : '';
+        const supplierName = txn.supplierId ? getSupplierById(txn.supplierId)?.name || '' : '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matchesSearch =
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          customerName.toLowerCase().includes(query) ||
+          supplierName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matchesSearch) return false;
+      }
+
       return true;
     });
-  }, [transactions, filterStartDate, filterEndDate, filterCategory, filterType, filterPaymentMethod]);
+  }, [
+    transactions,
+    filterStartDate,
+    filterEndDate,
+    filterCategory,
+    filterType,
+    filterPaymentMethod,
+    filterStatus,
+    filterCustomer,
+    filterSupplier,
+    searchTerm,
+    getCategoryById,
+    getCustomerById,
+    getSupplierById
+  ]);
 
   const sortedTransactions = useMemo(() => {
-    return [...filteredTransactions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+    return [...filteredTransactions].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }, [filteredTransactions]);
 
   // Transactions for selected calendar date
   const calendarDayTransactions = useMemo(() => {
     if (!selectedCalendarDate) return [];
-    return sortedTransactions.filter(txn => 
+    return sortedTransactions.filter(txn =>
       isSameDay(new Date(txn.date), selectedCalendarDate)
     );
   }, [sortedTransactions, selectedCalendarDate]);
@@ -231,61 +392,26 @@ export const Transactions: React.FC = () => {
     return dates;
   }, [filteredTransactions]);
 
-  const availableCategories = useMemo(() => {
-    const cats = getCategoriesByType(formData.type);
-    return cats.filter((c) => c.parentId !== null);
-  }, [formData.type, getCategoriesByType]);
-
-  // Filter descriptions by selected category (extract just the description strings, already sorted by frequency)
-  const filteredDescriptionOptions = useMemo(() => {
-    if (!formData.categoryId) {
-      // No category selected, show all grouped
-      return descriptionGroups.map(g => ({
-        label: `${g.categoryCode} - ${g.categoryName}`,
-        options: g.descriptions.map(d => d.description),
-      }));
-    }
-    
-    // Filter to only show descriptions from the selected category
-    const selectedGroup = descriptionGroups.find(g => g.categoryId === formData.categoryId);
-    if (selectedGroup) {
-      return [{
-        label: `${selectedGroup.categoryCode} - ${selectedGroup.categoryName}`,
-        options: selectedGroup.descriptions.map(d => d.description),
-      }];
-    }
-    
-    return [];
-  }, [descriptionGroups, formData.categoryId]);
-
-  // Filter references by selected description (sorted by frequency)
-  const filteredReferenceOptions = useMemo(() => {
-    if (!formData.description) {
-      // No description selected, show all grouped
-      return referenceGroups.map(g => ({
-        label: g.description,
-        options: g.references.map(r => r.reference),
-      }));
-    }
-    
-    // Filter to only show references from the selected description
-    const selectedGroup = referenceGroups.find(g => g.description === formData.description);
-    if (selectedGroup) {
-      return [{
-        label: selectedGroup.description,
-        options: selectedGroup.references.map(r => r.reference),
-      }];
-    }
-    
-    return [];
-  }, [referenceGroups, formData.description]);
-
   const handleClearFilters = () => {
     setFilterStartDate(startOfMonth(now));
     setFilterEndDate(endOfMonth(now));
     setFilterCategory('all');
     setFilterType('all');
     setFilterPaymentMethod('all');
+    setFilterStatus('all');
+    setFilterCustomer('all');
+    setFilterSupplier('all');
+    setSearchTerm('');
+  };
+
+  const handleOpenCreate = () => {
+    setEditingTransaction(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setIsDialogOpen(true);
   };
 
   const handleExportCsv = () => {
@@ -302,14 +428,14 @@ export const Transactions: React.FC = () => {
 
   const handleExportPdf = () => {
     if (!currentClient) return;
-    
+
     const filters = {
       startDate: filterStartDate,
       endDate: filterEndDate,
       category: filterCategory,
       type: filterType,
     };
-    
+
     if (viewMode === 'list') {
       exportListToPdf(
         sortedTransactions,
@@ -330,119 +456,6 @@ export const Transactions: React.FC = () => {
         userSettings
       );
     }
-  };
-
-  const updateFormField = (field: keyof typeof formData, value: typeof formData[keyof typeof formData]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleOpenCreate = () => {
-    setEditingTransaction(null);
-    setErrors({});
-    setFormData({
-      type: 'income',
-      categoryId: '',
-      amount: 0,
-      description: '',
-      date: selectedCalendarDate || new Date(),
-      reference: '',
-      notes: '',
-      paymentMethod: '',
-      collaboratorId: '',
-      commissionAmount: 0,
-      isRecurring: false,
-      recurrenceType: 'count' as 'count' | 'until',
-      repeatCount: 1,
-      repeatUntil: undefined as Date | undefined,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenEdit = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setErrors({});
-    setFormData({
-      type: transaction.type,
-      categoryId: transaction.categoryId,
-      amount: transaction.amount,
-      description: transaction.description,
-      date: new Date(transaction.date),
-      reference: transaction.reference || '',
-      notes: transaction.notes || '',
-      paymentMethod: transaction.paymentMethod || '',
-      collaboratorId: transaction.collaboratorId || '',
-      commissionAmount: transaction.commissionAmount || 0,
-      isRecurring: !!transaction.recurringId,
-      recurrenceType: 'count',
-      repeatCount: 1,
-      repeatUntil: undefined,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.type) newErrors.type = t.required;
-    if (!formData.categoryId) newErrors.categoryId = t.required;
-    if (formData.amount <= 0) newErrors.amount = t.required;
-    if (!formData.description) newErrors.description = t.required;
-    if (!formData.date) newErrors.date = t.required;
-    if (!formData.reference) newErrors.reference = t.required;
-
-    if (Object.keys(newErrors).length > 0 || !currentClient) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setSaving(true);
-
-    const paymentMethod = formData.paymentMethod || undefined;
-    const collaboratorId = formData.collaboratorId || undefined;
-    const commissionAmount = formData.commissionAmount || undefined;
-
-    if (editingTransaction) {
-      await updateTransaction(editingTransaction.id, {
-        type: formData.type,
-        categoryId: formData.categoryId,
-        amount: formData.amount,
-        description: formData.description,
-        date: formData.date,
-        reference: formData.reference || undefined,
-        notes: formData.notes || undefined,
-        paymentMethod,
-        collaboratorId,
-        commissionAmount,
-      });
-    } else {
-      const recurrence = formData.isRecurring ? {
-        count: formData.recurrenceType === 'count' ? formData.repeatCount : undefined,
-        until: formData.recurrenceType === 'until' ? formData.repeatUntil : undefined,
-      } : undefined;
-
-      await addTransaction({
-        clientId: currentClient.id,
-        type: formData.type,
-        categoryId: formData.categoryId,
-        amount: formData.amount,
-        description: formData.description,
-        date: formData.date,
-        reference: formData.reference || undefined,
-        notes: formData.notes || undefined,
-        paymentMethod,
-        collaboratorId,
-        commissionAmount,
-      }, recurrence);
-    }
-
-    setSaving(false);
-    setIsDialogOpen(false);
   };
 
   const handleDelete = async () => {
@@ -470,7 +483,7 @@ export const Transactions: React.FC = () => {
           <h2 className="page-title">{t.transactionsTitle}</h2>
           <p className="page-subtitle">{t.transactionsSubtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button
@@ -492,171 +505,292 @@ export const Transactions: React.FC = () => {
               <span className="hidden sm:inline">{t.calendarView}</span>
             </Button>
           </div>
-          <Button variant="outline" onClick={handleExportPdf} className="gap-2">
-            <FileDown className="h-4 w-4" />
-            <span className="hidden sm:inline">Exportar PDF</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportCsv} 
-            className="gap-2 group"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Exportar CSV</span>
-            {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
-          </Button>
-          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Importar Extrato</span>
-          </Button>
-          <Button onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t.addTransaction}
+
+          {/* Mobile dropdown actions */}
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreHorizontal className="h-4 w-4" />
+                  Ações
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleExportPdf} className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                  {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500 ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importar Extrato
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop buttons */}
+          <div className="hidden md:flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPdf} className="gap-2">
+              <FileDown className="h-4 w-4" />
+              <span>Exportar PDF</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportCsv}
+              className="gap-2 group"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exportar CSV</span>
+              {isAdvancedReportsLocked && <Lock className="h-3 w-3 text-amber-500" />}
+            </Button>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              <span>Importar Extrato</span>
+            </Button>
+          </div>
+
+          <Button onClick={handleOpenCreate} className="px-3 sm:px-4">
+            <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">{t.addTransaction}</span>
+            <span className="inline sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="finance-card p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          {/* Date Range */}
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="finance-card p-4 space-y-4">
+        {/* Main Row: Search, Date Range, Toggle Advanced Filters, Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          {/* Search Field */}
+          <div className="space-y-1 flex-1 min-w-[240px]">
+            <Label className="text-xs text-muted-foreground">Buscar Lançamento</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por descrição, ref, valor, cliente..."
+                className="pl-8 h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Date range & Main Filters Control */}
+          <div className="flex flex-wrap items-end gap-2 shrink-0">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.from}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                    <CalendarIcon className="h-4 w-4" />
-                    {filterStartDate ? format(filterStartDate, 'dd/MM/yyyy', { locale }) : '-'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filterStartDate}
-                    onSelect={setFilterStartDate}
-                    locale={locale}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="filter-from" className="text-xs text-muted-foreground">{t.from}</Label>
+              <Input
+                id="filter-from"
+                type="date"
+                value={filterStartDate ? new Date(filterStartDate.getTime() - filterStartDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterStartDate(val ? new Date(val + 'T12:00:00') : undefined);
+                }}
+                className="h-9 text-xs w-[155px]"
+              />
             </div>
             
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.to}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 w-[140px] justify-start">
-                    <CalendarIcon className="h-4 w-4" />
-                    {filterEndDate ? format(filterEndDate, 'dd/MM/yyyy', { locale }) : '-'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filterEndDate}
-                    onSelect={setFilterEndDate}
-                    locale={locale}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="filter-to" className="text-xs text-muted-foreground">{t.to}</Label>
+              <Input
+                id="filter-to"
+                type="date"
+                value={filterEndDate ? new Date(filterEndDate.getTime() - filterEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterEndDate(val ? new Date(val + 'T12:00:00') : undefined);
+                }}
+                className="h-9 text-xs w-[155px]"
+              />
             </div>
-          </div>
 
-          {/* Type Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t.type}</Label>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.allTypes}</SelectItem>
-                <SelectItem value="income">{t.income}</SelectItem>
-                <SelectItem value="expense">{t.expenses}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Daily Filter */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                setFilterStartDate(today);
+                setFilterEndDate(today);
+              }}
+              className="gap-1 h-9"
+            >
+              <CalendarIcon className="h-4 w-4" />
+              Diário
+            </Button>
 
-          {/* Payment Method Filter */}
-          {userSettings.enablePaymentMethods && (
+            {/* Advanced Filters Trigger */}
+            <Button
+              variant={showAdvancedFilters ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="gap-2 h-9"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filtros</span>
+            </Button>
+
+            {/* Clear Filters */}
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1 h-9">
+              <X className="h-4 w-4" />
+              Limpar
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible Advanced Filters Row */}
+        {showAdvancedFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Type Filter */}
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t.paymentMethod}</Label>
-              <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
-                <SelectTrigger className="w-[180px]">
+              <Label className="text-xs text-muted-foreground">{t.type}</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Formas</SelectItem>
-                  <SelectItem value="cash">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="h-4 w-4" />
-                      {t.cash}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="card">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      {t.card}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="pix">
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" />
-                      {t.pix}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="pending">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      {t.pending}
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="all">{t.allTypes}</SelectItem>
+                  <SelectItem value="income">{t.income}</SelectItem>
+                  <SelectItem value="expense">{t.expenses}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Category Filter */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t.category}</Label>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.allCategories}</SelectItem>
-                {allSubcategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.code} - {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Payment Method Filter */}
+            {userSettings.enablePaymentMethods && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t.paymentMethod}</Label>
+                <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Formas</SelectItem>
+                    <SelectItem value="cash">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-4 w-4 text-emerald-500" />
+                        {t.cash}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="card">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-500" />
+                        {t.card}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pix">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-purple-500" />
+                        {t.pix}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="boleto">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-cyan-500" />
+                        {t.boleto}
+                      </div>
+                    </SelectItem>
+                    {customPaymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.name}>
+                        <div className="flex items-center gap-2">
+                          {getPaymentMethodIconLarge(m.parentType)}
+                          {m.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Status Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="paid">Pago / Recebido</SelectItem>
+                  <SelectItem value="pending">Pendente (Em Aberto)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t.category}</Label>
+              <SearchableSelect
+                value={filterCategory === 'all' ? t.allCategories : (() => {
+                  const selectedCat = allSubcategories.find(c => c.id === filterCategory);
+                  return selectedCat ? `${selectedCat.code} - ${selectedCat.name}` : '';
+                })()}
+                onChange={(val) => {
+                  if (val === t.allCategories || !val) {
+                    setFilterCategory('all');
+                  } else {
+                    const selectedCat = allSubcategories.find(c => `${c.code} - ${c.name}` === val);
+                    if (selectedCat) {
+                      setFilterCategory(selectedCat.id);
+                    } else {
+                      setFilterCategory('all');
+                    }
+                  }
+                }}
+                options={[t.allCategories, ...allSubcategories.map(cat => `${cat.code} - ${cat.name}`)]}
+                placeholder={t.category}
+                searchPlaceholder="Buscar categoria..."
+                emptyMessage="Nenhuma categoria encontrada."
+                allowAdd={false}
+                className="w-full h-9"
+              />
+            </div>
+
+            {/* Customer Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente</Label>
+              <Select value={filterCustomer} onValueChange={setFilterCustomer}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Clientes</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Supplier Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Fornecedor</Label>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os Fornecedores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Fornecedores</SelectItem>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          {/* Daily Filter */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              setFilterStartDate(today);
-              setFilterEndDate(today);
-            }}
-            className="gap-1"
-          >
-            <CalendarIcon className="h-4 w-4" />
-            Diário
-          </Button>
-
-          {/* Clear Filters */}
-          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1">
-            <X className="h-4 w-4" />
-            {t.clearFilters}
-          </Button>
-        </div>
+        )}
 
         {/* Summary */}
         <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t text-sm">
@@ -686,162 +820,424 @@ export const Transactions: React.FC = () => {
 
         {/* Payment Method Breakdown */}
         {userSettings.enablePaymentMethods && (
-          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t text-sm">
-            <div className="flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.cash}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'cash').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
+          <div className="flex flex-col gap-3 mt-3 pt-3 border-t text-sm">
+            {/* ROW 1: Entradas */}
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <span className="text-xs font-bold text-income uppercase tracking-wider min-w-[70px]">Entradas:</span>
+              {(() => {
+                const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
+                const customUsedMethods = Array.from(new Set(
+                  filteredTransactions
+                    .map(txn => txn.paymentMethod)
+                    .filter(m => m && !defaultMethods.includes(m))
+                )) as string[];
+
+                const allMethods = [...defaultMethods, ...customUsedMethods];
+
+                const methodsRender = allMethods.map(method => {
+                  const incomeTotal = filteredTransactions
+                    .filter(txn => txn.type === 'income' && txn.status !== 'pending' && txn.paymentMethod === method)
+                    .reduce((s, txn) => s + txn.amount, 0);
+
+                  if (incomeTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`income-${method}`} className="flex items-center gap-2">
+                      {getPaymentMethodIcon(method)}
+                      <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
+                      <span className="font-semibold money-font text-income">
+                        {formatCurrency(incomeTotal)}
+                      </span>
+                    </div>
+                  );
+                });
+
+                const pendingIncome = filteredTransactions
+                  .filter(txn => txn.type === 'income' && txn.status === 'pending')
+                  .reduce((s, txn) => s + txn.amount, 0);
+
+                const pendingRender = pendingIncome > 0 ? (
+                  <div key="pending-income" className="flex items-center gap-2 border-l pl-4 border-dashed">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-muted-foreground">Pendente:</span>
+                    <span className="font-semibold money-font text-amber-600">
+                      {formatCurrency(pendingIncome)}
+                    </span>
+                  </div>
+                ) : null;
+
+                return [...methodsRender, pendingRender];
+              })()}
             </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.card}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'card').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.pix}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pix').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{t.pending}:</span>
-              <span className="font-semibold money-font">
-                {formatCurrency(filteredTransactions.filter(txn => txn.type === 'income' && txn.paymentMethod === 'pending').reduce((s, txn) => s + txn.amount, 0))}
-              </span>
+
+            {/* ROW 2: Saídas */}
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2 border-t border-dashed">
+              <span className="text-xs font-bold text-expense uppercase tracking-wider min-w-[70px]">Saídas:</span>
+              {(() => {
+                const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
+                const customUsedMethods = Array.from(new Set(
+                  filteredTransactions
+                    .map(txn => txn.paymentMethod)
+                    .filter(m => m && !defaultMethods.includes(m))
+                )) as string[];
+
+                const allMethods = [...defaultMethods, ...customUsedMethods];
+
+                const methodsRender = allMethods.map(method => {
+                  const expenseTotal = filteredTransactions
+                    .filter(txn => txn.type === 'expense' && txn.status !== 'pending' && txn.paymentMethod === method)
+                    .reduce((s, txn) => s + txn.amount, 0);
+
+                  if (expenseTotal === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`expense-${method}`} className="flex items-center gap-2">
+                      {getPaymentMethodIcon(method)}
+                      <span className="text-muted-foreground">{getPaymentMethodLabel(method, t)}:</span>
+                      <span className="font-semibold money-font text-expense">
+                        {formatCurrency(expenseTotal)}
+                      </span>
+                    </div>
+                  );
+                });
+
+                const pendingExpense = filteredTransactions
+                  .filter(txn => txn.type === 'expense' && txn.status === 'pending')
+                  .reduce((s, txn) => s + txn.amount, 0);
+
+                const pendingRender = pendingExpense > 0 ? (
+                  <div key="pending-expense" className="flex items-center gap-2 border-l pl-4 border-dashed">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-muted-foreground">Pendente:</span>
+                    <span className="font-semibold money-font text-amber-600">
+                      {formatCurrency(pendingExpense)}
+                    </span>
+                  </div>
+                ) : null;
+
+                return [...methodsRender, pendingRender];
+              })()}
             </div>
           </div>
         )}
       </div>
 
+      {/* Saldo Líquido Recente (Entradas - Saídas) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Saldo do Mês Atual (Total)</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal30 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal30)}
+          </span>
+        </div>
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias (Mês Atual + Anterior)</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal60 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal60)}
+          </span>
+        </div>
+        <div className="border border-indigo-100 bg-indigo-50/5 rounded-lg p-3 shadow-sm">
+          <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias (Mês Atual + 2 Ant.)</span>
+          <span className={cn(
+            "text-base font-bold font-mono mt-1 block",
+            netBalances.bal90 >= 0 ? "text-income" : "text-expense"
+          )}>
+            {formatCurrency(netBalances.bal90)}
+          </span>
+        </div>
+      </div>
+
       {/* List View */}
       {viewMode === 'list' && (
-        <div className="finance-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">{t.date}</TableHead>
-                <TableHead>{t.description}</TableHead>
-                <TableHead>{t.reference}</TableHead>
-                <TableHead>{t.category}</TableHead>
-                {userSettings.enablePaymentMethods && (
-                  <TableHead>{t.paymentMethod}</TableHead>
-                )}
-                {userSettings.enableCommission && (
-                  <>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead>Comissão</TableHead>
-                  </>
-                )}
-                <TableHead className="text-right">{t.amount}</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedTransactions.length === 0 ? (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block finance-card overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                    {t.noTransactions}
-                  </TableCell>
+                  <TableHead className="w-[100px]">{t.date}</TableHead>
+                  <TableHead>{t.description}</TableHead>
+                  <TableHead>{t.reference}</TableHead>
+                  <TableHead>{t.category}</TableHead>
+                  {userSettings.enablePaymentMethods && (
+                    <TableHead>{t.paymentMethod}</TableHead>
+                  )}
+                  {userSettings.enableCommission && (
+                    <>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead>Comissão</TableHead>
+                    </>
+                  )}
+                  <TableHead className="text-right">{t.amount}</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
                 </TableRow>
-              ) : (
-                sortedTransactions.map((transaction) => {
-                  const category = getCategoryById(transaction.categoryId);
-                  const collaborator = transaction.collaboratorId ? getCollaboratorById(transaction.collaboratorId) : null;
-                  return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        {formatDate(transaction.date)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={cn(
-                              'p-1.5 rounded-full',
-                              transaction.type === 'income'
-                                ? 'bg-income-muted text-income'
-                                : 'bg-expense-muted text-expense'
-                            )}
-                          >
-                            {transaction.type === 'income' ? (
-                              <ArrowUpRight className="h-3 w-3" />
+              </TableHeader>
+              <TableBody>
+                {sortedTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                      {t.noTransactions}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedTransactions.map((transaction) => {
+                    const category = getCategoryById(transaction.categoryId);
+                    const commissionsList = transaction.commissions || [];
+                    const totalCommission = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
+                    const collaboratorsNames = commissionsList
+                      .map(c => getCollaboratorById(c.collaboratorId)?.name)
+                      .filter(Boolean)
+                      .join(', ');
+                    const commissionTooltip = commissionsList
+                      .map(c => `${getCollaboratorById(c.collaboratorId)?.name || '?'}: ${formatCurrency(c.commissionAmount)}`)
+                      .join(' | ');
+
+                    return (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {formatDate(transaction.date)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={cn(
+                                'p-1.5 rounded-full shrink-0',
+                                transaction.type === 'income'
+                                  ? 'bg-income-muted text-income'
+                                  : 'bg-expense-muted text-expense'
+                              )}
+                            >
+                              {transaction.type === 'income' ? (
+                                <ArrowUpRight className="h-3 w-3" />
+                              ) : (
+                                <ArrowDownRight className="h-3 w-3" />
+                              )}
+                            </div>
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{transaction.description}</span>
+                                {transaction.status === 'pending' ? (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-amber-500/5 text-amber-700 border-amber-500/30 font-medium h-4 shrink-0">
+                                    Pendente
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-500/5 text-emerald-700 border-emerald-500/30 font-medium h-4 shrink-0">
+                                    {transaction.type === 'income' ? 'Recebido' : 'Pago'}
+                                  </Badge>
+                                )}
+                              </div>
+                              {transaction.customerId && (
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium mt-1">
+                                  Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                                </span>
+                              )}
+                              {transaction.supplierId && (
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium">
+                                  Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {transaction.reference || '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {category?.name || '-'}
+                        </TableCell>
+                        {userSettings.enablePaymentMethods && (
+                          <TableCell>
+                            {transaction.paymentMethod ? (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                {getPaymentMethodIcon(transaction.paymentMethod)}
+                                <span className="text-sm">{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
+                              </div>
                             ) : (
-                              <ArrowDownRight className="h-3 w-3" />
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {userSettings.enableCommission && (
+                          <>
+                            <TableCell className="text-muted-foreground truncate max-w-[150px]" title={collaboratorsNames}>
+                              {collaboratorsNames || '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" title={commissionTooltip}>
+                              {totalCommission > 0 ? formatCurrency(totalCommission) : '-'}
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell
+                          className={cn(
+                            'text-right font-semibold money-font',
+                            transaction.type === 'income' ? 'money-positive' : 'money-negative'
+                          )}
+                        >
+                          {transaction.type === 'income' ? '+' : '-'}
+                          {formatCurrency(transaction.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEdit(transaction)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletingTransaction(transaction);
+                                setIsDeleteDialogOpenState(true);
+                              }}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Cards View */}
+          <div className="block md:hidden space-y-4">
+            {sortedTransactions.length === 0 ? (
+              <div className="finance-card p-8 text-center text-muted-foreground">
+                {t.noTransactions}
+              </div>
+            ) : (
+              sortedTransactions.map((transaction) => {
+                const category = getCategoryById(transaction.categoryId);
+                const commissionsList = transaction.commissions || [];
+                return (
+                  <div key={transaction.id} className="finance-card p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          className={cn(
+                            'p-2 rounded-full shrink-0',
+                            transaction.type === 'income'
+                              ? 'bg-income-muted text-income'
+                              : 'bg-expense-muted text-expense'
+                          )}
+                        >
+                          {transaction.type === 'income' ? (
+                            <ArrowUpRight className="h-4 w-4" />
+                          ) : (
+                            <ArrowDownRight className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-sm block truncate">{transaction.description}</span>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground font-mono">{formatDate(transaction.date)}</span>
+                            {transaction.customerId && (
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
+                                Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                              </span>
+                            )}
+                            {transaction.supplierId && (
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
+                                Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
+                              </span>
                             )}
                           </div>
-                          <span className="font-medium">{transaction.description}</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {transaction.reference || '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {category?.name || '-'}
-                      </TableCell>
-                      {userSettings.enablePaymentMethods && (
-                        <TableCell>
-                          {transaction.type === 'income' && transaction.paymentMethod ? (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              {paymentMethodIcons[transaction.paymentMethod]}
-                              <span className="text-sm">{t[transaction.paymentMethod]}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      )}
-                      {userSettings.enableCommission && (
-                        <>
-                          <TableCell className="text-muted-foreground">{collaborator?.name || '-'}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {transaction.commissionAmount ? formatCurrency(transaction.commissionAmount) : '-'}
-                          </TableCell>
-                        </>
-                      )}
-                      <TableCell
+                      </div>
+                      <span
                         className={cn(
-                          'text-right font-semibold money-font',
+                          'font-semibold money-font text-sm shrink-0',
                           transaction.type === 'income' ? 'money-positive' : 'money-negative'
                         )}
                       >
                         {transaction.type === 'income' ? '+' : '-'}
                         {formatCurrency(transaction.amount)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEdit(transaction)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setDeletingTransaction(transaction);
-                              setIsDeleteDialogOpenState(true);
-                            }}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t text-muted-foreground">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Categoria</span>
+                        <span className="font-medium text-foreground">{category?.name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Referência</span>
+                        <span className="font-medium text-foreground">{transaction.reference || '-'}</span>
+                      </div>
+                      {userSettings.enablePaymentMethods && transaction.paymentMethod && (
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Forma de Pagamento</span>
+                          <div className="flex items-center gap-1 mt-0.5 text-foreground">
+                            {getPaymentMethodIcon(transaction.paymentMethod)}
+                            <span>{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                      )}
+                      {userSettings.enableCommission && commissionsList.length > 0 && (
+                        <div className="col-span-2 mt-1 border-t pt-1">
+                          <span className="text-[10px] text-muted-foreground block uppercase tracking-wider mb-1">Comissões</span>
+                          <div className="space-y-1 bg-muted/30 p-2 rounded">
+                            {commissionsList.map((comm, idx) => {
+                              const name = getCollaboratorById(comm.collaboratorId)?.name || '-';
+                              return (
+                                <div key={idx} className="flex justify-between text-foreground">
+                                  <span>{name}</span>
+                                  <span className="font-medium">{formatCurrency(comm.commissionAmount)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(transaction)}
+                        className="h-8 gap-1"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDeletingTransaction(transaction);
+                          setIsDeleteDialogOpenState(true);
+                        }}
+                        className="h-8 gap-1 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
       )}
 
       {/* Calendar View */}
@@ -898,7 +1294,7 @@ export const Transactions: React.FC = () => {
           <div className="finance-card">
             <div className="p-4 border-b border-border">
               <h3 className="font-semibold">
-                {selectedCalendarDate 
+                {selectedCalendarDate
                   ? format(selectedCalendarDate, 'dd MMMM yyyy', { locale })
                   : t.selectClient
                 }
@@ -975,339 +1371,11 @@ export const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl w-[95vw]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingTransaction ? t.editTransaction : t.addTransaction}
-            </DialogTitle>
-            <DialogDescription>
-              {editingTransaction 
-                ? "Altere os detalhes do lançamento abaixo." 
-                : "Preencha as informações para registrar um novo lançamento financeiro."
-              }
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Type and Category */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={cn(errors.type && "text-destructive")}>{t.type}</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(val) => {
-                    updateFormField('type', val as TransactionType);
-                    updateFormField('categoryId', '');
-                    if (userSettings.enablePaymentMethods) {
-                      updateFormField('paymentMethod', '');
-                    }
-                  }}
-                >
-                  <SelectTrigger className={cn(errors.type && "border-destructive")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">{t.income}</SelectItem>
-                    <SelectItem value="expense">{t.expenses}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label className={cn(errors.categoryId && "text-destructive")}>{t.category}</Label>
-                <Select
-                  value={formData.categoryId}
-                  onValueChange={(val) => updateFormField('categoryId', val)}
-                >
-                  <SelectTrigger className={cn(errors.categoryId && "border-destructive")}>
-                    <SelectValue placeholder={t.category} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCategories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.code} - {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
-              </div>
-            </div>
-
-            {/* Amount, Date and Payment Method */}
-            <div className={cn(
-              "grid gap-4",
-              userSettings.enablePaymentMethods && formData.type === 'income' 
-                ? "grid-cols-3" 
-                : "grid-cols-2"
-            )}>
-              <div className="space-y-2">
-                <Label htmlFor="amount" className={cn(errors.amount && "text-destructive")}>{t.amount}</Label>
-                <MoneyInput
-                  id="amount"
-                  value={formData.amount}
-                  onChange={(value) => updateFormField('amount', value)}
-                  className={cn(errors.amount && "border-destructive")}
-                />
-                {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label className={cn(errors.date && "text-destructive")}>{t.date}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formData.date && "text-muted-foreground",
-                        errors.date && "border-destructive"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.date ? format(formData.date, 'dd/MM/yyyy', { locale }) : t.date}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.date}
-                      onSelect={(date) => date && updateFormField('date', date)}
-                      locale={locale}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  {t.paymentMethod}
-                  <UpgradeBadge />
-                </Label>
-                <Select
-                  value={formData.paymentMethod}
-                  onValueChange={(val) => updateFormField('paymentMethod', val as PaymentMethod)}
-                  disabled={!hasFeature('payment_methods')}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isPaymentMethodsLocked ? "Recurso Premium" : t.paymentMethod} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4" />
-                        {t.cash}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="card">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        {t.card}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pix">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="h-4 w-4" />
-                        {t.pix}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {t.pending}
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Description and Reference */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="description" className={cn(errors.description && "text-destructive")}>{t.description}</Label>
-                <SearchableSelect
-                  value={formData.description}
-                  onChange={(value) => {
-                    updateFormField('description', value);
-                    updateFormField('reference', '');
-                  }}
-                  groupedOptions={filteredDescriptionOptions}
-                  placeholder={t.description}
-                  searchPlaceholder="Buscar descrição..."
-                  emptyMessage="Nenhuma descrição encontrada."
-                  addNewLabel="Adicionar"
-                  className={cn(errors.description && "border-destructive")}
-                />
-                {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reference" className={cn(errors.reference && "text-destructive")}>{t.reference}</Label>
-                <SearchableSelect
-                  value={formData.reference}
-                  onChange={(value) => updateFormField('reference', value)}
-                  groupedOptions={filteredReferenceOptions}
-                  placeholder={t.reference}
-                  searchPlaceholder="Buscar referência..."
-                  emptyMessage="Nenhuma referência encontrada."
-                  addNewLabel="Adicionar"
-                  className={cn(errors.reference && "border-destructive")}
-                />
-                {errors.reference && <p className="text-xs text-destructive">{errors.reference}</p>}
-              </div>
-            </div>
-
-            {/* Recurrence Section - Only for new transactions or showing status for existing */}
-            {!editingTransaction && (
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="isRecurring" 
-                    checked={formData.isRecurring} 
-                    onCheckedChange={(checked) => updateFormField('isRecurring', !!checked)}
-                  />
-                  <Label htmlFor="isRecurring" className="cursor-pointer font-semibold">Repetir lançamento mensalmente</Label>
-                </div>
-
-                {formData.isRecurring && (
-                  <div className="pl-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <RadioGroup 
-                      value={formData.recurrenceType} 
-                      onValueChange={(val) => updateFormField('recurrenceType', val as 'count' | 'until')}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="count" id="type-count" />
-                        <Label htmlFor="type-count" className="cursor-pointer">Por quantidade</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="until" id="type-until" />
-                        <Label htmlFor="type-until" className="cursor-pointer">Até uma data</Label>
-                      </div>
-                    </RadioGroup>
-
-                    {formData.recurrenceType === 'count' ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">Repetir por</span>
-                        <Input 
-                          type="number" 
-                          className="w-20" 
-                          min={1} 
-                          max={60}
-                          value={formData.repeatCount}
-                          onChange={(e) => updateFormField('repeatCount', parseInt(e.target.value) || 1)}
-                        />
-                        <span className="text-sm">meses (além do atual)</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm whitespace-nowrap">Repetir até</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !formData.repeatUntil && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.repeatUntil ? format(formData.repeatUntil, 'dd/MM/yyyy', { locale }) : "Selecionar data"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={formData.repeatUntil}
-                              onSelect={(date) => updateFormField('repeatUntil', date)}
-                              locale={locale}
-                              initialFocus
-                              disabled={(date) => date < formData.date}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {editingTransaction && editingTransaction.recurringId && (
-              <div className="p-3 border border-amber-200 bg-amber-50 rounded-lg text-amber-800 text-sm flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0" />
-                Este lançamento faz parte de uma recorrência mensal.
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">{t.notes}</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => updateFormField('notes', e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    Colaborador
-                    {isCommissionsLocked && <UpgradeBadge />}
-                  </Label>
-                  <CollaboratorSelect
-                    value={formData.collaboratorId}
-                    onChange={(val) => updateFormField('collaboratorId', val)}
-                    collaborators={collaborators}
-                    disabled={isCommissionsLocked}
-                    onAddNew={async (name) => {
-                      const newCollaborator = await addCollaborator(name);
-                      if (newCollaborator) {
-                        updateFormField('collaboratorId', newCollaborator.id);
-                      }
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="commissionAmount" className="flex items-center gap-1">
-                    Comissão (R$)
-                    {isCommissionsLocked && <UpgradeBadge />}
-                  </Label>
-                  <MoneyInput
-                    id="commissionAmount"
-                    value={formData.commissionAmount}
-                    onChange={(value) => updateFormField('commissionAmount', value)}
-                    disabled={isCommissionsLocked}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              {t.cancel}
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                t.save
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingTransaction={editingTransaction}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpenState}>
@@ -1318,8 +1386,8 @@ export const Transactions: React.FC = () => {
               {deletingTransaction?.recurringId ? (
                 <div className="space-y-4">
                   <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
-                  <RadioGroup 
-                    value={recurringDeleteOption} 
+                  <RadioGroup
+                    value={recurringDeleteOption}
                     onValueChange={(val) => setRecurringDeleteOption(val as 'single' | 'future' | 'all')}
                     className="space-y-2"
                   >

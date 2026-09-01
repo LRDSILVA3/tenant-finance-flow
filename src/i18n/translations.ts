@@ -76,6 +76,7 @@ export interface Translations {
   card: string;
   pix: string;
   pending: string;
+  boleto: string;
 
   // Settings
   settingsSubtitle: string;
@@ -196,6 +197,7 @@ export const translations: Record<Language, Translations> = {
     card: 'Cartão',
     pix: 'PIX',
     pending: 'Pendente',
+    boleto: 'Boleto',
 
     settingsSubtitle: 'Gerencie as configurações do sistema',
     enablePaymentMethods: 'Habilitar Formas de Recebimento',
@@ -298,6 +300,7 @@ export const translations: Record<Language, Translations> = {
     card: 'Card',
     pix: 'PIX',
     pending: 'Pending',
+    boleto: 'Boleto',
 
     settingsSubtitle: 'Manage system settings',
     enablePaymentMethods: 'Enable Payment Methods',
@@ -400,6 +403,7 @@ export const translations: Record<Language, Translations> = {
     card: 'Tarjeta',
     pix: 'PIX',
     pending: 'Pendiente',
+    boleto: 'Boleto',
 
     settingsSubtitle: 'Administrar configuración del sistema',
     enablePaymentMethods: 'Habilitar Formas de Pago',

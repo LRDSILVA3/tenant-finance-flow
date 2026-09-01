@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, CreditCard, Sparkles, Building2, Mail, Lock } from 'lucide-react';
+import { Loader2, Check, CreditCard, Sparkles, Building2, Mail, Lock, QrCode } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function Onboarding() {
     currentAddress, 
     saveAddress
   } = useFinance();
+  const { loadSubscription } = useSubscription();
   
   const [step, setStep] = useState(1);
   
@@ -60,6 +62,10 @@ export default function Onboarding() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCVC, setCardCVC] = useState('');
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'pix'>('credit_card');
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [showPixStep, setShowPixStep] = useState(false);
 
   // Auto-select plan from query parameter or default to 'Avançado'
   useEffect(() => {
@@ -92,7 +98,7 @@ export default function Onboarding() {
     
     // If authenticated but without plan subscription, auto-set step 2
     if (!authLoading && isAuthenticated && !loadingClients && !loadingSubscription && clients.length > 0 && !currentSubscription) {
-      setStep(2);
+      setStep(prev => prev < 2 ? 2 : prev);
       if (clients[0]) {
         setCompanyName(clients[0].name);
         setTaxId(clients[0].taxId || '');
@@ -168,7 +174,7 @@ export default function Onboarding() {
           }
 
           // Create client under new user session (address is created in step 3 or saved as blank for now)
-          await addClient({ name: companyName, taxId });
+          await addClient({ name: companyName, taxId }, data.user.id);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Erro desconhecido';
           toast({ title: 'Erro ao criar conta', description: message, variant: 'destructive' });
@@ -229,7 +235,7 @@ export default function Onboarding() {
       return;
     }
     
-    if (!cardNumber || !cardName || !cardExpiry || !cardCVC) {
+    if (paymentMethod === 'credit_card' && (!cardNumber || !cardName || !cardExpiry || !cardCVC)) {
       toast({ title: 'Erro', description: 'Preencha os dados do cartão de crédito', variant: 'destructive' });
       return;
     }
@@ -261,44 +267,48 @@ export default function Onboarding() {
         
         // Add subscription
         if (targetPlan && targetPlan.price > 0) {
-          // Tokenization via Pagar.me API v5
-          const publicKey = import.meta.env.VITE_PAGARME_PUBLIC_KEY;
-          if (!publicKey) {
-            throw new Error("Chave pública do Pagar.me não encontrada.");
+          let cardToken = undefined;
+
+          if (paymentMethod === 'credit_card') {
+            // Tokenization via Pagar.me API v5
+            const publicKey = import.meta.env.VITE_PAGARME_PUBLIC_KEY;
+            if (!publicKey) {
+              throw new Error("Chave pública do Pagar.me não encontrada.");
+            }
+
+            const [expMonth, expYearStr] = cardExpiry.split('/');
+            const expYear = parseInt(expYearStr) + 2000;
+
+            const tokenResponse = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'card',
+                card: {
+                  number: cardNumber.replace(/\s/g, ''),
+                  holder_name: cardName.trim(),
+                  exp_month: parseInt(expMonth),
+                  exp_year: expYear,
+                  cvv: cardCVC,
+                }
+              })
+            });
+
+            const tokenData = await tokenResponse.json();
+
+            if (!tokenResponse.ok) {
+              throw new Error(tokenData.message || "Dados do cartão inválidos.");
+            }
+
+            cardToken = tokenData.id;
           }
-
-          const [expMonth, expYearStr] = cardExpiry.split('/');
-          const expYear = parseInt(expYearStr) + 2000;
-
-          const tokenResponse = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'card',
-              card: {
-                number: cardNumber.replace(/\s/g, ''),
-                holder_name: cardName.trim(),
-                exp_month: parseInt(expMonth),
-                exp_year: expYear,
-                cvv: cardCVC,
-              }
-            })
-          });
-
-          const tokenData = await tokenResponse.json();
-
-          if (!tokenResponse.ok) {
-            throw new Error(tokenData.message || "Dados do cartão inválidos.");
-          }
-
-          const cardToken = tokenData.id;
           
-          const success = await subscribeWithPagarme(
+          const response = await subscribeWithPagarme(
             clientId, 
             selectedPlanId, 
             cardToken, 
             taxId.replace(/\D/g, ''), 
-            cardName.trim(),
+            paymentMethod === 'credit_card' ? cardName.trim() : 'Cliente',
             phone.replace(/\D/g, ''),
             {
               zipCode,
@@ -308,23 +318,37 @@ export default function Onboarding() {
               neighborhood,
               city,
               state: stateCode,
-            }
+            },
+            paymentMethod
           );
           
-          if (!success) throw new Error("Falha ao processar assinatura.");
+          if (!response.success) {
+            throw new Error(response.error || "Falha ao processar assinatura.");
+          }
+
+          if (paymentMethod === 'pix' && response.qrCode) {
+            setQrCode(response.qrCode);
+            setQrCodeUrl(response.qrCodeUrl || null);
+            setShowPixStep(true);
+            toast({ title: 'Sucesso!', description: 'PIX gerado. Realize o pagamento para ativar sua assinatura.' });
+            setLoading(false);
+            return;
+          }
         } else {
           // Simple change for free plans (fallback safety)
           await changePlan(clientId, selectedPlanId);
         }
 
-        // Save local billing method reference
-        await saveBillingMethod(clientId, {
-          cardHolderName: cardName,
-          cardLast4: cardNumber.slice(-4),
-          cardBrand: 'Visa', 
-          cardExpiry: cardExpiry,
-          isDefault: true
-        });
+        if (paymentMethod === 'credit_card') {
+          // Save local billing method reference
+          await saveBillingMethod(clientId, {
+            cardHolderName: cardName,
+            cardLast4: cardNumber.slice(-4),
+            cardBrand: 'Visa', 
+            cardExpiry: cardExpiry,
+            isDefault: true
+          });
+        }
         
         toast({ title: 'Sucesso!', description: 'Conta configurada com sucesso.' });
         navigate('/app', { replace: true });
@@ -337,7 +361,70 @@ export default function Onboarding() {
     }
   };
 
-  if (authLoading || loadingClients || loadingPlans || (isAuthenticated && loadingSubscription)) {
+  // Polling for PIX payment status in Onboarding
+  useEffect(() => {
+    let intervalId: any;
+    
+    if (showPixStep && qrCode) {
+      let clientId = clients.length > 0 ? clients[0].id : null;
+      if (!clientId) {
+        const searchClient = async () => {
+          const { data } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('name', companyName)
+            .maybeSingle();
+          return data?.id;
+        };
+        searchClient().then(id => {
+          if (id) startPolling(id);
+        });
+      } else {
+        startPolling(clientId);
+      }
+    }
+
+    function startPolling(cId: string) {
+      console.log("Starting PIX payment polling for client:", cId);
+      intervalId = setInterval(async () => {
+        try {
+          const { data, error } = await supabase
+            .from('subscriptions')
+            .select('status')
+            .eq('client_id', cId)
+            .maybeSingle();
+
+          if (error) {
+            console.error("Error polling subscription status:", error);
+            return;
+          }
+
+          if (data && data.status === 'active') {
+            clearInterval(intervalId);
+            toast({ 
+              title: "Pagamento Confirmado!", 
+              description: "Sua assinatura foi ativada com sucesso.", 
+              variant: "default" 
+            });
+            await loadSubscription(cId);
+            navigate('/app', { replace: true });
+          }
+        } catch (err) {
+          console.error("Error in polling interval:", err);
+        }
+      }, 5000); // Check every 5 seconds
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [showPixStep, qrCode, clients, companyName, navigate, loadSubscription]);
+
+
+
+  if (authLoading || loadingClients || loadingPlans || (isAuthenticated && loadingSubscription && step === 1)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -554,7 +641,7 @@ export default function Onboarding() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && !showPixStep && (
           <Card className="max-w-md mx-auto animate-fade-in shadow-lg border-primary/20">
             <CardHeader className="text-center pb-2">
               <div className="flex justify-center mb-4">
@@ -571,6 +658,28 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               
+              {/* Payment Method Selector */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg mb-4">
+                <Button 
+                  type="button"
+                  variant={paymentMethod === 'credit_card' ? 'default' : 'ghost'} 
+                  className={cn("w-full text-xs font-semibold h-9", paymentMethod === 'credit_card' ? "shadow-sm bg-card hover:bg-card text-foreground" : "")}
+                  onClick={() => setPaymentMethod('credit_card')}
+                >
+                  <CreditCard className="h-4 w-4 mr-1.5" />
+                  Cartão de Crédito
+                </Button>
+                <Button 
+                  type="button"
+                  variant={paymentMethod === 'pix' ? 'default' : 'ghost'} 
+                  className={cn("w-full text-xs font-semibold h-9", paymentMethod === 'pix' ? "shadow-sm bg-card hover:bg-card text-foreground" : "")}
+                  onClick={() => setPaymentMethod('pix')}
+                >
+                  <QrCode className="h-4 w-4 mr-1.5" />
+                  Pix
+                </Button>
+              </div>
+
               {/* Billing Address (Moved here) */}
               <h4 className="font-semibold text-sm text-primary border-b pb-1">Endereço de Cobrança</h4>
               <div className="grid grid-cols-3 gap-4">
@@ -594,7 +703,11 @@ export default function Onboarding() {
                   <Label htmlFor="numberStr">Número *</Label>
                   <Input id="numberStr" value={numberStr} onChange={e => setNumberStr(e.target.value)} />
                 </div>
-                <div className="grid gap-2 col-span-2">
+                <div className="grid gap-2 col-span-1">
+                  <Label htmlFor="neighborhood">Bairro *</Label>
+                  <Input id="neighborhood" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                </div>
+                <div className="grid gap-2 col-span-1">
                   <Label htmlFor="complement">Complemento</Label>
                   <Input id="complement" value={complement} onChange={e => setComplement(e.target.value)} />
                 </div>
@@ -611,51 +724,67 @@ export default function Onboarding() {
               </div>
 
               {/* Credit Card Details */}
-              <h4 className="font-semibold text-sm text-primary border-b pb-1 mt-6">Dados do Cartão</h4>
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Número do Cartão *</Label>
-                <Input 
-                  id="cardNumber" 
-                  placeholder="0000 0000 0000 0000" 
-                  value={cardNumber} 
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').substring(0, 19);
-                    setCardNumber(val);
-                  }} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cardName">Nome no Cartão *</Label>
-                <Input id="cardName" placeholder="NOME COMO ESTÁ NO CARTÃO" value={cardName} onChange={e => setCardName(e.target.value.toUpperCase())} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cardExpiry">Validade *</Label>
-                  <Input 
-                    id="cardExpiry" 
-                    placeholder="MM/AA" 
-                    value={cardExpiry} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2').substring(0, 5);
-                      setCardExpiry(val);
-                    }} 
-                  />
+              {paymentMethod === 'credit_card' && (
+                <>
+                  <h4 className="font-semibold text-sm text-primary border-b pb-1 mt-6">Dados do Cartão</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardNumber">Número do Cartão *</Label>
+                    <Input 
+                      id="cardNumber" 
+                      placeholder="0000 0000 0000 0000" 
+                      value={cardNumber} 
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').substring(0, 19);
+                        setCardNumber(val);
+                      }} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardName">Nome no Cartão *</Label>
+                    <Input id="cardName" placeholder="NOME COMO ESTÁ NO CARTÃO" value={cardName} onChange={e => setCardName(e.target.value.toUpperCase())} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cardExpiry">Validade *</Label>
+                      <Input 
+                        id="cardExpiry" 
+                        placeholder="MM/AA" 
+                        value={cardExpiry} 
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2').substring(0, 5);
+                          setCardExpiry(val);
+                        }} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cardCVC">CVV *</Label>
+                      <Input 
+                        id="cardCVC" 
+                        type="password" 
+                        maxLength={4} 
+                        placeholder="123" 
+                        value={cardCVC} 
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                          setCardCVC(val);
+                        }} 
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {paymentMethod === 'pix' && (
+                <div className="p-4 bg-muted/50 rounded-lg mt-6 border space-y-2">
+                  <div className="flex gap-2 items-center text-sm font-semibold text-primary">
+                    <QrCode className="h-5 w-5" />
+                    Pagamento Instantâneo via Pix
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                    Ao finalizar o cadastro, geraremos um QR Code Pix dinâmico para você realizar o pagamento com segurança. O código copia e cola também será exibido na próxima tela.
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cardCVC">CVV *</Label>
-                  <Input 
-                    id="cardCVC" 
-                    type="password" 
-                    maxLength={4} 
-                    placeholder="123" 
-                    value={cardCVC} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                      setCardCVC(val);
-                    }} 
-                  />
-                </div>
-              </div>
+              )}
               
               <div className="p-4 bg-muted/50 rounded-lg mt-4 border space-y-2">
                 <div className="flex justify-between text-sm">
@@ -683,6 +812,60 @@ export default function Onboarding() {
               <Button onClick={handleComplete} disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {loading ? 'Finalizando...' : 'Concluir Cadastro'}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {step === 3 && showPixStep && qrCode && (
+          <Card className="max-w-md mx-auto animate-fade-in shadow-lg border-primary/20">
+            <CardHeader className="text-center pb-2">
+              <div className="flex justify-center mb-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm animate-pulse">
+                  <QrCode className="h-6 w-6" />
+                </div>
+              </div>
+              <CardTitle className="text-2xl">Aguardando Pagamento Pix</CardTitle>
+              <CardDescription>
+                Aponte a câmera do seu celular para o QR Code abaixo ou copie o código Pix para pagar. Esta tela será atualizada automaticamente assim que confirmarmos o seu pagamento.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-4 text-center">
+              {qrCodeUrl && (
+                <div className="flex justify-center border p-4 bg-white rounded-lg max-w-[280px] mx-auto shadow-sm">
+                  <img src={qrCodeUrl} alt="QR Code Pix" className="h-auto w-full max-w-[240px]" />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label className="text-left block text-xs text-muted-foreground font-semibold uppercase">Código Pix Copia e Cola</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={qrCode} className="font-mono text-xs bg-muted/50" />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrCode);
+                      toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." });
+                    }}
+                  >
+                    Copiar
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground bg-muted/50 py-2 px-3 rounded-lg">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span>Verificando pagamento em tempo real...</span>
+              </div>
+
+
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button variant="ghost" onClick={() => {
+                setShowPixStep(false);
+                setStep(2);
+              }} className="w-full text-xs text-muted-foreground hover:text-foreground">
+                Voltar e Alterar Forma de Pagamento
               </Button>
             </CardFooter>
           </Card>

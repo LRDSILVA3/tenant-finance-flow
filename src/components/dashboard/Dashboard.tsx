@@ -9,14 +9,17 @@ import { RecentTransactions } from './RecentTransactions';
 import { MonthlyFlowData, FinancialSummary, PaymentMethod } from '@/types/finance';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Banknote, CreditCard, Smartphone, Clock, Lock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Banknote, CreditCard, Smartphone, Clock, Lock, FileText, Wallet } from 'lucide-react';
 import { CategoryBreakdown } from './CategoryBreakdown';
+import { TodayScheduleWidget } from './TodayScheduleWidget';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   onNavigateToTransactions: () => void;
+  onNavigateToSchedule?: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -26,14 +29,15 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const paymentMethodConfig: Record<PaymentMethod, { icon: React.ReactNode; color: string }> = {
+const paymentMethodConfig: Record<string, { icon: React.ReactNode; color: string }> = {
   cash: { icon: <Banknote className="h-4 w-4" />, color: 'text-emerald-600' },
   card: { icon: <CreditCard className="h-4 w-4" />, color: 'text-blue-600' },
   pix: { icon: <Smartphone className="h-4 w-4" />, color: 'text-teal-600' },
   pending: { icon: <Clock className="h-4 w-4" />, color: 'text-amber-600' },
+  boleto: { icon: <FileText className="h-4 w-4" />, color: 'text-cyan-600' },
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, onNavigateToSchedule }) => {
   const { t, currentClient, transactions, language, userSettings } = useFinance();
   const { hasFeature } = useFeatureAccess();
   const [isDailyView, setIsDailyView] = useState(false);
@@ -78,25 +82,100 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
     };
   }, [filteredTransactionsForPeriod]);
 
-  const paymentMethodBreakdown = useMemo(() => {
-    if (!userSettings.enablePaymentMethods) return null;
+  const netBalances = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
-    const incomeTransactions = filteredTransactionsForPeriod.filter(txn => txn.type === 'income');
-    
-    const breakdown: Record<PaymentMethod, number> = {
-      cash: 0,
-      card: 0,
-      pix: 0,
-      pending: 0,
-    };
+    let bal30 = 0; // Mês Atual
+    let bal60 = 0; // Últimos 60 Dias (Mês Atual + Mês Anterior)
+    let bal90 = 0; // Últimos 90 Dias (Mês Atual + 2 Meses Anteriores)
 
-    incomeTransactions.forEach(txn => {
-      if (txn.paymentMethod) {
-        breakdown[txn.paymentMethod] += txn.amount;
+    transactions.forEach((txn) => {
+      const txnDate = new Date(txn.date);
+      const value = txn.type === 'income' ? txn.amount : -txn.amount;
+
+      // Calcular a diferença de meses entre a transação e o mês atual
+      const monthDiff = (currentYear - txnDate.getFullYear()) * 12 + (currentMonth - txnDate.getMonth());
+
+      if (monthDiff === 0) {
+        // Mês Atual (completo, incluindo lançamentos futuros deste mês)
+        bal30 += value;
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 1) {
+        // Mês Anterior
+        bal60 += value;
+        bal90 += value;
+      } else if (monthDiff === 2) {
+        // 2 meses atrás
+        bal90 += value;
       }
     });
 
-    return breakdown;
+    return { bal30, bal60, bal90 };
+  }, [transactions]);
+
+  const paymentMethodBreakdown = useMemo(() => {
+    if (!userSettings.enablePaymentMethods) return null;
+
+    const defaultMethods = ['cash', 'card', 'pix', 'boleto'];
+    
+    // Find all custom payment methods in transactions for this period
+    const customUsedMethods = Array.from(new Set(
+      filteredTransactionsForPeriod
+        .map(txn => txn.paymentMethod)
+        .filter(m => m && !defaultMethods.includes(m))
+    )) as string[];
+
+    const allMethods = [...defaultMethods, ...customUsedMethods];
+
+    const incomeBreakdown: Record<string, number> = {};
+    const expenseBreakdown: Record<string, number> = {};
+
+    allMethods.forEach(method => {
+      incomeBreakdown[method] = 0;
+      expenseBreakdown[method] = 0;
+    });
+
+    // Incomes
+    filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'income' && txn.status !== 'pending')
+      .forEach(txn => {
+        if (txn.paymentMethod) {
+          if (incomeBreakdown[txn.paymentMethod] === undefined) {
+            incomeBreakdown[txn.paymentMethod] = 0;
+          }
+          incomeBreakdown[txn.paymentMethod] += txn.amount;
+        }
+      });
+
+    const pendingIncome = filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'income' && txn.status === 'pending')
+      .reduce((s, txn) => s + txn.amount, 0);
+
+    // Expenses
+    filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'expense' && txn.status !== 'pending')
+      .forEach(txn => {
+        if (txn.paymentMethod) {
+          if (expenseBreakdown[txn.paymentMethod] === undefined) {
+            expenseBreakdown[txn.paymentMethod] = 0;
+          }
+          expenseBreakdown[txn.paymentMethod] += txn.amount;
+        }
+      });
+
+    const pendingExpense = filteredTransactionsForPeriod
+      .filter(txn => txn.type === 'expense' && txn.status === 'pending')
+      .reduce((s, txn) => s + txn.amount, 0);
+
+    return {
+      income: incomeBreakdown,
+      expense: expenseBreakdown,
+      pendingIncome,
+      pendingExpense
+    };
   }, [filteredTransactionsForPeriod, userSettings.enablePaymentMethods]);
 
   const monthlyFlowData: MonthlyFlowData[] = useMemo(() => {
@@ -178,29 +257,142 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
         <StatCard title={t.expenses} value={summary.totalExpense} type="expense" />
       </div>
 
+      {/* Net Balances of Last 30/60/90 Days */}
+      <Card className="border border-indigo-100 bg-indigo-50/10">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">
+            Saldo Líquido por Período (Entradas - Saídas)
+          </CardTitle>
+          <CardDescription>
+            Valor total acumulado que sobrou nos últimos 30, 60 e 90 dias.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Saldo do Mês Atual (Total)</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal30 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal30)}
+              </span>
+            </div>
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 60 Dias (Mês Atual + Anterior)</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal60 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal60)}
+              </span>
+            </div>
+            <div className="p-3 bg-background border rounded-lg shadow-sm">
+              <span className="text-xs text-muted-foreground block font-medium">Últimos 90 Dias (Mês Atual + 2 Ant.)</span>
+              <span className={cn(
+                "text-lg font-bold font-mono mt-1 block",
+                netBalances.bal90 >= 0 ? "text-income" : "text-expense"
+              )}>
+                {formatCurrency(netBalances.bal90)}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Payment Method Breakdown */}
       {paymentMethodBreakdown && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">{t.paymentMethodBreakdown}</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">{t.paymentMethodBreakdown}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(Object.keys(paymentMethodBreakdown) as PaymentMethod[]).map((method) => {
-                const config = paymentMethodConfig[method];
-                const value = paymentMethodBreakdown[method];
-                return (
-                  <div key={method} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <div className={`p-2 rounded-full bg-background ${config.color}`}>
-                      {config.icon}
+          <CardContent className="space-y-6">
+            {/* Entradas */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b pb-1">
+                <span className="text-xs font-bold text-income uppercase tracking-wider">Entradas</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {(Object.keys(paymentMethodBreakdown.income) as string[]).map((method) => {
+                  const config = paymentMethodConfig[method] || {
+                    icon: <Wallet className="h-4 w-4" />,
+                    color: 'text-indigo-600'
+                  };
+                  const value = paymentMethodBreakdown.income[method];
+                  
+                  if (value === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`income-${method}`} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-muted-foreground/5">
+                      <div className={`p-2 rounded-full bg-background ${config.color}`}>
+                        {config.icon}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
+                        <p className="font-semibold money-font text-income">{formatCurrency(value)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {paymentMethodBreakdown.pendingIncome > 0 && (
+                  <div key="pending-income" className="flex items-center gap-3 p-3 rounded-lg bg-amber-50/20 border border-amber-200/20">
+                    <div className="p-2 rounded-full bg-background text-amber-600">
+                      <Clock className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">{t[method]}</p>
-                      <p className="font-semibold money-font">{formatCurrency(value)}</p>
+                      <p className="text-xs text-muted-foreground">Pendente</p>
+                      <p className="font-semibold money-font text-amber-600">{formatCurrency(paymentMethodBreakdown.pendingIncome)}</p>
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
+            </div>
+
+            {/* Saídas */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b pb-1">
+                <span className="text-xs font-bold text-expense uppercase tracking-wider">Saídas</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {(Object.keys(paymentMethodBreakdown.expense) as string[]).map((method) => {
+                  const config = paymentMethodConfig[method] || {
+                    icon: <Wallet className="h-4 w-4" />,
+                    color: 'text-indigo-600'
+                  };
+                  const value = paymentMethodBreakdown.expense[method];
+                  
+                  if (value === 0 && !['cash', 'card', 'pix'].includes(method)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={`expense-${method}`} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-muted-foreground/5">
+                      <div className={`p-2 rounded-full bg-background ${config.color}`}>
+                        {config.icon}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t[method as keyof typeof t] || method}</p>
+                        <p className="font-semibold money-font text-expense">{formatCurrency(value)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {paymentMethodBreakdown.pendingExpense > 0 && (
+                  <div key="pending-expense" className="flex items-center gap-3 p-3 rounded-lg bg-amber-50/20 border border-amber-200/20">
+                    <div className="p-2 rounded-full bg-background text-amber-600">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pendente</p>
+                      <p className="font-semibold money-font text-amber-600">{formatCurrency(paymentMethodBreakdown.pendingExpense)}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -256,11 +448,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions }
         </div>
       )}
 
-      {/* Recent Transactions */}
-      <div className="grid grid-cols-1 gap-6">
+      {/* Recent Transactions + Agenda do Dia */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RecentTransactions
           transactions={transactions}
           onViewAll={onNavigateToTransactions}
+        />
+        <TodayScheduleWidget
+          onNavigateToSchedule={onNavigateToSchedule ?? (() => {})}
         />
       </div>
     </div>

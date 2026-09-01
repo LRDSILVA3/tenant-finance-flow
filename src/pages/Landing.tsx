@@ -155,7 +155,7 @@ export default function Landing() {
       name: "Mariana Costa",
       role: "CEO da Costa & Cia",
       avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
-      content: "O Previna mudou completamente a forma como lidamos com a nossa gestão multi-tenant. Agora alternamos entre nossas 3 filiais sem nenhuma dor de cabeça.",
+      content: "O Previna mudou completamente a forma como lidamos com a nossa gestão de filiais. Agora alternamos entre nossas 3 filiais sem nenhuma dor de cabeça.",
       stars: 5,
     },
     {
@@ -181,7 +181,7 @@ export default function Landing() {
     },
     {
       question: "Posso gerenciar mais de uma empresa na mesma conta?",
-      answer: "Sim! O Previna é um sistema multi-empresa (multi-tenant) nativo. A partir do plano Intermediário, você pode criar e alternar entre diferentes empresas/clientes com extrema facilidade, mantendo os dados financeiros de cada uma totalmente isolados.",
+      answer: "Sim! O Previna é um sistema multi-empresa nativo. A partir do plano Intermediário, você pode criar e alternar entre diferentes empresas/clientes com extrema facilidade, mantendo os dados financeiros de cada uma totalmente isolados.",
     },
     {
       question: "Meus dados de pagamento estão seguros?",

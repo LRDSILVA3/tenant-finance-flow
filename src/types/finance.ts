@@ -4,7 +4,25 @@ export type Language = 'pt' | 'en' | 'es';
 
 export type TransactionType = 'income' | 'expense';
 
-export type PaymentMethod = 'cash' | 'card' | 'pix' | 'pending';
+export type TransactionStatus = 'paid' | 'pending';
+
+export type PaymentMethod = string;
+
+export interface CustomPaymentMethod {
+  id: string;
+  clientId: string;
+  name: string;
+  parentType: 'cash' | 'card' | 'pix' | 'boleto' | 'other';
+  createdAt: Date;
+}
+
+export interface Supplier {
+  id: string;
+  clientId: string;
+  name: string;
+  contactInfo?: string;
+  createdAt: Date;
+}
 
 export type UserRole = 'owner' | 'collaborator';
 
@@ -50,6 +68,13 @@ export interface Category {
   createdAt: Date;
 }
 
+export interface TransactionCommission {
+  id: string;
+  transactionId: string;
+  collaboratorId: string;
+  commissionAmount: number;
+}
+
 export interface Transaction {
   id: string;
   clientId: string;
@@ -61,8 +86,12 @@ export interface Transaction {
   reference?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
-  collaboratorId?: string;
-  commissionAmount?: number;
+  status: TransactionStatus;
+  collaboratorId?: string; // Legado
+  commissionAmount?: number; // Legado
+  commissions?: TransactionCommission[];
+  customerId?: string;
+  supplierId?: string;
   recurringId?: string;
   createdAt: Date;
 }
@@ -74,7 +103,7 @@ export interface UserSettings {
   enableCommission: boolean;
 }
 
-export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'future';
 
 export interface PlanFeatures {
   payment_methods: boolean;
@@ -146,3 +175,110 @@ export interface FinancialSummary {
   totalExpense: number;
   balance: number;
 }
+
+// ─── Clientes (CRM Leve) ──────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string;
+  clientId: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  document?: string; // CPF ou CNPJ
+  personType?: 'individual' | 'legal';
+  birthDate?: string;
+  cep?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  notes?: string;
+  isActive: boolean;
+  asaasCustomerId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Agenda de Serviços ───────────────────────────────────────────────────────
+
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+export interface ServiceType {
+  id: string;
+  clientId: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface Appointment {
+  id: string;
+  clientId: string;
+  customerId?: string;
+  serviceTypeId?: string;
+  collaboratorId?: string;
+  title: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  price: number;
+  status: AppointmentStatus;
+  notes?: string;
+  transactionId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SystemNotification {
+  id: string;
+  type: 'low_stock' | 'expired_product' | 'expiring_product' | 'plan_expiration' | 'invoice_authorized' | 'invoice_error' | 'margin_warning' | 'birthday';
+  title: string;
+  message: string;
+  date: Date;
+  referenceId?: string;
+  read: boolean;
+}
+
+export interface ClientAsaasConfig {
+  clientId: string;
+  apiKey: string;
+  environment: 'sandbox' | 'production';
+  municipalServiceCode?: string;
+  issPercent: number;
+  cofinsPercent: number;
+  pisPercent: number;
+  inssPercent: number;
+  irPercent: number;
+  csllPercent: number;
+  automaticEmission: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type InvoiceStatus = 'SCHEDULED' | 'SYNCHRONIZED' | 'AUTHORIZED' | 'PROCESSING_CANCELLATION' | 'CANCELED' | 'DENIED' | 'ERROR';
+
+export interface Invoice {
+  id: string;
+  clientId: string;
+  subscriptionId?: string;
+  transactionId?: string;
+  asaasId?: string;
+  status: InvoiceStatus;
+  amount: number;
+  description?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
+  clientApiKeyUsed: boolean;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
