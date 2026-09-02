@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -19,7 +20,10 @@ import {
   Phone,
   Mail,
   Loader2,
-  X
+  X,
+  Filter,
+  ArrowUpDown,
+  DollarSign
 } from 'lucide-react';
 
 interface Supplier {
@@ -35,11 +39,14 @@ const emptyForm = {
 };
 
 export const Suppliers: React.FC = () => {
-  const { currentClient, loadSuppliers: reloadContextSuppliers } = useFinance();
+  const { currentClient, transactions, loadSuppliers: reloadContextSuppliers } = useFinance();
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterPendingPayables, setFilterPendingPayables] = useState<'all' | 'has_pending' | 'settled'>('all');
+  const [filterHasContact, setFilterHasContact] = useState<'all' | 'with_contact' | 'no_contact'>('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc'>('name_asc');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -79,16 +86,45 @@ export const Suppliers: React.FC = () => {
     loadSuppliers();
   }, [loadSuppliers]);
 
+  // Map of suppliers with pending expense balance
+  const supplierPendingBalanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    transactions.forEach(t => {
+      if (t.type === 'expense' && t.status === 'pending' && t.supplierId) {
+        map.set(t.supplierId, (map.get(t.supplierId) || 0) + t.amount);
+      }
+    });
+    return map;
+  }, [transactions]);
+
   const filteredSuppliers = useMemo(() => {
-    return suppliers.filter((s) => {
+    const result = suppliers.filter((s) => {
       const query = searchQuery.toLowerCase().trim();
-      if (!query) return true;
-      return (
+      const matchSearch = !query || (
         s.name.toLowerCase().includes(query) ||
         (s.contactInfo && s.contactInfo.toLowerCase().includes(query))
       );
+
+      const hasPending = (supplierPendingBalanceMap.get(s.id) || 0) > 0;
+      const matchPending = 
+        filterPendingPayables === 'all' ||
+        (filterPendingPayables === 'has_pending' && hasPending) ||
+        (filterPendingPayables === 'settled' && !hasPending);
+
+      const hasContact = !!(s.contactInfo && s.contactInfo.trim());
+      const matchContact =
+        filterHasContact === 'all' ||
+        (filterHasContact === 'with_contact' && hasContact) ||
+        (filterHasContact === 'no_contact' && !hasContact);
+
+      return matchSearch && matchPending && matchContact;
     });
-  }, [suppliers, searchQuery]);
+
+    return result.sort((a, b) => {
+      if (sortBy === 'name_desc') return b.name.localeCompare(a.name, 'pt-BR');
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
+  }, [suppliers, searchQuery, filterPendingPayables, filterHasContact, sortBy, supplierPendingBalanceMap]);
 
   const handleOpenCreate = () => {
     setSelectedSupplier(null);
@@ -218,30 +254,72 @@ export const Suppliers: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border shadow-sm">
-        <div className="flex items-center gap-2 max-w-md w-full bg-muted/30 px-3 py-1.5 rounded-lg border focus-within:border-primary/50 transition-colors">
-          <Search className="h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center justify-between bg-card p-3 rounded-xl border shadow-sm">
+        <div className="relative flex-1 min-w-[220px] w-full sm:w-auto">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            type="text"
+            type="search"
             placeholder="Buscar fornecedor por nome ou contato..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm w-full"
+            className="pl-8 h-9 text-xs"
           />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSearchQuery('')}
-              className="h-6 w-6 p-0 hover:bg-muted"
-            >
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          )}
         </div>
-        <div className="text-xs text-muted-foreground shrink-0">
-          Total de {filteredSuppliers.length} fornecedores encontrados
-        </div>
+
+        {/* Pending Payables Filter */}
+        <Select value={filterPendingPayables} onValueChange={(v: any) => setFilterPendingPayables(v)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-44">
+            <SelectValue placeholder="Contas a Pagar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Situações</SelectItem>
+            <SelectItem value="has_pending" className="text-rose-600 font-semibold">🚨 Com Débito a Pagar</SelectItem>
+            <SelectItem value="settled" className="text-emerald-600 font-semibold">✅ Sem Pendências</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Contact Info Filter */}
+        <Select value={filterHasContact} onValueChange={(v: any) => setFilterHasContact(v)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-36">
+            <SelectValue placeholder="Contato" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Contatos</SelectItem>
+            <SelectItem value="with_contact">Com Contato</SelectItem>
+            <SelectItem value="no_contact">Sem Contato</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Sort Order */}
+        <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-36">
+            <div className="flex items-center gap-1.5 truncate">
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Ordem" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name_asc">Nome (A-Z)</SelectItem>
+            <SelectItem value="name_desc">Nome (Z-A)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(searchQuery.trim() || filterPendingPayables !== 'all' || filterHasContact !== 'all' || sortBy !== 'name_asc') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setFilterPendingPayables('all');
+              setFilterHasContact('all');
+              setSortBy('name_asc');
+            }}
+            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar
+          </Button>
+        )}
       </div>
 
       {/* Suppliers Table Card */}

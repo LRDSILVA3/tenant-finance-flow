@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -35,7 +36,19 @@ import {
   Calculator,
   Package,
   AlertTriangle,
-  Truck
+  Truck,
+  ShieldAlert,
+  Flame,
+  Clock,
+  ArrowUpDown,
+  CheckCircle2,
+  PackageCheck,
+  History,
+  Sparkles,
+  Filter,
+  X,
+  Boxes,
+  RefreshCw
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -70,6 +83,9 @@ interface Product {
   sale_price: number;
   current_stock: number;
   min_stock: number;
+  category?: string | null;
+  unit?: string;
+  location?: string | null;
   expiration_date: string | null;
 }
 
@@ -109,9 +125,17 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
   const activeReportTab = activeTab || localActiveTab;
   const setActiveReportTab = onTabChange || setLocalActiveTab;
 
-  // Inventory State
+  // Inventory Sub-tabs and Filters State
+  const [subTabInventory, setSubTabInventory] = useState<'overview' | 'abc' | 'turnover' | 'expirations' | 'kardex'>('overview');
+  const [invCategoryFilter, setInvCategoryFilter] = useState<string>('all');
+  const [invSupplierFilter, setInvSupplierFilter] = useState<string>('all');
+  const [invKardexProductFilter, setInvKardexProductFilter] = useState<string>('all');
+  const [invKardexTypeFilter, setInvKardexTypeFilter] = useState<string>('all');
+
+  // Inventory Data State
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [stockMovements, setStockMovements] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
 
   useEffect(() => {
@@ -119,18 +143,15 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
       if (!currentClient) return;
       setLoadingInventory(true);
       try {
-        const { data: suppliersData } = await supabase
-          .from('suppliers')
-          .select('id, name')
-          .eq('client_id', currentClient.id);
-        
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('*')
-          .eq('client_id', currentClient.id);
-        
-        if (suppliersData) setSuppliers(suppliersData as Supplier[]);
-        if (productsData) setProducts(productsData as Product[]);
+        const [suppliersRes, productsRes, movementsRes] = await Promise.all([
+          supabase.from('suppliers').select('id, name').eq('client_id', currentClient.id),
+          supabase.from('products').select('*').eq('client_id', currentClient.id),
+          supabase.from('stock_movements').select('*').eq('client_id', currentClient.id).order('created_at', { ascending: false }),
+        ]);
+
+        if (suppliersRes.data) setSuppliers(suppliersRes.data as Supplier[]);
+        if (productsRes.data) setProducts(productsRes.data as Product[]);
+        if (movementsRes.data) setStockMovements(movementsRes.data);
       } catch (err) {
         console.error('Erro ao buscar dados de estoque:', err);
       } finally {
@@ -139,33 +160,62 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
     };
 
     fetchInventoryData();
-  }, [currentClient, activeReportTab]); // Refresh when tab changes or client changes
+  }, [currentClient, activeReportTab]);
 
+  // Unique product categories
+  const invCategories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => {
+      if (p.category && p.category.trim()) cats.add(p.category.trim());
+    });
+    return Array.from(cats).sort();
+  }, [products]);
+
+  // Filtered Products for Inventory Reports
+  const filteredInvProducts = useMemo(() => {
+    return products.filter(p => {
+      if (invCategoryFilter !== 'all' && p.category !== invCategoryFilter) return false;
+      if (invSupplierFilter !== 'all') {
+        if (invSupplierFilter === 'none') {
+          if (p.supplier_id) return false;
+        } else if (p.supplier_id !== invSupplierFilter) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [products, invCategoryFilter, invSupplierFilter]);
+
+  // 1. Overview Valuation Data
   const inventoryReportData = useMemo(() => {
     let totalItems = 0;
     let totalCostValuation = 0;
     let totalSaleValuation = 0;
+    let zeroStockCount = 0;
     const criticalItems: Product[] = [];
     const supplierTotals: Record<string, { name: string; itemsCount: number; costValuation: number; saleValuation: number }> = {};
+    const categoryTotals: Record<string, { name: string; itemsCount: number; costValuation: number; saleValuation: number }> = {};
 
-    // Initialize suppliers
     suppliers.forEach(s => {
       supplierTotals[s.id] = { name: s.name, itemsCount: 0, costValuation: 0, saleValuation: 0 };
     });
-    // Add fallback for null supplier
     supplierTotals['none'] = { name: 'Sem Fornecedor', itemsCount: 0, costValuation: 0, saleValuation: 0 };
 
-    products.forEach(p => {
+    filteredInvProducts.forEach(p => {
       totalItems += p.current_stock;
       const costVal = p.current_stock * Number(p.cost_price);
       const saleVal = p.current_stock * Number(p.sale_price);
       totalCostValuation += costVal;
       totalSaleValuation += saleVal;
 
+      if (p.current_stock <= 0) {
+        zeroStockCount++;
+      }
       if (p.current_stock <= p.min_stock) {
         criticalItems.push(p);
       }
 
+      // Supplier breakdown
       const supplierId = p.supplier_id || 'none';
       if (!supplierTotals[supplierId]) {
         supplierTotals[supplierId] = { 
@@ -178,21 +228,296 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
       supplierTotals[supplierId].itemsCount += p.current_stock;
       supplierTotals[supplierId].costValuation += costVal;
       supplierTotals[supplierId].saleValuation += saleVal;
+
+      // Category breakdown
+      const catKey = p.category || 'Sem Categoria';
+      if (!categoryTotals[catKey]) {
+        categoryTotals[catKey] = { name: catKey, itemsCount: 0, costValuation: 0, saleValuation: 0 };
+      }
+      categoryTotals[catKey].itemsCount += p.current_stock;
+      categoryTotals[catKey].costValuation += costVal;
+      categoryTotals[catKey].saleValuation += saleVal;
     });
 
     const supplierSummaries = Object.values(supplierTotals)
       .filter(s => s.itemsCount > 0 || s.costValuation > 0)
       .sort((a, b) => b.costValuation - a.costValuation);
 
+    const categorySummaries = Object.values(categoryTotals)
+      .filter(c => c.itemsCount > 0 || c.costValuation > 0)
+      .sort((a, b) => b.costValuation - a.costValuation);
+
+    const stockoutRate = filteredInvProducts.length > 0 ? (criticalItems.length / filteredInvProducts.length) * 100 : 0;
+
     return {
       totalItems,
       totalCostValuation,
       totalSaleValuation,
       totalMarkup: totalSaleValuation - totalCostValuation,
+      avgMarginPercent: totalSaleValuation > 0 ? ((totalSaleValuation - totalCostValuation) / totalSaleValuation) * 100 : 0,
       criticalItems: criticalItems.sort((a, b) => a.current_stock - b.current_stock),
-      supplierSummaries
+      zeroStockCount,
+      stockoutRate,
+      supplierSummaries,
+      categorySummaries,
     };
-  }, [products, suppliers]);
+  }, [filteredInvProducts, suppliers]);
+
+  // 2. ABC Curve & Pareto Calculation
+  const abcCurveData = useMemo(() => {
+    // Out movements in period
+    const movementsInPeriod = stockMovements.filter(m => {
+      if (m.type !== 'out') return false;
+      const d = new Date(m.created_at);
+      if (startDate && d < startDate) return false;
+      if (endDate && d > endDate) return false;
+      return true;
+    });
+
+    // Sum revenue/sales per product
+    const productSales: Record<string, { product: Product; quantitySold: number; totalRevenue: number; totalCost: number }> = {};
+
+    filteredInvProducts.forEach(p => {
+      productSales[p.id] = {
+        product: p,
+        quantitySold: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+      };
+    });
+
+    movementsInPeriod.forEach(m => {
+      if (productSales[m.product_id]) {
+        const p = productSales[m.product_id].product;
+        const qty = m.quantity || 0;
+        productSales[m.product_id].quantitySold += qty;
+        productSales[m.product_id].totalRevenue += qty * Number(p.sale_price);
+        productSales[m.product_id].totalCost += qty * Number(p.cost_price);
+      }
+    });
+
+    let items = Object.values(productSales);
+    const totalRevenueAll = items.reduce((acc, i) => acc + i.totalRevenue, 0);
+
+    // If total revenue in period is 0, base ABC on current inventory sale valuation
+    const fallbackToValuation = totalRevenueAll === 0;
+    const baseTotal = fallbackToValuation
+      ? items.reduce((acc, i) => acc + (i.product.current_stock * i.product.sale_price), 0)
+      : totalRevenueAll;
+
+    items = items
+      .map(item => {
+        const val = fallbackToValuation ? (item.product.current_stock * item.product.sale_price) : item.totalRevenue;
+        return {
+          ...item,
+          metricValue: val,
+        };
+      })
+      .sort((a, b) => b.metricValue - a.metricValue);
+
+    let accumulatedValue = 0;
+    let classACount = 0;
+    let classAValue = 0;
+    let classBCount = 0;
+    let classBValue = 0;
+    let classCCount = 0;
+    let classCValue = 0;
+
+    const classifiedItems = items.map((item) => {
+      accumulatedValue += item.metricValue;
+      const percentOfTotal = baseTotal > 0 ? (item.metricValue / baseTotal) * 100 : 0;
+      const cumPercent = baseTotal > 0 ? (accumulatedValue / baseTotal) * 100 : 0;
+
+      let classification: 'A' | 'B' | 'C' = 'C';
+      if (cumPercent <= 80 || (classACount === 0 && items.length > 0)) {
+        classification = 'A';
+        classACount++;
+        classAValue += item.metricValue;
+      } else if (cumPercent <= 95) {
+        classification = 'B';
+        classBCount++;
+        classBValue += item.metricValue;
+      } else {
+        classification = 'C';
+        classCCount++;
+        classCValue += item.metricValue;
+      }
+
+      return {
+        ...item,
+        percentOfTotal,
+        cumPercent,
+        classification,
+      };
+    });
+
+    // Top 10 items for Pareto chart
+    const paretoChartData = classifiedItems.slice(0, 15).map(i => ({
+      name: i.product.name.length > 18 ? `${i.product.name.slice(0, 16)}...` : i.product.name,
+      valor: i.metricValue,
+      acumulado: Number(i.cumPercent.toFixed(1)),
+      classe: i.classification,
+    }));
+
+    return {
+      classifiedItems,
+      baseTotal,
+      fallbackToValuation,
+      totalProducts: classifiedItems.length,
+      classACount,
+      classAValue,
+      classAPercent: baseTotal > 0 ? (classAValue / baseTotal) * 100 : 0,
+      classBCount,
+      classBValue,
+      classBPercent: baseTotal > 0 ? (classBValue / baseTotal) * 100 : 0,
+      classCCount,
+      classCValue,
+      classCPercent: baseTotal > 0 ? (classCValue / baseTotal) * 100 : 0,
+      paretoChartData,
+    };
+  }, [filteredInvProducts, stockMovements, startDate, endDate]);
+
+  // 3. Turnover & Restock Suggestion Calculation
+  const turnoverAndRestockData = useMemo(() => {
+    const periodDays = Math.max(1, startDate && endDate
+      ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 30
+    );
+
+    // Sum out movements in period
+    const productOutMap: Record<string, number> = {};
+    stockMovements.forEach(m => {
+      if (m.type === 'out') {
+        const d = new Date(m.created_at);
+        if (startDate && d < startDate) return;
+        if (endDate && d > endDate) return;
+        productOutMap[m.product_id] = (productOutMap[m.product_id] || 0) + (m.quantity || 0);
+      }
+    });
+
+    let totalSuggestedCost = 0;
+    let urgentRestockCount = 0;
+
+    const items = filteredInvProducts.map(p => {
+      const outQty = productOutMap[p.id] || 0;
+      const cmd = outQty / periodDays; // Consumo Médio Diário
+      const daysOfInventory = cmd > 0 ? p.current_stock / cmd : (p.current_stock > 0 ? 999 : 0);
+      
+      // Sugestão de compra para cobrir meta de 30 dias com estoque mínimo
+      const targetStock = Math.ceil(cmd * 30) + p.min_stock;
+      const suggestedBuy = Math.max(0, targetStock - p.current_stock);
+      const suggestedBuyCost = suggestedBuy * Number(p.cost_price);
+
+      let urgency: 'urgent' | 'warning' | 'normal' | 'excess' = 'normal';
+      if (p.current_stock <= p.min_stock || daysOfInventory <= 7) {
+        urgency = 'urgent';
+        urgentRestockCount++;
+      } else if (daysOfInventory <= 15) {
+        urgency = 'warning';
+      } else if (daysOfInventory > 60 && p.current_stock > p.min_stock * 2) {
+        urgency = 'excess';
+      }
+
+      totalSuggestedCost += suggestedBuyCost;
+
+      return {
+        product: p,
+        outQty,
+        cmd,
+        daysOfInventory,
+        suggestedBuy,
+        suggestedBuyCost,
+        urgency,
+      };
+    }).sort((a, b) => {
+      // Sort by urgency: urgent first, then highest suggested cost
+      const score = (u: string) => (u === 'urgent' ? 3 : u === 'warning' ? 2 : u === 'normal' ? 1 : 0);
+      if (score(b.urgency) !== score(a.urgency)) return score(b.urgency) - score(a.urgency);
+      return b.suggestedBuyCost - a.suggestedBuyCost;
+    });
+
+    return {
+      items,
+      periodDays,
+      totalSuggestedCost,
+      urgentRestockCount,
+    };
+  }, [filteredInvProducts, stockMovements, startDate, endDate]);
+
+  // 4. Expirations Risk Data
+  const expirationsReportData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiredItems: { product: Product; daysDiff: number; lossValue: number }[] = [];
+    const expiring7d: { product: Product; daysDiff: number; riskValue: number }[] = [];
+    const expiring15d: { product: Product; daysDiff: number; riskValue: number }[] = [];
+    const expiring30d: { product: Product; daysDiff: number; riskValue: number }[] = [];
+    const safeItems: { product: Product; daysDiff: number }[] = [];
+
+    let totalExpiredLoss = 0;
+    let totalRisk7d = 0;
+    let totalRisk15d = 0;
+    let totalRisk30d = 0;
+
+    filteredInvProducts.forEach(p => {
+      if (!p.expiration_date) return;
+      const exp = new Date(`${p.expiration_date}T00:00:00`);
+      const daysDiff = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const costTotal = p.current_stock * Number(p.cost_price);
+
+      if (daysDiff < 0) {
+        if (p.current_stock > 0) {
+          expiredItems.push({ product: p, daysDiff, lossValue: costTotal });
+          totalExpiredLoss += costTotal;
+        }
+      } else if (daysDiff <= 7) {
+        if (p.current_stock > 0) {
+          expiring7d.push({ product: p, daysDiff, riskValue: costTotal });
+          totalRisk7d += costTotal;
+        }
+      } else if (daysDiff <= 15) {
+        if (p.current_stock > 0) {
+          expiring15d.push({ product: p, daysDiff, riskValue: costTotal });
+          totalRisk15d += costTotal;
+        }
+      } else if (daysDiff <= 30) {
+        if (p.current_stock > 0) {
+          expiring30d.push({ product: p, daysDiff, riskValue: costTotal });
+          totalRisk30d += costTotal;
+        }
+      } else {
+        safeItems.push({ product: p, daysDiff });
+      }
+    });
+
+    const allAtRiskItems = [...expiredItems, ...expiring7d, ...expiring15d, ...expiring30d].sort((a, b) => a.daysDiff - b.daysDiff);
+
+    return {
+      expiredItems,
+      totalExpiredLoss,
+      expiring7d,
+      totalRisk7d,
+      expiring15d,
+      totalRisk15d,
+      expiring30d,
+      totalRisk30d,
+      totalCapitalAtRisk: totalExpiredLoss + totalRisk7d + totalRisk15d + totalRisk30d,
+      allAtRiskItems,
+    };
+  }, [filteredInvProducts]);
+
+  // 5. Kardex Data
+  const kardexData = useMemo(() => {
+    return stockMovements.filter(m => {
+      const d = new Date(m.created_at);
+      if (startDate && d < startDate) return false;
+      if (endDate && d > endDate) return false;
+      if (invKardexProductFilter !== 'all' && m.product_id !== invKardexProductFilter) return false;
+      if (invKardexTypeFilter !== 'all' && m.type !== invKardexTypeFilter) return false;
+      return true;
+    });
+  }, [stockMovements, startDate, endDate, invKardexProductFilter, invKardexTypeFilter]);
 
   // Date period helper
   const handlePeriodTypeChange = (type: PeriodType) => {
@@ -1769,177 +2094,802 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
 
           {/* Inventory Report Tab */}
           <TabsContent value="inventory" className="space-y-6 print:block">
-            {/* Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="border shadow-sm bg-muted/20">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Itens Totais em Estoque</p>
-                      <p className="text-2xl font-bold font-mono mt-1 text-foreground">{inventoryReportData.totalItems}</p>
-                    </div>
-                    <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                      <Package className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Sub-navigation and Filter Toolbar */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-2 bg-muted/20 border rounded-xl">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  variant={subTabInventory === 'overview' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSubTabInventory('overview')}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  Valoração & Posição
+                </Button>
+                <Button
+                  variant={subTabInventory === 'abc' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSubTabInventory('abc')}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                  Curva ABC (Pareto)
+                </Button>
+                <Button
+                  variant={subTabInventory === 'turnover' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSubTabInventory('turnover')}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-blue-500" />
+                  Giro & Sugestão de Compras
+                </Button>
+                <Button
+                  variant={subTabInventory === 'expirations' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSubTabInventory('expirations')}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <ShieldAlert className="h-3.5 w-3.5 text-orange-500" />
+                  Validades & Risco
+                </Button>
+                <Button
+                  variant={subTabInventory === 'kardex' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSubTabInventory('kardex')}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <History className="h-3.5 w-3.5 text-purple-500" />
+                  Extrato Kardex
+                </Button>
+              </div>
 
-              <Card className="border shadow-sm bg-muted/20">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Valoração (Custo/Pago)</p>
-                      <p className="text-2xl font-bold font-mono mt-1 text-expense">{formatCurrency(inventoryReportData.totalCostValuation)}</p>
-                    </div>
-                    <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-                      <TrendingDown className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Dynamic Filters for Inventory */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={invCategoryFilter} onValueChange={setInvCategoryFilter}>
+                  <SelectTrigger className="h-8 text-xs w-[150px]">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas Categorias</SelectItem>
+                    {invCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
 
-              <Card className="border shadow-sm bg-muted/20">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Valoração (Preço de Venda)</p>
-                      <p className="text-2xl font-bold font-mono mt-1 text-income">{formatCurrency(inventoryReportData.totalSaleValuation)}</p>
-                    </div>
-                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <Select value={invSupplierFilter} onValueChange={setInvSupplierFilter}>
+                  <SelectTrigger className="h-8 text-xs w-[150px]">
+                    <SelectValue placeholder="Fornecedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Fornecedores</SelectItem>
+                    <SelectItem value="none">Sem Fornecedor</SelectItem>
+                    {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
 
-              <Card className="border shadow-sm bg-muted/20">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider font-semibold">Lucro Estimado / Markup</p>
-                      <p className={cn("text-2xl font-bold font-mono mt-1", inventoryReportData.totalMarkup >= 0 ? "text-income" : "text-expense")}>
-                        {formatCurrency(inventoryReportData.totalMarkup)}
-                      </p>
-                    </div>
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                      <DollarSign className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                {(invCategoryFilter !== 'all' || invSupplierFilter !== 'all') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { setInvCategoryFilter('all'); setInvSupplierFilter('all'); }}
+                    className="h-8 px-2 text-xs text-muted-foreground"
+                    title="Limpar filtros de estoque"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1">
-              {/* Critical stock items */}
-              <Card className="border shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-red-600">
-                    <AlertTriangle className="h-5 w-5" />
-                    Produtos com Estoque Crítico (Reposição Necessária)
-                  </CardTitle>
-                  <CardDescription>
-                    Produtos cuja quantidade atual está abaixo ou igual ao estoque mínimo.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {inventoryReportData.criticalItems.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
-                      <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                        <Package className="h-5 w-5" />
+            {/* 1. SUB-VIEW: OVERVIEW & VALUATION */}
+            {subTabInventory === 'overview' && (
+              <div className="space-y-6">
+                {/* Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Itens Totais em Estoque</p>
+                          <p className="text-2xl font-bold font-mono mt-1 text-foreground">{inventoryReportData.totalItems}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{filteredInvProducts.length} produtos cadastrados</p>
+                        </div>
+                        <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                          <Package className="h-5 w-5" />
+                        </div>
                       </div>
-                      Nenhum produto em nível crítico de estoque.
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Capital Imobilizado (Custo)</p>
+                          <p className="text-2xl font-bold font-mono mt-1 text-expense">{formatCurrency(inventoryReportData.totalCostValuation)}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Investimento em mercadorias</p>
+                        </div>
+                        <div className="p-2 bg-red-50 text-red-600 rounded-lg">
+                          <TrendingDown className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Faturamento Potencial (Venda)</p>
+                          <p className="text-2xl font-bold font-mono mt-1 text-income">{formatCurrency(inventoryReportData.totalSaleValuation)}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Ao preço de venda praticado</p>
+                        </div>
+                        <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                          <TrendingUp className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider font-semibold">Margem Bruta / Markup</p>
+                          <p className={cn("text-2xl font-bold font-mono mt-1", inventoryReportData.totalMarkup >= 0 ? "text-income" : "text-expense")}>
+                            {formatCurrency(inventoryReportData.totalMarkup)}
+                          </p>
+                          <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">
+                            {inventoryReportData.avgMarginPercent.toFixed(1)}% de margem teórica
+                          </p>
+                        </div>
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                          <DollarSign className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1">
+                  {/* Critical stock items */}
+                  <Card className="border shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-base font-semibold flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Produtos em Nível Crítico ou Zerados ({inventoryReportData.criticalItems.length})
+                      </CardTitle>
+                      <CardDescription>
+                        Taxa de ruptura estimada: <b>{inventoryReportData.stockoutRate.toFixed(1)}%</b> do catálogo.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {inventoryReportData.criticalItems.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
+                          <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                            <CheckCircle2 className="h-5 w-5" />
+                          </div>
+                          Nenhum produto em nível crítico de estoque.
+                        </div>
+                      ) : (
+                        <div className="overflow-hidden border rounded-lg max-h-[320px] overflow-y-auto">
+                          <Table>
+                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                              <TableRow>
+                                <TableHead>Produto</TableHead>
+                                <TableHead className="text-center">Mínimo</TableHead>
+                                <TableHead className="text-center">Atual</TableHead>
+                                <TableHead className="text-right">Custo Reposição</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inventoryReportData.criticalItems.map((p) => {
+                                const diff = Math.max(0, p.min_stock - p.current_stock);
+                                return (
+                                  <TableRow key={p.id} className="hover:bg-red-50/10">
+                                    <TableCell className="font-semibold text-sm">
+                                      <div>{p.name}</div>
+                                      <div className="text-xs text-muted-foreground font-mono">{p.sku || 'Sem SKU'}</div>
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-xs text-muted-foreground">{p.min_stock}</TableCell>
+                                    <TableCell className="text-center">
+                                      <span className={cn(
+                                        "inline-block px-2 py-0.5 rounded-full text-xs font-semibold font-mono",
+                                        p.current_stock === 0 ? "bg-red-600 text-white" : "bg-red-100 text-red-800"
+                                      )}>
+                                        {p.current_stock}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs text-expense">
+                                      {formatCurrency(diff * p.cost_price)}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Grouped by Supplier */}
+                  <Card className="border shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <Truck className="h-5 w-5 text-primary" />
+                        Valor de Estoque por Fornecedor
+                      </CardTitle>
+                      <CardDescription>
+                        Concentração do capital investido e retorno por fornecedor parceiro.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {inventoryReportData.supplierSummaries.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          Nenhum dado de estoque por fornecedor disponível.
+                        </div>
+                      ) : (
+                        <div className="overflow-hidden border rounded-lg max-h-[320px] overflow-y-auto">
+                          <Table>
+                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                              <TableRow>
+                                <TableHead>Fornecedor</TableHead>
+                                <TableHead className="text-center">Itens</TableHead>
+                                <TableHead className="text-right">Custo Total</TableHead>
+                                <TableHead className="text-right">Venda Projetada</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inventoryReportData.supplierSummaries.map((s, idx) => (
+                                <TableRow key={idx} className="hover:bg-muted/30">
+                                  <TableCell className="font-semibold text-sm">{s.name}</TableCell>
+                                  <TableCell className="text-center font-mono text-sm">{s.itemsCount}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm text-expense">{formatCurrency(s.costValuation)}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm text-income">{formatCurrency(s.saleValuation)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* 2. SUB-VIEW: ABC CURVE (PARETO) */}
+            {subTabInventory === 'abc' && (
+              <div className="space-y-6">
+                {/* ABC Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Classe A */}
+                  <Card className="border shadow-sm bg-emerald-50/30 border-emerald-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-emerald-600 text-white font-bold text-xs">Classe A (80% da Receita)</Badge>
+                        <span className="text-xs font-mono font-bold text-emerald-800">{abcCurveData.classAPercent.toFixed(1)}% do Total</span>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-emerald-950 mt-3">{formatCurrency(abcCurveData.classAValue)}</p>
+                      <p className="text-xs text-emerald-700 mt-1 font-medium">
+                        {abcCurveData.classACount} itens vitais (Alta prioridade de reposição)
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Classe B */}
+                  <Card className="border shadow-sm bg-blue-50/30 border-blue-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-blue-600 text-white font-bold text-xs">Classe B (15% da Receita)</Badge>
+                        <span className="text-xs font-mono font-bold text-blue-800">{abcCurveData.classBPercent.toFixed(1)}% do Total</span>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-blue-950 mt-3">{formatCurrency(abcCurveData.classBValue)}</p>
+                      <p className="text-xs text-blue-700 mt-1 font-medium">
+                        {abcCurveData.classBCount} itens intermediários (Giro moderado)
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Classe C */}
+                  <Card className="border shadow-sm bg-amber-50/30 border-amber-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-amber-600 text-white font-bold text-xs">Classe C (5% da Receita)</Badge>
+                        <span className="text-xs font-mono font-bold text-amber-800">{abcCurveData.classCPercent.toFixed(1)}% do Total</span>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-amber-950 mt-3">{formatCurrency(abcCurveData.classCValue)}</p>
+                      <p className="text-xs text-amber-700 mt-1 font-medium">
+                        {abcCurveData.classCCount} itens de cauda longa (Evitar sobre-estoque)
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Pareto Chart */}
+                {abcCurveData.paretoChartData.length > 0 && (
+                  <Card className="border shadow-md">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-primary" />
+                        Gráfico de Pareto (Top 15 Itens & % Acumulada)
+                      </CardTitle>
+                      <CardDescription>
+                        {abcCurveData.fallbackToValuation 
+                          ? "Baseado no valor total em estoque (nenhuma saída registrada no período)." 
+                          : "Baseado nas movimentações de saída/vendas registradas no período."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[280px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={abcCurveData.paretoChartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                            <XAxis dataKey="name" angle={-25} textAnchor="end" height={50} tick={{ fontSize: 10 }} />
+                            <YAxis yAxisId="left" orientation="left" stroke="#8884d8" tickFormatter={(v) => `R$ ${v > 1000 ? (v/1000).toFixed(0) + 'k' : v}`} tick={{ fontSize: 10 }} />
+                            <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" unit="%" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                            <Tooltip 
+                              formatter={(value: any, name: string) => {
+                                if (name === 'acumulado') return [`${value}%`, 'Acumulado'];
+                                return [formatCurrency(Number(value)), 'Valor'];
+                              }}
+                            />
+                            <Legend />
+                            <Bar yAxisId="left" dataKey="valor" name="Valor (R$)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                              {abcCurveData.paretoChartData.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={entry.classe === 'A' ? '#10b981' : entry.classe === 'B' ? '#3b82f6' : '#f59e0b'} 
+                                />
+                              ))}
+                            </Bar>
+                            <Line yAxisId="right" type="monotone" dataKey="acumulado" name="% Acumulado" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ABC Table */}
+                <Card className="border shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold">Tabela de Classificação de Produtos</CardTitle>
+                    <CardDescription>
+                      Classificação ordenada de impacto financeiro sobre o faturamento.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-hidden border rounded-lg max-h-[400px] overflow-y-auto">
+                      <Table>
+                        <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                          <TableRow>
+                            <TableHead className="w-[80px]">Classe</TableHead>
+                            <TableHead>Produto</TableHead>
+                            <TableHead className="text-center">Estoque Atual</TableHead>
+                            <TableHead className="text-right">Preço Venda</TableHead>
+                            <TableHead className="text-right">Valor Total</TableHead>
+                            <TableHead className="text-right">% do Total</TableHead>
+                            <TableHead className="text-right">% Acumulado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {abcCurveData.classifiedItems.map((item, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/30">
+                              <TableCell>
+                                <Badge className={cn(
+                                  "font-bold text-xs",
+                                  item.classification === 'A' ? "bg-emerald-600 text-white" :
+                                  item.classification === 'B' ? "bg-blue-600 text-white" : "bg-amber-600 text-white"
+                                )}>
+                                  Classe {item.classification}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-semibold text-sm">
+                                <div>{item.product.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{item.product.sku || '-'}</div>
+                              </TableCell>
+                              <TableCell className="text-center font-mono text-xs">{item.product.current_stock} {item.product.unit || 'UN'}</TableCell>
+                              <TableCell className="text-right font-mono text-xs text-income font-medium">{formatCurrency(item.product.sale_price)}</TableCell>
+                              <TableCell className="text-right font-mono text-xs font-bold">{formatCurrency(item.metricValue)}</TableCell>
+                              <TableCell className="text-right font-mono text-xs text-muted-foreground">{item.percentOfTotal.toFixed(1)}%</TableCell>
+                              <TableCell className="text-right font-mono text-xs font-semibold">{item.cumPercent.toFixed(1)}%</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  ) : (
-                    <div className="overflow-hidden border rounded-lg max-h-[300px] overflow-y-auto">
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* 3. SUB-VIEW: TURNOVER & RESTOCK SUGGESTIONS */}
+            {subTabInventory === 'turnover' && (
+              <div className="space-y-6">
+                {/* Summary KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground font-medium uppercase">Produtos com Reposição Urgente</span>
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-red-700 mt-2">{turnoverAndRestockData.urgentRestockCount} itens</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Estoque zerado ou cobertura ≤ 7 dias</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground font-medium uppercase">Investimento Sugerido (30d)</span>
+                        <DollarSign className="h-4 w-4 text-primary" />
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-primary mt-2">{formatCurrency(turnoverAndRestockData.totalSuggestedCost)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Para repor estoque mínimo e demanda</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border shadow-sm bg-muted/20">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground font-medium uppercase">Período de Análise de Giro</span>
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-foreground mt-2">{turnoverAndRestockData.periodDays} dias</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Base de cálculo de consumo diário</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Restock Suggestion Table */}
+                <Card className="border shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5 text-primary" />
+                      Sugestão de Reposição & Dias de Cobertura
+                    </CardTitle>
+                    <CardDescription>
+                      Cálculo de consumo médio diário (CMD) e recomendação de pedido para cobertura de 30 dias.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-hidden border rounded-lg max-h-[450px] overflow-y-auto">
                       <Table>
                         <TableHeader className="bg-muted/50 sticky top-0 z-10">
                           <TableRow>
                             <TableHead>Produto</TableHead>
-                            <TableHead className="text-center">Estoque Mínimo</TableHead>
                             <TableHead className="text-center">Estoque Atual</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
+                            <TableHead className="text-center">Consumo Diário</TableHead>
+                            <TableHead className="text-center">Cobertura (Dias)</TableHead>
+                            <TableHead className="text-center">Sugestão Compra</TableHead>
+                            <TableHead className="text-right">Custo Estimado</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {inventoryReportData.criticalItems.map((p) => (
-                            <TableRow key={p.id} className="hover:bg-red-50/10">
+                          {turnoverAndRestockData.items.map((item, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/30">
                               <TableCell className="font-semibold text-sm">
-                                <div>{p.name}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{p.sku || 'Sem SKU'}</div>
+                                <div>{item.product.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{item.product.sku || '-'}</div>
                               </TableCell>
-                              <TableCell className="text-center font-mono text-sm text-muted-foreground">{p.min_stock}</TableCell>
+                              <TableCell className="text-center font-mono text-xs font-semibold">
+                                {item.product.current_stock} {item.product.unit || 'UN'}
+                              </TableCell>
+                              <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                                {item.cmd.toFixed(2)}/dia
+                              </TableCell>
                               <TableCell className="text-center">
-                                <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold font-mono bg-red-100 text-red-800">
-                                  {p.current_stock}
+                                <span className={cn(
+                                  "font-mono text-xs font-bold px-2 py-0.5 rounded",
+                                  item.daysOfInventory <= 7 ? "bg-red-100 text-red-800" :
+                                  item.daysOfInventory <= 15 ? "bg-orange-100 text-orange-800" :
+                                  item.daysOfInventory > 60 ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"
+                                )}>
+                                  {item.daysOfInventory > 365 ? "> 1 ano" : `${item.daysOfInventory.toFixed(0)} dias`}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-right">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => {
-                                    // Trigger tab switch to main inventory view if possible
-                                    const mainInventoryTab = document.querySelector('[data-value="inventory"]') as HTMLElement;
-                                    if (mainInventoryTab) mainInventoryTab.click();
-                                  }}
-                                  className="h-7 text-xs"
-                                >
-                                  Repor
-                                </Button>
+                              <TableCell className="text-center font-mono text-sm font-bold text-foreground">
+                                {item.suggestedBuy > 0 ? `+${item.suggestedBuy} ${item.product.unit || 'UN'}` : '0'}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-expense font-semibold">
+                                {formatCurrency(item.suggestedBuyCost)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant={
+                                  item.urgency === 'urgent' ? 'destructive' :
+                                  item.urgency === 'warning' ? 'outline' : 'secondary'
+                                } className={cn(
+                                  "text-[10px]",
+                                  item.urgency === 'warning' && "border-amber-400 bg-amber-50 text-amber-800",
+                                  item.urgency === 'excess' && "border-blue-400 bg-blue-50 text-blue-800"
+                                )}>
+                                  {item.urgency === 'urgent' ? 'Reposição Urgente' :
+                                   item.urgency === 'warning' ? 'Atenção' :
+                                   item.urgency === 'excess' ? 'Excesso de Estoque' : 'Estoque Saudável'}
+                                </Badge>
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-              {/* Grouped by Supplier */}
-              <Card className="border shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-primary" />
-                    Valor de Estoque por Fornecedor
-                  </CardTitle>
-                  <CardDescription>
-                    Distribuição da quantidade de itens e valor investido por fornecedor.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {inventoryReportData.supplierSummaries.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Nenhum dado de estoque por fornecedor disponível.
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden border rounded-lg max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                          <TableRow>
-                            <TableHead>Fornecedor</TableHead>
-                            <TableHead className="text-center">Itens</TableHead>
-                            <TableHead className="text-right">Custo Total</TableHead>
-                            <TableHead className="text-right">Venda Projetada</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {inventoryReportData.supplierSummaries.map((s, idx) => (
-                            <TableRow key={idx} className="hover:bg-muted/30">
-                              <TableCell className="font-semibold text-sm">{s.name}</TableCell>
-                              <TableCell className="text-center font-mono text-sm">{s.itemsCount}</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-expense">{formatCurrency(s.costValuation)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-income">{formatCurrency(s.saleValuation)}</TableCell>
+            {/* 4. SUB-VIEW: EXPIRATIONS & FINANCIAL RISK */}
+            {subTabInventory === 'expirations' && (
+              <div className="space-y-6">
+                {/* Expiration Risk Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Vencidos */}
+                  <Card className="border bg-red-50/40 border-red-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between text-red-700">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <ShieldAlert className="h-4 w-4" /> Já Vencidos
+                        </span>
+                        <Badge variant="destructive" className="text-[10px]">Perda</Badge>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-red-950 mt-2">{expirationsReportData.expiredItems.length} produtos</p>
+                      <p className="text-xs font-mono font-semibold text-red-600 mt-0.5">Perda Total: {formatCurrency(expirationsReportData.totalExpiredLoss)}</p>
+                    </CardContent>
+                  </Card>
+
+                  {/* 7 dias */}
+                  <Card className="border bg-orange-50/40 border-orange-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between text-orange-700">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <Flame className="h-4 w-4" /> Vence em 7 dias
+                        </span>
+                        <Badge variant="outline" className="text-[10px] border-orange-300 bg-orange-100 text-orange-800">Urgência</Badge>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-orange-950 mt-2">{expirationsReportData.expiring7d.length} produtos</p>
+                      <p className="text-xs font-mono font-semibold text-orange-600 mt-0.5">Risco: {formatCurrency(expirationsReportData.totalRisk7d)}</p>
+                    </CardContent>
+                  </Card>
+
+                  {/* 30 dias */}
+                  <Card className="border bg-amber-50/40 border-amber-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between text-amber-700">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <Clock className="h-4 w-4" /> Vence em 30 dias
+                        </span>
+                        <Badge variant="outline" className="text-[10px] border-amber-300 bg-amber-100 text-amber-800">Atenção</Badge>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-amber-950 mt-2">{expirationsReportData.expiring15d.length + expirationsReportData.expiring30d.length} produtos</p>
+                      <p className="text-xs font-mono font-semibold text-amber-700 mt-0.5">Risco: {formatCurrency(expirationsReportData.totalRisk15d + expirationsReportData.totalRisk30d)}</p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Capital Total em Risco */}
+                  <Card className="border bg-purple-50/30 border-purple-200">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between text-purple-700">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <DollarSign className="h-4 w-4" /> Capital em Risco
+                        </span>
+                        <Badge variant="outline" className="text-[10px] border-purple-300 bg-purple-100 text-purple-800">Total</Badge>
+                      </div>
+                      <p className="text-2xl font-bold font-mono text-purple-950 mt-2">{formatCurrency(expirationsReportData.totalCapitalAtRisk)}</p>
+                      <p className="text-xs text-purple-700 mt-0.5">Somatória de itens em alerta</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Expiration Risk Table */}
+                <Card className="border shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <ShieldAlert className="h-5 w-5 text-red-600" />
+                      Detalhamento de Produtos por Data de Validade
+                    </CardTitle>
+                    <CardDescription>
+                      Lista cronológica dos itens com vencimento iminente ou expirados.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {expirationsReportData.allAtRiskItems.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground flex flex-col items-center justify-center gap-2">
+                        <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                        Nenhum produto vencido ou com vencimento nos próximos 30 dias.
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden border rounded-lg max-h-[400px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                            <TableRow>
+                              <TableHead>Produto</TableHead>
+                              <TableHead className="text-center">Data Validade</TableHead>
+                              <TableHead className="text-center">Dias Restantes</TableHead>
+                              <TableHead className="text-center">Estoque Atual</TableHead>
+                              <TableHead className="text-right">Preço Custo</TableHead>
+                              <TableHead className="text-right">Valor em Risco</TableHead>
+                              <TableHead className="text-center">Status</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {expirationsReportData.allAtRiskItems.map((item, idx) => {
+                              const isExp = item.daysDiff < 0;
+                              const isUrgent = item.daysDiff <= 7;
+                              const formattedExp = item.product.expiration_date
+                                ? new Intl.DateTimeFormat('pt-BR').format(new Date(`${item.product.expiration_date}T00:00:00`))
+                                : '-';
+
+                              return (
+                                <TableRow key={idx} className={cn("hover:bg-muted/30", isExp && "bg-red-50/20")}>
+                                  <TableCell className="font-semibold text-sm">
+                                    <div>{item.product.name}</div>
+                                    <div className="text-xs text-muted-foreground font-mono">{item.product.sku || '-'}</div>
+                                  </TableCell>
+                                  <TableCell className="text-center font-mono text-xs">{formattedExp}</TableCell>
+                                  <TableCell className="text-center">
+                                    <span className={cn(
+                                      "inline-block font-mono text-xs font-bold px-2 py-0.5 rounded",
+                                      isExp ? "bg-red-600 text-white" :
+                                      isUrgent ? "bg-orange-100 text-orange-800" : "bg-amber-100 text-amber-800"
+                                    )}>
+                                      {isExp ? `Vencido há ${Math.abs(item.daysDiff)}d` : `${item.daysDiff} dias`}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center font-mono text-xs font-semibold">
+                                    {item.product.current_stock} {item.product.unit || 'UN'}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                    {formatCurrency(item.product.cost_price)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-xs text-red-600 font-bold">
+                                    {formatCurrency(item.product.current_stock * item.product.cost_price)}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={isExp ? 'destructive' : 'outline'} className={cn(
+                                      "text-[10px]",
+                                      !isExp && isUrgent && "border-orange-400 bg-orange-50 text-orange-800"
+                                    )}>
+                                      {isExp ? '🚨 VENCIDO (Descarte)' : isUrgent ? '🔥 Liquidação / Queima' : 'Atenção'}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* 5. SUB-VIEW: KARDEX (MOVEMENT AUDIT LOG) */}
+            {subTabInventory === 'kardex' && (
+              <div className="space-y-4">
+                {/* Kardex Filters */}
+                <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/20 border rounded-lg">
+                  <div className="w-64">
+                    <Select value={invKardexProductFilter} onValueChange={setInvKardexProductFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Filtrar por Produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os Produtos</SelectItem>
+                        {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="w-48">
+                    <Select value={invKardexTypeFilter} onValueChange={setInvKardexTypeFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Tipo de Movimento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os Tipos</SelectItem>
+                        <SelectItem value="in">📥 Entradas / Compras</SelectItem>
+                        <SelectItem value="out">📤 Saídas / Vendas</SelectItem>
+                        <SelectItem value="adjustment">⚖️ Ajustes de Inventário</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(invKardexProductFilter !== 'all' || invKardexTypeFilter !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setInvKardexProductFilter('all'); setInvKardexTypeFilter('all'); }}
+                      className="h-8 text-xs"
+                    >
+                      Limpar Filtros
+                    </Button>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+
+                {/* Kardex Table */}
+                <Card className="border shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <History className="h-5 w-5 text-primary" />
+                      Extrato Cronológico de Movimentações (Kardex)
+                    </CardTitle>
+                    <CardDescription>
+                      Histórico auditável de todas as movimentações físicas de estoque no período.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {kardexData.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        Nenhuma movimentação registrada com os filtros selecionados.
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden border rounded-lg max-h-[450px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                            <TableRow>
+                              <TableHead>Data / Hora</TableHead>
+                              <TableHead>Produto</TableHead>
+                              <TableHead className="text-center">Tipo</TableHead>
+                              <TableHead className="text-center">Quantidade</TableHead>
+                              <TableHead>Observações / Motivo</TableHead>
+                              <TableHead className="text-right">Custo / Valor</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {kardexData.map((m) => {
+                              const prod = products.find(p => p.id === m.product_id);
+                              const formattedDate = new Intl.DateTimeFormat('pt-BR', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              }).format(new Date(m.created_at));
+
+                              return (
+                                <TableRow key={m.id} className="hover:bg-muted/30">
+                                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                                    {formattedDate}
+                                  </TableCell>
+                                  <TableCell className="font-semibold text-sm">
+                                    {prod?.name || 'Produto Removido'}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={
+                                      m.type === 'in' ? 'default' :
+                                      m.type === 'out' ? 'destructive' : 'outline'
+                                    } className={cn(
+                                      "text-[10px]",
+                                      m.type === 'in' && "bg-emerald-600",
+                                      m.type === 'out' && "bg-rose-600"
+                                    )}>
+                                      {m.type === 'in' ? '📥 Entrada' : m.type === 'out' ? '📤 Saída' : '⚖️ Ajuste'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center font-mono text-xs font-bold">
+                                    {m.type === 'in' ? `+${m.quantity}` : m.type === 'out' ? `-${m.quantity}` : m.quantity} {prod?.unit || 'UN'}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    {m.notes || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-xs">
+                                    {m.cost_price ? formatCurrency(m.cost_price * m.quantity) : '-'}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       )}

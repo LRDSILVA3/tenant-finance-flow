@@ -48,6 +48,13 @@ import {
   Tag,
   Barcode,
   Sparkles,
+  Calendar,
+  Filter,
+  ArrowUpDown,
+  Flame,
+  ShieldAlert,
+  AlertCircle,
+  X
 } from 'lucide-react';
 
 const isSameCart = (cartA: any[], cartB: any[]) => {
@@ -159,6 +166,19 @@ export const Inventory: React.FC = () => {
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCritical, setFilterCritical] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterSupplier, setFilterSupplier] = useState<string>('all');
+  const [filterStockStatus, setFilterStockStatus] = useState<string>('all');
+  const [filterExpiration, setFilterExpiration] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('name_asc');
+  const [showExpirationBanner, setShowExpirationBanner] = useState(true);
+
+  // Discard / Loss Modal State
+  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
+  const [discardProduct, setDiscardProduct] = useState<Product | null>(null);
+  const [discardQuantity, setDiscardQuantity] = useState<number>(1);
+  const [discardNotes, setDiscardNotes] = useState<string>('Descarte por Vencimento');
+  const [savingDiscard, setSavingDiscard] = useState(false);
 
   // Modals States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -590,15 +610,165 @@ export const Inventory: React.FC = () => {
     };
   }, [handleBarcodeReceived]);
 
-  // Filtered Products
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesCritical = !filterCritical || (p.current_stock <= p.min_stock);
-      return matchesSearch && matchesCritical;
+  // Expiration KPIs & Financial Risk
+  const expirationStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let expiredCount = 0;
+    let expiredValue = 0;
+    let expiring7dCount = 0;
+    let expiring7dValue = 0;
+    let expiring15dCount = 0;
+    let expiring15dValue = 0;
+    let expiring30dCount = 0;
+    let expiring30dValue = 0;
+    let safeCount = 0;
+
+    products.forEach((p) => {
+      if (!p.expiration_date) {
+        safeCount++;
+        return;
+      }
+      const exp = new Date(`${p.expiration_date}T00:00:00`);
+      const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const costTotal = p.current_stock * p.cost_price;
+
+      if (diffDays < 0) {
+        if (p.current_stock > 0) {
+          expiredCount++;
+          expiredValue += costTotal;
+        }
+      } else if (diffDays <= 7) {
+        if (p.current_stock > 0) {
+          expiring7dCount++;
+          expiring7dValue += costTotal;
+        }
+      } else if (diffDays <= 15) {
+        if (p.current_stock > 0) {
+          expiring15dCount++;
+          expiring15dValue += costTotal;
+        }
+      } else if (diffDays <= 30) {
+        if (p.current_stock > 0) {
+          expiring30dCount++;
+          expiring30dValue += costTotal;
+        }
+      } else {
+        safeCount++;
+      }
     });
-  }, [products, searchQuery, filterCritical]);
+
+    const totalAtRisk = expiredValue + expiring7dValue + expiring15dValue + expiring30dValue;
+
+    return {
+      expiredCount,
+      expiredValue,
+      expiring7dCount,
+      expiring7dValue,
+      expiring15dCount,
+      expiring15dValue,
+      expiring30dCount,
+      expiring30dValue,
+      safeCount,
+      totalAtRisk,
+    };
+  }, [products]);
+
+  // Unique product categories
+  const productCategories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => {
+      if (p.category && p.category.trim()) cats.add(p.category.trim());
+    });
+    return Array.from(cats).sort();
+  }, [products]);
+
+  // Comprehensive Filtered & Sorted Products
+  const filteredProducts = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return products
+      .filter((p) => {
+        // 1. Text search
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchesName = p.name.toLowerCase().includes(q);
+          const matchesSku = p.sku && p.sku.toLowerCase().includes(q);
+          const matchesCat = p.category && p.category.toLowerCase().includes(q);
+          const matchesLoc = p.location && p.location.toLowerCase().includes(q);
+          if (!matchesName && !matchesSku && !matchesCat && !matchesLoc) return false;
+        }
+
+        // 2. Legacy button filter
+        if (filterCritical && p.current_stock > p.min_stock) return false;
+
+        // 3. Category filter
+        if (filterCategory !== 'all' && p.category !== filterCategory) return false;
+
+        // 4. Supplier filter
+        if (filterSupplier !== 'all') {
+          if (filterSupplier === 'none') {
+            if (p.supplier_id) return false;
+          } else if (p.supplier_id !== filterSupplier) {
+            return false;
+          }
+        }
+
+        // 5. Stock Status filter
+        if (filterStockStatus === 'critical') {
+          if (p.current_stock > p.min_stock || p.current_stock === 0) return false;
+        } else if (filterStockStatus === 'zero') {
+          if (p.current_stock > 0) return false;
+        } else if (filterStockStatus === 'normal') {
+          if (p.current_stock <= p.min_stock) return false;
+        }
+
+        // 6. Expiration status filter
+        if (filterExpiration !== 'all') {
+          if (!p.expiration_date) {
+            if (filterExpiration !== 'no_date') return false;
+          } else {
+            const exp = new Date(`${p.expiration_date}T00:00:00`);
+            const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (filterExpiration === 'expired') {
+              if (diffDays >= 0 || p.current_stock <= 0) return false;
+            } else if (filterExpiration === 'expiring_7d') {
+              if (diffDays < 0 || diffDays > 7 || p.current_stock <= 0) return false;
+            } else if (filterExpiration === 'expiring_15d') {
+              if (diffDays < 0 || diffDays > 15 || p.current_stock <= 0) return false;
+            } else if (filterExpiration === 'expiring_30d') {
+              if (diffDays < 0 || diffDays > 30 || p.current_stock <= 0) return false;
+            } else if (filterExpiration === 'safe') {
+              if (diffDays <= 30) return false;
+            }
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'name_asc') return a.name.localeCompare(b.name, 'pt-BR');
+        if (sortBy === 'name_desc') return b.name.localeCompare(a.name, 'pt-BR');
+        if (sortBy === 'stock_asc') return a.current_stock - b.current_stock;
+        if (sortBy === 'stock_desc') return b.current_stock - a.current_stock;
+        if (sortBy === 'cost_desc') return (b.current_stock * b.cost_price) - (a.current_stock * a.cost_price);
+        if (sortBy === 'sale_desc') return (b.current_stock * b.sale_price) - (a.current_stock * a.sale_price);
+        if (sortBy === 'margin_desc') {
+          const marginA = a.sale_price > 0 ? ((a.sale_price - a.cost_price) / a.sale_price) : 0;
+          const marginB = b.sale_price > 0 ? ((b.sale_price - b.cost_price) / b.sale_price) : 0;
+          return marginB - marginA;
+        }
+        if (sortBy === 'expiration_asc') {
+          if (!a.expiration_date && !b.expiration_date) return 0;
+          if (!a.expiration_date) return 1;
+          if (!b.expiration_date) return -1;
+          return new Date(`${a.expiration_date}T00:00:00`).getTime() - new Date(`${b.expiration_date}T00:00:00`).getTime();
+        }
+        return 0;
+      });
+  }, [products, searchQuery, filterCritical, filterCategory, filterSupplier, filterStockStatus, filterExpiration, sortBy]);
 
   // Count items below minimum stock
   const criticalItemsCount = useMemo(() => {
@@ -609,6 +779,44 @@ export const Inventory: React.FC = () => {
   const cartSubtotal = useMemo(() => {
     return cartItems.reduce((sum, item) => sum + (item.product.sale_price * item.quantity), 0);
   }, [cartItems]);
+
+  // Discard / Loss Handlers
+  const handleOpenDiscard = (product: Product) => {
+    setDiscardProduct(product);
+    setDiscardQuantity(product.current_stock > 0 ? product.current_stock : 1);
+    setDiscardNotes('Descarte por Vencimento / Perda');
+    setIsDiscardModalOpen(true);
+  };
+
+  const handleConfirmDiscard = async () => {
+    if (!currentClient || !discardProduct || discardQuantity <= 0) return;
+    setSavingDiscard(true);
+    try {
+      const { error: moveError } = await supabase.from('stock_movements').insert({
+        client_id: currentClient.id,
+        product_id: discardProduct.id,
+        type: 'out',
+        quantity: discardQuantity,
+        notes: discardNotes || 'Descarte por Vencimento / Perda',
+      });
+      if (moveError) throw moveError;
+
+      const newStock = Math.max(0, discardProduct.current_stock - discardQuantity);
+      await supabase.from('products').update({ current_stock: newStock }).eq('id', discardProduct.id);
+
+      toast({
+        title: "Baixa por descarte realizada!",
+        description: `${discardQuantity} unidades de "${discardProduct.name}" retiradas do estoque.`
+      });
+      setIsDiscardModalOpen(false);
+      setDiscardProduct(null);
+      loadProducts();
+    } catch (err) {
+      toast({ title: "Erro ao realizar descarte", variant: "destructive" });
+    } finally {
+      setSavingDiscard(false);
+    }
+  };
 
   // Open Create Product Modal
   const openCreateProduct = () => {
@@ -998,174 +1206,507 @@ export const Inventory: React.FC = () => {
         </div>
       </div>
 
-      {/* Critical Stock Warning Alert Banner */}
-      {criticalItemsCount > 0 && (
-        <Card className="border-red-200 bg-red-50/50">
-          <CardContent className="flex items-center gap-3 py-3 px-4">
-            <AlertTriangle className="h-5 w-5 text-red-600 animate-pulse flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-red-950">Aviso de Estoque Crítico</p>
-              <p className="text-xs text-red-700">Existem {criticalItemsCount} produtos com quantidade igual ou abaixo do estoque mínimo definido.</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Expiration & Critical Risk Hub */}
+      {showExpirationBanner && (expirationStats.totalAtRisk > 0 || criticalItemsCount > 0) && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Vencidos */}
+            <Card 
+              onClick={() => setFilterExpiration(filterExpiration === 'expired' ? 'all' : 'expired')}
+              className={cn(
+                "cursor-pointer transition-all border shadow-sm hover:shadow-md",
+                filterExpiration === 'expired' ? "ring-2 ring-red-600 bg-red-100/40 border-red-400" : "bg-red-50/40 border-red-200"
+              )}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
+                    <ShieldAlert className="h-4 w-4 text-red-600 animate-pulse" />
+                    <span>Já Vencidos</span>
+                  </div>
+                  <p className="text-xl font-bold font-mono text-red-950">{expirationStats.expiredCount} <span className="text-xs font-normal text-red-700">itens</span></p>
+                  <p className="text-[11px] font-medium text-red-600 font-mono">Perda: {formatCurrency(expirationStats.expiredValue)}</p>
+                </div>
+                <Badge variant="outline" className="border-red-300 bg-red-100 text-red-800 text-[10px] font-semibold">
+                  {filterExpiration === 'expired' ? 'Filtrado' : 'Filtrar'}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            {/* Vence em até 7 dias */}
+            <Card 
+              onClick={() => setFilterExpiration(filterExpiration === 'expiring_7d' ? 'all' : 'expiring_7d')}
+              className={cn(
+                "cursor-pointer transition-all border shadow-sm hover:shadow-md",
+                filterExpiration === 'expiring_7d' ? "ring-2 ring-orange-600 bg-orange-100/40 border-orange-400" : "bg-orange-50/40 border-orange-200"
+              )}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-700">
+                    <Flame className="h-4 w-4 text-orange-600" />
+                    <span>Vence em 7 dias</span>
+                  </div>
+                  <p className="text-xl font-bold font-mono text-orange-950">{expirationStats.expiring7dCount} <span className="text-xs font-normal text-orange-700">itens</span></p>
+                  <p className="text-[11px] font-medium text-orange-600 font-mono">Risco: {formatCurrency(expirationStats.expiring7dValue)}</p>
+                </div>
+                <Badge variant="outline" className="border-orange-300 bg-orange-100 text-orange-800 text-[10px] font-semibold">
+                  {filterExpiration === 'expiring_7d' ? 'Filtrado' : 'Filtrar'}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            {/* Vence em até 30 dias */}
+            <Card 
+              onClick={() => setFilterExpiration(filterExpiration === 'expiring_30d' ? 'all' : 'expiring_30d')}
+              className={cn(
+                "cursor-pointer transition-all border shadow-sm hover:shadow-md",
+                filterExpiration === 'expiring_30d' ? "ring-2 ring-amber-600 bg-amber-100/40 border-amber-400" : "bg-amber-50/40 border-amber-200"
+              )}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <span>Vence em 30 dias</span>
+                  </div>
+                  <p className="text-xl font-bold font-mono text-amber-950">{expirationStats.expiring30dCount + expirationStats.expiring15dCount} <span className="text-xs font-normal text-amber-700">itens</span></p>
+                  <p className="text-[11px] font-medium text-amber-700 font-mono">Risco: {formatCurrency(expirationStats.expiring30dValue + expirationStats.expiring15dValue)}</p>
+                </div>
+                <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800 text-[10px] font-semibold">
+                  {filterExpiration === 'expiring_30d' ? 'Filtrado' : 'Filtrar'}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            {/* Estoque Crítico Geral */}
+            <Card 
+              onClick={() => setFilterStockStatus(filterStockStatus === 'critical' ? 'all' : 'critical')}
+              className={cn(
+                "cursor-pointer transition-all border shadow-sm hover:shadow-md",
+                filterStockStatus === 'critical' ? "ring-2 ring-rose-600 bg-rose-100/40 border-rose-400" : "bg-rose-50/30 border-rose-200"
+              )}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-700">
+                    <AlertTriangle className="h-4 w-4 text-rose-600" />
+                    <span>Estoque Crítico (≤ Min)</span>
+                  </div>
+                  <p className="text-xl font-bold font-mono text-rose-950">{criticalItemsCount} <span className="text-xs font-normal text-rose-700">produtos</span></p>
+                  <p className="text-[11px] font-medium text-rose-600">Reposição recomendada</p>
+                </div>
+                <Badge variant="outline" className="border-rose-300 bg-rose-100 text-rose-800 text-[10px] font-semibold">
+                  {filterStockStatus === 'critical' ? 'Filtrado' : 'Filtrar'}
+                </Badge>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
+        <Card className="border shadow-sm">
+          <CardHeader className="pb-3 border-b bg-muted/10">
+            <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Catálogo de Itens</CardTitle>
-                  <CardDescription>Cadastre novos itens, ajuste a quantidade e defina limites mínimos.</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    Catálogo de Produtos & Validades
+                  </CardTitle>
+                  <CardDescription>
+                    Gerencie estoque físico, precificação, validades e reposição.
+                  </CardDescription>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="relative w-64">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Buscar por nome ou SKU..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                  <Button
-                    variant={filterCritical ? 'destructive' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilterCritical(!filterCritical)}
-                    className="gap-1.5"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    Estoque Crítico
-                  </Button>
+
+                <div className="flex items-center gap-2">
+                  {(filterCategory !== 'all' || filterSupplier !== 'all' || filterStockStatus !== 'all' || filterExpiration !== 'all' || searchQuery.trim() || sortBy !== 'name_asc') && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setFilterCategory('all');
+                        setFilterSupplier('all');
+                        setFilterStockStatus('all');
+                        setFilterExpiration('all');
+                        setSortBy('name_asc');
+                        setFilterCritical(false);
+                      }}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Limpar Filtros
+                    </Button>
+                  )}
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-8 text-muted-foreground">
-                  Carregando produtos...
+
+              {/* Comprehensive Filter Toolbar */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
+                {/* Search */}
+                <div className="relative lg:col-span-2">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar nome, SKU, local..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-9 text-xs"
+                  />
                 </div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nenhum produto encontrado.
+
+                {/* Category */}
+                <div>
+                  <Select value={filterCategory} onValueChange={setFilterCategory}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas Categorias</SelectItem>
+                      {productCategories.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : (
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead>Produto</TableHead>
-                        <TableHead>SKU / Código</TableHead>
-                        <TableHead className="text-right">Preço Custo</TableHead>
-                        <TableHead className="text-right">Preço Venda</TableHead>
-                        <TableHead className="text-center">Estoque Atual</TableHead>
-                        <TableHead className="text-right w-[120px]">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredProducts.map((p) => {
-                        const isCritical = p.current_stock <= p.min_stock;
-                        return (
-                          <TableRow key={p.id}>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-sm">{p.name}</span>
-                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                  {p.category && (
-                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-slate-600 font-medium">
-                                      {p.category}
-                                    </Badge>
-                                  )}
-                                  {p.location && (
-                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-amber-600 font-mono">
-                                      📍 {p.location}
-                                    </Badge>
-                                  )}
-                                  {p.expiration_date && (() => {
-                                    const expDate = new Date(`${p.expiration_date}T00:00:00`);
-                                    const today = new Date();
-                                    today.setHours(0,0,0,0);
-                                    const diffTime = expDate.getTime() - today.getTime();
-                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                    
-                                    let badgeColor = "bg-slate-50 border-slate-200 text-slate-600";
-                                    let label = `📅 Venc: ${new Intl.DateTimeFormat('pt-BR').format(expDate)}`;
-                                    
-                                    if (diffDays < 0) {
-                                      badgeColor = "bg-red-50 border-red-200 text-red-600 font-bold";
-                                      label = `🚨 Vencido (${new Intl.DateTimeFormat('pt-BR').format(expDate)})`;
-                                    } else if (diffDays <= 30) {
-                                      badgeColor = "bg-amber-50 border-amber-200 text-amber-600 font-semibold";
-                                      label = `⚠️ Vence em ${diffDays}d (${new Intl.DateTimeFormat('pt-BR').format(expDate)})`;
-                                    }
-                                    
-                                    return (
-                                      <Badge variant="outline" className={cn("text-[9px] px-1 py-0 h-4 font-mono", badgeColor)}>
-                                        {label}
-                                      </Badge>
-                                    );
-                                  })()}
-                                </div>
+
+                {/* Supplier */}
+                <div>
+                  <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Fornecedores</SelectItem>
+                      <SelectItem value="none">Sem Fornecedor</SelectItem>
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Expiration Filter */}
+                <div>
+                  <Select value={filterExpiration} onValueChange={setFilterExpiration}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Validade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Validades</SelectItem>
+                      <SelectItem value="expired" className="text-red-600 font-semibold">🚨 Já Vencidos</SelectItem>
+                      <SelectItem value="expiring_7d" className="text-orange-600 font-semibold">⚠️ Vence em 7 dias</SelectItem>
+                      <SelectItem value="expiring_15d" className="text-amber-600">⏳ Vence em 15 dias</SelectItem>
+                      <SelectItem value="expiring_30d" className="text-amber-700">📅 Vence em 30 dias</SelectItem>
+                      <SelectItem value="safe" className="text-emerald-600">✅ Dentro do Prazo</SelectItem>
+                      <SelectItem value="no_date">Sem Data Cadastrada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sort Order */}
+                <div>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <SelectValue placeholder="Ordenar por" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name_asc">Nome (A - Z)</SelectItem>
+                      <SelectItem value="name_desc">Nome (Z - A)</SelectItem>
+                      <SelectItem value="expiration_asc">📅 Vencimento mais urgente</SelectItem>
+                      <SelectItem value="stock_asc">Menor Estoque</SelectItem>
+                      <SelectItem value="stock_desc">Maior Estoque</SelectItem>
+                      <SelectItem value="cost_desc">Maior Custo Imobilizado</SelectItem>
+                      <SelectItem value="sale_desc">Maior Faturamento Potencial</SelectItem>
+                      <SelectItem value="margin_desc">Maior Margem (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {loading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                Carregando catálogo de produtos...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground space-y-2">
+                <Package className="h-8 w-8 mx-auto text-muted-foreground/50" />
+                <p className="font-medium text-sm">Nenhum produto encontrado com os filtros aplicados.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterCategory('all');
+                    setFilterSupplier('all');
+                    setFilterStockStatus('all');
+                    setFilterExpiration('all');
+                    setSortBy('name_asc');
+                  }}
+                  className="text-xs"
+                >
+                  Limpar todos os filtros
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-hidden border rounded-lg">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>SKU / Cód.</TableHead>
+                      <TableHead className="text-right">Preço Custo</TableHead>
+                      <TableHead className="text-right">Preço Venda</TableHead>
+                      <TableHead className="text-center">Margem</TableHead>
+                      <TableHead className="text-center">Estoque Atual</TableHead>
+                      <TableHead className="text-right w-[140px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((p) => {
+                      const isCritical = p.current_stock <= p.min_stock;
+                      const isZero = p.current_stock === 0;
+                      const marginPercent = p.sale_price > 0 ? ((p.sale_price - p.cost_price) / p.sale_price) * 100 : 0;
+
+                      // Expiration calculation
+                      let expInfo: { label: string; badgeClass: string; isExpired: boolean; isUrgent: boolean } | null = null;
+                      if (p.expiration_date) {
+                        const expDate = new Date(`${p.expiration_date}T00:00:00`);
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const diffTime = expDate.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const formattedDate = new Intl.DateTimeFormat('pt-BR').format(expDate);
+
+                        if (diffDays < 0) {
+                          expInfo = {
+                            label: `🚨 Vencido há ${Math.abs(diffDays)}d (${formattedDate})`,
+                            badgeClass: "bg-red-100 border-red-300 text-red-800 font-bold",
+                            isExpired: true,
+                            isUrgent: true,
+                          };
+                        } else if (diffDays === 0) {
+                          expInfo = {
+                            label: `🚨 Vence HOJE (${formattedDate})`,
+                            badgeClass: "bg-red-100 border-red-300 text-red-800 font-bold animate-pulse",
+                            isExpired: false,
+                            isUrgent: true,
+                          };
+                        } else if (diffDays <= 7) {
+                          expInfo = {
+                            label: `⚠️ Vence em ${diffDays}d (${formattedDate})`,
+                            badgeClass: "bg-orange-100 border-orange-300 text-orange-800 font-semibold",
+                            isExpired: false,
+                            isUrgent: true,
+                          };
+                        } else if (diffDays <= 15) {
+                          expInfo = {
+                            label: `⏳ Vence em ${diffDays}d (${formattedDate})`,
+                            badgeClass: "bg-amber-100 border-amber-300 text-amber-800 font-medium",
+                            isExpired: false,
+                            isUrgent: false,
+                          };
+                        } else if (diffDays <= 30) {
+                          expInfo = {
+                            label: `📅 Vence em ${diffDays}d (${formattedDate})`,
+                            badgeClass: "bg-amber-50 border-amber-200 text-amber-700",
+                            isExpired: false,
+                            isUrgent: false,
+                          };
+                        } else {
+                          expInfo = {
+                            label: `✅ Venc: ${formattedDate}`,
+                            badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                            isExpired: false,
+                            isUrgent: false,
+                          };
+                        }
+                      }
+
+                      return (
+                        <TableRow key={p.id} className={cn("hover:bg-muted/30 transition-colors", expInfo?.isExpired && p.current_stock > 0 && "bg-red-50/20")}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-sm text-foreground">{p.name}</span>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                {p.category && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-slate-600 font-medium">
+                                    {p.category}
+                                  </Badge>
+                                )}
+                                {p.location && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-amber-700 font-mono">
+                                    📍 {p.location}
+                                  </Badge>
+                                )}
+                                {expInfo && (
+                                  <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-mono", expInfo.badgeClass)}>
+                                    {expInfo.label}
+                                  </Badge>
+                                )}
                               </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{p.sku || '-'}</TableCell>
-                            <TableCell className="text-right font-mono text-xs text-expense">{formatCurrency(p.cost_price)}</TableCell>
-                            <TableCell className="text-right font-mono text-xs text-income font-semibold">{formatCurrency(p.sale_price)}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={isCritical ? 'destructive' : 'secondary'} className="font-mono">
-                                {p.current_stock} {p.unit || 'UN'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{p.sku || '-'}</TableCell>
+                          <TableCell className="text-right font-mono text-xs text-expense">{formatCurrency(p.cost_price)}</TableCell>
+                          <TableCell className="text-right font-mono text-xs text-income font-semibold">{formatCurrency(p.sale_price)}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={cn(
+                              "text-xs font-mono font-medium",
+                              marginPercent >= 30 ? "text-emerald-600" : marginPercent > 0 ? "text-amber-600" : "text-rose-600"
+                            )}>
+                              {marginPercent.toFixed(1)}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge 
+                              variant={isZero ? 'destructive' : isCritical ? 'destructive' : 'secondary'} 
+                              className={cn(
+                                "font-mono text-xs",
+                                isZero ? "bg-red-600 text-white" : isCritical ? "bg-rose-500 text-white" : ""
+                              )}
+                            >
+                              {p.current_stock} {p.unit || 'UN'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Entrada / Saída de estoque"
+                                onClick={() => openAdjustmentModal(p)}
+                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                              >
+                                <PackagePlus className="h-4 w-4" />
+                              </Button>
+
+                              {/* Direct Discard button if expired */}
+                              {expInfo?.isExpired && p.current_stock > 0 && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  title="Movimentar estoque"
-                                  onClick={() => openAdjustmentModal(p)}
-                                  className="h-8 w-8 p-0"
+                                  title="Baixa por descarte de produto vencido"
+                                  onClick={() => handleOpenDiscard(p)}
+                                  className="h-8 w-8 p-0 text-red-600 border-red-300 hover:bg-red-50"
                                 >
-                                  <PackagePlus className="h-4 w-4" />
+                                  <Flame className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  title="Ver histórico de movimentações"
-                                  onClick={() => openHistoryModal(p)}
-                                  className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
-                                >
-                                  <History className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditProduct(p)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteProduct(p.id)}
-                                  className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                              )}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Ver histórico de movimentações (Kardex)"
+                                onClick={() => openHistoryModal(p)}
+                                className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
+                              >
+                                <History className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Editar produto"
+                                onClick={() => openEditProduct(p)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Excluir produto"
+                                onClick={() => handleDeleteProduct(p.id)}
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Discard / Loss Dialog */}
+      <Dialog open={isDiscardModalOpen} onOpenChange={setIsDiscardModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="h-5 w-5" />
+              Baixa por Descarte / Vencimento
+            </DialogTitle>
+            <DialogDescription>
+              Retire itens vencidos ou avariados do estoque registrando o motivo para auditoria.
+            </DialogDescription>
+          </DialogHeader>
+
+          {discardProduct && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted/40 rounded-lg border space-y-1">
+                <p className="font-semibold text-sm">{discardProduct.name}</p>
+                <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                  <span>Estoque atual: {discardProduct.current_stock} {discardProduct.unit}</span>
+                  <span>Custo unit.: {formatCurrency(discardProduct.cost_price)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="discard-qty">Quantidade a Descartar</Label>
+                <Input
+                  id="discard-qty"
+                  type="number"
+                  min={1}
+                  max={discardProduct.current_stock || 1}
+                  value={discardQuantity}
+                  onChange={(e) => setDiscardQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="font-mono"
+                />
+                <p className="text-xs text-red-600 font-mono">
+                  Impacto financeiro de perda: {formatCurrency((discardQuantity || 0) * discardProduct.cost_price)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="discard-notes">Motivo / Observações</Label>
+                <Textarea
+                  id="discard-notes"
+                  value={discardNotes}
+                  onChange={(e) => setDiscardNotes(e.target.value)}
+                  placeholder="Ex: Vencimento do lote, avaria no transporte..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDiscardModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmDiscard}
+              disabled={savingDiscard || !discardProduct || discardQuantity <= 0}
+            >
+              {savingDiscard ? 'Registrando...' : 'Confirmar Descarte'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Realtime Mobile Barcode Scanner Modal */}
       <Dialog open={isScanModalOpen} onOpenChange={setIsScanModalOpen}>

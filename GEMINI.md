@@ -15,6 +15,8 @@
 - Check `ENGINEERING.md` for style guides before proposing changes.
 
 ### 2. Execution & Validation
+- **Autonomous Execution**: Execute all requested tasks end-to-end autonomously without interrupting for permissions, approvals, or non-critical checkpoints. Only pause to ask the user if strictly necessary (e.g. blocking ambiguity or critical destructive operations).
+- **Git Commit & Push**: Always commit and push directly whenever requested by the user. Use concise English commit messages without any co-author or AI signatures (`Lucas Silva <rm.pessoal13@gmail.com>`).
 - Implement surgical changes.
 - Always add/update tests (if applicable).
 - Run `npm run lint` and `npm run test` before committing.

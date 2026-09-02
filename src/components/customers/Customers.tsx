@@ -18,7 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   Users, Plus, Search, Pencil, Trash2, UserCheck, UserX,
-  Phone, Mail, FileText, Loader2, CalendarDays
+  Phone, Mail, FileText, Loader2, CalendarDays, Cake, Wallet, Filter, ArrowUpDown, X
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -67,12 +67,16 @@ type FilterStatus = 'all' | 'active' | 'inactive';
 export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) => void }> = ({
   onNavigateToSchedule,
 }) => {
-  const { currentClient, loadCustomers: reloadContextCustomers } = useFinance();
+  const { currentClient, transactions, loadCustomers: reloadContextCustomers } = useFinance();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('active');
+  const [filterPersonType, setFilterPersonType] = useState<'all' | 'individual' | 'legal'>('all');
+  const [filterBirthdays, setFilterBirthdays] = useState<boolean>(false);
+  const [filterPendingBalance, setFilterPendingBalance] = useState<'all' | 'has_pending' | 'settled'>('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc'>('name_asc');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -102,11 +106,25 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
     if (currentClient) loadCustomers();
   }, [currentClient, loadCustomers]);
 
+  // Map of customers with pending receivable balance
+  const customerPendingBalanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    transactions.forEach(t => {
+      if (t.type === 'income' && t.status === 'pending' && t.customerId) {
+        map.set(t.customerId, (map.get(t.customerId) || 0) + t.amount);
+      }
+    });
+    return map;
+  }, [transactions]);
+
+  // Current month for birthday matching (1-12)
+  const currentMonth = new Date().getMonth() + 1;
+
   // ── Filtered list ────────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return customers.filter((c) => {
+    const result = customers.filter((c) => {
       const matchSearch =
         !q ||
         c.name.toLowerCase().includes(q) ||
@@ -119,9 +137,31 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
         (filterStatus === 'active' && c.isActive) ||
         (filterStatus === 'inactive' && !c.isActive);
 
-      return matchSearch && matchStatus;
+      const matchPersonType =
+        filterPersonType === 'all' ||
+        c.personType === filterPersonType;
+
+      const matchBirthday = !filterBirthdays || (() => {
+        if (!c.birthDate) return false;
+        const parts = c.birthDate.split('-');
+        if (parts.length < 2) return false;
+        return Number(parts[1]) === currentMonth;
+      })();
+
+      const hasPending = (customerPendingBalanceMap.get(c.id) || 0) > 0;
+      const matchPending =
+        filterPendingBalance === 'all' ||
+        (filterPendingBalance === 'has_pending' && hasPending) ||
+        (filterPendingBalance === 'settled' && !hasPending);
+
+      return matchSearch && matchStatus && matchPersonType && matchBirthday && matchPending;
     });
-  }, [customers, searchQuery, filterStatus]);
+
+    return result.sort((a, b) => {
+      if (sortBy === 'name_desc') return b.name.localeCompare(a.name, 'pt-BR');
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
+  }, [customers, searchQuery, filterStatus, filterPersonType, filterBirthdays, filterPendingBalance, sortBy, customerPendingBalanceMap, currentMonth]);
 
   // ── Form helpers ─────────────────────────────────────────────────────────
 
@@ -313,18 +353,32 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                 {filtered.length} cliente{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-56">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, email..."
+                  placeholder="Buscar por nome, email, doc..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 w-full sm:w-56"
+                  className="pl-8 h-9 text-xs"
                 />
               </div>
+
+              {/* Person Type */}
+              <Select value={filterPersonType} onValueChange={(v: any) => setFilterPersonType(v)}>
+                <SelectTrigger className="h-9 text-xs w-full sm:w-32">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">PF / PJ</SelectItem>
+                  <SelectItem value="individual">Pessoa Física</SelectItem>
+                  <SelectItem value="legal">Pessoa Jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Status */}
               <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
-                <SelectTrigger className="w-full sm:w-36">
+                <SelectTrigger className="h-9 text-xs w-full sm:w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -333,6 +387,63 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                   <SelectItem value="inactive">Inativos</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Financial Balance */}
+              <Select value={filterPendingBalance} onValueChange={(v: any) => setFilterPendingBalance(v)}>
+                <SelectTrigger className="h-9 text-xs w-full sm:w-40">
+                  <SelectValue placeholder="Financeiro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Qualquer Saldo</SelectItem>
+                  <SelectItem value="has_pending" className="text-amber-600 font-semibold">💰 Com Débito Pendente</SelectItem>
+                  <SelectItem value="settled" className="text-emerald-600 font-semibold">✅ Sem Débito</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Birthday Month Button */}
+              <Button
+                variant={filterBirthdays ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterBirthdays(!filterBirthdays)}
+                className={cn("h-9 text-xs gap-1.5", filterBirthdays && "bg-pink-600 hover:bg-pink-700 text-white")}
+                title="Filtrar aniversariantes do mês atual"
+              >
+                <Cake className="h-3.5 w-3.5 text-pink-400" />
+                Aniversariantes
+              </Button>
+
+              {/* Sort */}
+              <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                <SelectTrigger className="h-9 text-xs w-full sm:w-36">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <SelectValue placeholder="Ordem" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name_asc">Nome (A-Z)</SelectItem>
+                  <SelectItem value="name_desc">Nome (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(searchQuery.trim() || filterStatus !== 'active' || filterPersonType !== 'all' || filterBirthdays || filterPendingBalance !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterStatus('active');
+                    setFilterPersonType('all');
+                    setFilterBirthdays(false);
+                    setFilterPendingBalance('all');
+                    setSortBy('name_asc');
+                  }}
+                  className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Limpar
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

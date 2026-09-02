@@ -23,6 +23,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import {
   HandCoins,
   Clock,
   ChevronDown,
@@ -38,11 +46,16 @@ import {
   User,
   Search,
   X,
-  Plus
+  Plus,
+  Filter,
+  ArrowUpDown,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   ResponsiveContainer,
   BarChart,
@@ -54,15 +67,91 @@ import {
   LabelList,
 } from 'recharts';
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value === undefined || value === null || isNaN(value)) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
 };
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(date));
+const parseDateSafe = (dateVal?: string | Date | null): Date => {
+  if (!dateVal) return new Date();
+  if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? new Date() : dateVal;
+  if (typeof dateVal === 'string') {
+    if (dateVal.includes('T')) {
+      const d = new Date(dateVal);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }
+    const parts = dateVal.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m, d, 12, 0, 0);
+      }
+    }
+    const parsed = new Date(dateVal);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  return new Date();
+};
+
+const formatDate = (date?: string | Date | null) => {
+  if (!date) return '—';
+  try {
+    const d = parseDateSafe(date);
+    return new Intl.DateTimeFormat('pt-BR').format(d);
+  } catch {
+    return '—';
+  }
+};
+
+const getDueBadgeInfo = (dateVal?: string | Date | null) => {
+  const d = parseDateSafe(dateVal);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dMidnight = new Date(d);
+  dMidnight.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((dMidnight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (isNaN(diffDays)) {
+    return { label: 'Data Indefinida', isOverdue: false, isTodayDue: false, className: 'bg-muted text-muted-foreground' };
+  }
+  if (diffDays < 0) {
+    const abs = Math.abs(diffDays);
+    return {
+      label: abs === 1 ? 'Atrasado 1d' : `Atrasado ${abs}d`,
+      isOverdue: true,
+      isTodayDue: false,
+      className: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-300'
+    };
+  }
+  if (diffDays === 0) {
+    return {
+      label: 'Vence Hoje',
+      isOverdue: false,
+      isTodayDue: true,
+      className: 'border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold'
+    };
+  }
+  if (diffDays === 1) {
+    return {
+      label: 'Vence Amanhã',
+      isOverdue: false,
+      isTodayDue: false,
+      className: 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+    };
+  }
+  return {
+    label: `Em ${diffDays}d`,
+    isOverdue: false,
+    isTodayDue: false,
+    className: 'bg-muted text-muted-foreground'
+  };
 };
 
 const getPaymentMethodIcon = (method: string) => {
@@ -109,8 +198,14 @@ export const Receivables: React.FC = () => {
     userSettings
   } = useFinance();
 
+  const [viewMode, setViewMode] = useState<'grouped' | 'table'>('grouped');
   const [expandedCustomers, setExpandedCustomers] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [dueDateFilter, setDueDateFilter] = useState<'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'future'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'nearest_due' | 'highest_amount' | 'lowest_amount' | 'customer_az'>('nearest_due');
+
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isNewTxDialogOpen, setIsNewTxDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
@@ -123,17 +218,36 @@ export const Receivables: React.FC = () => {
   const [interestRate, setInterestRate] = useState<number>(0);
   const [confirming, setConfirming] = useState(false);
 
-  // Filter pending income transactions with customerId
+  // Filter pending income transactions
   const pendingTransactions = useMemo(() => {
     return transactions.filter(
       (txn) =>
         txn.type === 'income' &&
-        txn.status === 'pending' &&
-        txn.customerId
+        txn.status === 'pending'
     );
   }, [transactions]);
-  // Group pending transactions by customer and filter by search query
+
+  // Categorias de receita presentes nas pendências
+  const incomeCategories = useMemo(() => {
+    const catMap = new Map<string, string>();
+    pendingTransactions.forEach(t => {
+      const cat = getCategoryById(t.categoryId);
+      if (cat) catMap.set(cat.id, cat.name);
+    });
+    return Array.from(catMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [pendingTransactions, getCategoryById]);
+
+  // Group pending transactions by customer and filter by all criteria
   const groupedReceivables = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
     const groups: Record<string, {
       customerId: string;
       customerName: string;
@@ -145,11 +259,15 @@ export const Receivables: React.FC = () => {
     }> = {};
 
     pendingTransactions.forEach((txn) => {
-      // Filter transactions by searchQuery if provided
+      const txDate = parseDateSafe(txn.date);
+      const txDateMidnight = new Date(txDate);
+      txDateMidnight.setHours(0, 0, 0, 0);
+
+      // 1. Text search
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
-        const cust = getCustomerById(txn.customerId!);
-        const customerName = cust?.name || 'Cliente Desconhecido';
+        const cust = txn.customerId ? getCustomerById(txn.customerId) : null;
+        const customerName = cust?.name || (txn.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado');
         const cat = getCategoryById(txn.categoryId);
         const categoryName = cat?.name || '';
         const amountStr = txn.amount.toString();
@@ -167,12 +285,39 @@ export const Receivables: React.FC = () => {
         if (!matches) return;
       }
 
-      const cId = txn.customerId!;
+      // 2. Due Date filter
+      if (dueDateFilter === 'overdue') {
+        if (txDateMidnight >= today) return;
+      } else if (dueDateFilter === 'today') {
+        if (txDateMidnight.getTime() !== today.getTime()) return;
+      } else if (dueDateFilter === 'this_week') {
+        if (txDateMidnight < today || txDateMidnight > endOfWeek) return;
+      } else if (dueDateFilter === 'this_month') {
+        if (txDate.getMonth() !== today.getMonth() || txDate.getFullYear() !== today.getFullYear()) return;
+      } else if (dueDateFilter === 'future') {
+        if (txDateMidnight <= endOfMonth) return;
+      }
+
+      // 3. Category filter
+      if (categoryFilter !== 'all' && txn.categoryId !== categoryFilter) {
+        return;
+      }
+
+      // 4. Payment Method filter
+      if (paymentMethodFilter !== 'all') {
+        if (paymentMethodFilter === 'none') {
+          if (txn.paymentMethod) return;
+        } else if (txn.paymentMethod !== paymentMethodFilter) {
+          return;
+        }
+      }
+
+      const cId = txn.customerId || 'unassigned';
       if (!groups[cId]) {
-        const cust = getCustomerById(cId);
+        const cust = txn.customerId ? getCustomerById(txn.customerId) : null;
         groups[cId] = {
           customerId: cId,
-          customerName: cust?.name || 'Cliente Desconhecido',
+          customerName: cust?.name || (txn.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado'),
           customerPhone: cust?.phone,
           customerEmail: cust?.email,
           transactions: [],
@@ -183,16 +328,105 @@ export const Receivables: React.FC = () => {
       groups[cId].transactions.push(txn);
       groups[cId].totalOwed += txn.amount;
 
-      const txDate = new Date(txn.date);
       if (!groups[cId].nearestDueDate || txDate < groups[cId].nearestDueDate) {
         groups[cId].nearestDueDate = txDate;
       }
     });
 
-    // Convert to array and sort alphabetically by customer name
-    return Object.values(groups)
-      .sort((a, b) => a.customerName.localeCompare(b.customerName, 'pt-BR', { sensitivity: 'base' }));
-  }, [pendingTransactions, getCustomerById, getCategoryById, searchQuery]);
+    return Object.values(groups).sort((a, b) => {
+      if (sortBy === 'highest_amount') return b.totalOwed - a.totalOwed;
+      if (sortBy === 'lowest_amount') return a.totalOwed - b.totalOwed;
+      if (sortBy === 'nearest_due') {
+        if (!a.nearestDueDate && !b.nearestDueDate) return 0;
+        if (!a.nearestDueDate) return 1;
+        if (!b.nearestDueDate) return -1;
+        return a.nearestDueDate.getTime() - b.nearestDueDate.getTime();
+      }
+      // customer_az
+      if (a.customerId === 'unassigned') return 1;
+      if (b.customerId === 'unassigned') return -1;
+      return a.customerName.localeCompare(b.customerName, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [pendingTransactions, getCustomerById, getCategoryById, searchQuery, dueDateFilter, categoryFilter, paymentMethodFilter, sortBy]);
+
+  // Lista plana de contas a receber para o modo de visualização em tabela
+  const flatReceivables = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return pendingTransactions.filter((txn) => {
+      const txDate = parseDateSafe(txn.date);
+      const txDateMidnight = new Date(txDate);
+      txDateMidnight.setHours(0, 0, 0, 0);
+
+      // 1. Text search
+      if (searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        const cust = txn.customerId ? getCustomerById(txn.customerId) : null;
+        const customerName = cust?.name || (txn.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado');
+        const cat = getCategoryById(txn.categoryId);
+        const categoryName = cat?.name || '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matches = 
+          customerName.toLowerCase().includes(query) ||
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matches) return false;
+      }
+
+      // 2. Due Date filter
+      if (dueDateFilter === 'overdue') {
+        if (txDateMidnight >= today) return false;
+      } else if (dueDateFilter === 'today') {
+        if (txDateMidnight.getTime() !== today.getTime()) return false;
+      } else if (dueDateFilter === 'this_week') {
+        if (txDateMidnight < today || txDateMidnight > endOfWeek) return false;
+      } else if (dueDateFilter === 'this_month') {
+        if (txDate.getMonth() !== today.getMonth() || txDate.getFullYear() !== today.getFullYear()) return false;
+      } else if (dueDateFilter === 'future') {
+        if (txDateMidnight <= endOfMonth) return false;
+      }
+
+      // 3. Category filter
+      if (categoryFilter !== 'all' && txn.categoryId !== categoryFilter) {
+        return false;
+      }
+
+      // 4. Payment Method filter
+      if (paymentMethodFilter !== 'all') {
+        if (paymentMethodFilter === 'none') {
+          if (txn.paymentMethod) return false;
+        } else if (txn.paymentMethod !== paymentMethodFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'highest_amount') return b.amount - a.amount;
+      if (sortBy === 'lowest_amount') return a.amount - b.amount;
+      if (sortBy === 'customer_az') {
+        const custA = a.customerId ? getCustomerById(a.customerId)?.name || 'Sem Cliente' : 'Sem Cliente';
+        const custB = b.customerId ? getCustomerById(b.customerId)?.name || 'Sem Cliente' : 'Sem Cliente';
+        return custA.localeCompare(custB, 'pt-BR');
+      }
+      // nearest_due
+      return parseDateSafe(a.date).getTime() - parseDateSafe(b.date).getTime();
+    });
+  }, [pendingTransactions, getCustomerById, getCategoryById, searchQuery, dueDateFilter, categoryFilter, paymentMethodFilter, sortBy]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -486,142 +720,316 @@ export const Receivables: React.FC = () => {
       )}
 
       {/* Search and Filters */}
-      <div className="flex items-center gap-2 max-w-md bg-muted/30 px-3 py-1.5 rounded-lg border focus-within:border-primary/50 transition-colors">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Buscar cliente, descrição, ref, valor..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm w-full"
-        />
-        {searchQuery && (
+      <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2.5 p-3 bg-muted/20 border rounded-xl">
+        <div className="relative flex-1 min-w-[220px] w-full sm:w-auto">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar cliente, descrição, ref, valor..."
+            className="pl-8 h-9 text-xs"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Due Date Filter */}
+        <Select value={dueDateFilter} onValueChange={(val: any) => setDueDateFilter(val)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[170px]">
+            <SelectValue placeholder="Vencimento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Datas</SelectItem>
+            <SelectItem value="overdue" className="text-red-600 font-semibold">🚨 Em Atraso</SelectItem>
+            <SelectItem value="today" className="text-amber-600 font-semibold">⚡ Vence Hoje</SelectItem>
+            <SelectItem value="this_week" className="text-blue-600">📅 Esta Semana</SelectItem>
+            <SelectItem value="this_month">🗓️ Este Mês</SelectItem>
+            <SelectItem value="future">⏳ Próximos Meses</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Category Filter */}
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[150px]">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Categorias</SelectItem>
+            {incomeCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        {/* Sort Order */}
+        <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[170px]">
+            <div className="flex items-center gap-1.5 truncate">
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Ordenar" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="nearest_due">📅 Vencimento mais próximo</SelectItem>
+            <SelectItem value="highest_amount">💰 Maior Valor a Receber</SelectItem>
+            <SelectItem value="lowest_amount">📉 Menor Valor a Receber</SelectItem>
+            <SelectItem value="customer_az">👤 Cliente (A-Z)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(searchQuery.trim() || dueDateFilter !== 'all' || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || sortBy !== 'nearest_due') && (
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setSearchQuery('')}
-            className="h-6 w-6 p-0 hover:bg-muted"
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setDueDateFilter('all');
+              setCategoryFilter('all');
+              setPaymentMethodFilter('all');
+              setSortBy('nearest_due');
+            }}
+            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
           >
-            <X className="h-3.5 w-3.5 text-muted-foreground" />
+            <X className="h-3.5 w-3.5" />
+            Limpar
           </Button>
         )}
       </div>
 
-      {/* Accordion List */}
-      <div className="space-y-3">
-        {groupedReceivables.length === 0 ? (
-          <Card className="p-8 text-center text-muted-foreground italic bg-muted/10">
-            Nenhuma conta pendente encontrada para receber.
-          </Card>
-        ) : (
-          groupedReceivables.map((group) => {
-            const isExpanded = !!expandedCustomers[group.customerId];
-            return (
-              <div
-                key={group.customerId}
-                className="border rounded-lg bg-card overflow-hidden shadow-sm hover:border-border transition-all duration-200"
-              >
-                {/* Accordion Header */}
-                <button
-                  onClick={() => toggleExpand(group.customerId)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-4"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="p-2 bg-amber-500/10 rounded-full text-amber-600 shrink-0">
-                      <User className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-semibold text-sm truncate text-foreground">{group.customerName}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
-                        {group.customerPhone && <span>{group.customerPhone}</span>}
-                        <span>{group.transactions.length} {group.transactions.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}</span>
-                        {group.nearestDueDate && (
-                          <span>
-                            • Vencimento mais próximo: {formatDate(group.nearestDueDate)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Deve</p>
-                      <p className="font-bold text-amber-600 money-font text-sm sm:text-base">{formatCurrency(group.totalOwed)}</p>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </button>
+      {/* Controles de Modo de Visualização */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+        <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-lg border w-fit">
+          <Button
+            variant={viewMode === 'grouped' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('grouped')}
+            className="h-8 text-xs gap-1.5 font-medium"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Agrupado por Cliente
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="h-8 text-xs gap-1.5 font-medium"
+          >
+            <List className="h-3.5 w-3.5" />
+            Listagem em Tabela ({flatReceivables.length})
+          </Button>
+        </div>
 
-                {/* Accordion Content */}
-                {isExpanded && (
-                  <div className="border-t bg-muted/10 p-4 space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Detalhamento dos Lançamentos</p>
-                    <div className="space-y-3">
-                      {group.transactions.map((tx) => {
-                        const cat = getCategoryById(tx.categoryId);
-                        return (
-                          <div
-                            key={tx.id}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between border p-3 rounded-lg bg-background shadow-2xs gap-3 hover:border-primary/20 transition-colors"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm text-foreground">{tx.description}</span>
-                                <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">
-                                  {cat?.name || '-'}
-                                </Badge>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <CalendarDays className="h-3 w-3" />
-                                  {formatDate(tx.date)}
-                                </span>
-                                {tx.paymentMethod && (
+        <span className="text-xs text-muted-foreground font-medium">
+          {viewMode === 'grouped' 
+            ? `${groupedReceivables.length} clientes com débitos`
+            : `${flatReceivables.length} lançamentos a receber`}
+        </span>
+      </div>
+
+      {/* Conteúdo Principal: Modo Agrupado OU Modo Tabela Plana */}
+      {viewMode === 'grouped' ? (
+        <div className="space-y-3">
+          {groupedReceivables.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground italic bg-muted/10">
+              Nenhuma conta pendente encontrada para receber com os filtros selecionados.
+            </Card>
+          ) : (
+            groupedReceivables.map((group) => {
+              const isExpanded = !!expandedCustomers[group.customerId];
+              return (
+                <div
+                  key={group.customerId}
+                  className="border rounded-lg bg-card overflow-hidden shadow-sm hover:border-border transition-all duration-200"
+                >
+                  {/* Accordion Header */}
+                  <button
+                    onClick={() => toggleExpand(group.customerId)}
+                    className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="p-2 bg-amber-500/10 rounded-full text-amber-600 shrink-0">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-sm truncate text-foreground">{group.customerName}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
+                          {group.customerPhone && <span>{group.customerPhone}</span>}
+                          <span>{group.transactions.length} {group.transactions.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}</span>
+                          {group.nearestDueDate && (
+                            <span>
+                              • Vencimento mais próximo: {formatDate(group.nearestDueDate)}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Deve</p>
+                        <p className="font-bold text-amber-600 money-font text-sm sm:text-base">{formatCurrency(group.totalOwed)}</p>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Accordion Body */}
+                  {isExpanded && (
+                    <div className="border-t bg-muted/10 divide-y">
+                      <div className="p-4 space-y-3">
+                        {group.transactions.map((tx) => {
+                          const cat = getCategoryById(tx.categoryId);
+                          return (
+                            <div
+                              key={tx.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-card gap-3 hover:bg-muted/20 transition-colors"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm text-foreground">{tx.description}</span>
+                                  {tx.reference && (
+                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                                      Ref: {tx.reference}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
-                                    {getPaymentMethodIcon(tx.paymentMethod)}
-                                    {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                    <Clock className="h-3 w-3" />
+                                    Vencimento: <strong className="text-foreground">{formatDate(tx.date)}</strong>
                                   </span>
-                                )}
-                                {tx.reference && (
-                                  <span className="font-mono bg-muted px-1 rounded text-[10px]">
-                                    Ref: {tx.reference}
-                                  </span>
-                                )}
+                                  <span>•</span>
+                                  <span>Cat: {cat?.name || 'Geral'}</span>
+                                  {tx.paymentMethod && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-1">
+                                        {getPaymentMethodIcon(tx.paymentMethod)}
+                                        {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
+                                <span className="font-bold text-amber-600 money-font text-sm">{formatCurrency(tx.amount)}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                  onClick={() => handleOpenPaymentDialog(tx)}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Marcar Pago
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        /* MODO TABELA PLANA */
+        <Card className="border shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            {flatReceivables.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="font-medium">Nenhum lançamento encontrado com os filtros selecionados.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[140px]">Vencimento</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Forma Pagamento</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right w-[120px]">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {flatReceivables.map((tx) => {
+                      const cust = tx.customerId ? getCustomerById(tx.customerId) : null;
+                      const cat = getCategoryById(tx.categoryId);
+                      const badgeInfo = getDueBadgeInfo(tx.date);
+
+                      return (
+                        <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-amber-50/20")}>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="space-y-0.5">
+                              <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
+                              <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
+                                {badgeInfo.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
+                              {tx.reference && (
+                                <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                              )}
                               {tx.notes && (
-                                <p className="text-xs text-muted-foreground/80 italic max-w-xl truncate mt-1">
-                                  Obs: {tx.notes}
-                                </p>
+                                <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
                               )}
                             </div>
-
-                            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
-                              <span className="font-bold text-amber-600 money-font text-sm">{formatCurrency(tx.amount)}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                onClick={() => handleOpenPaymentDialog(tx)}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Marcar Pago
-                              </Button>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="text-sm font-medium text-foreground block">{cust?.name || (tx.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado')}</span>
+                              {cust?.phone && <span className="text-[11px] text-muted-foreground">{cust.phone}</span>}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {cat?.name || 'Geral'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {tx.paymentMethod ? (
+                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                {getPaymentMethodIcon(tx.paymentMethod)}
+                                {getPaymentMethodLabel(tx.paymentMethod, t)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-sm text-amber-600">
+                            {formatCurrency(tx.amount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenPaymentDialog(tx)}
+                              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Receber
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
-            );
-          })
-        )}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Mark As Paid Dialog */}
       <Dialog open={selectedTx !== null} onOpenChange={(open) => !open && setSelectedTx(null)}>

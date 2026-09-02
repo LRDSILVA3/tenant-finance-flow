@@ -23,6 +23,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import {
   HandCoins,
   Clock,
   ChevronDown,
@@ -38,11 +46,16 @@ import {
   User,
   Search,
   X,
-  Plus
+  Plus,
+  Filter,
+  ArrowUpDown,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   ResponsiveContainer,
   BarChart,
@@ -54,15 +67,91 @@ import {
   LabelList,
 } from 'recharts';
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value === undefined || value === null || isNaN(value)) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
 };
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(date));
+const parseDateSafe = (dateVal?: string | Date | null): Date => {
+  if (!dateVal) return new Date();
+  if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? new Date() : dateVal;
+  if (typeof dateVal === 'string') {
+    if (dateVal.includes('T')) {
+      const d = new Date(dateVal);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }
+    const parts = dateVal.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m, d, 12, 0, 0);
+      }
+    }
+    const parsed = new Date(dateVal);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  return new Date();
+};
+
+const formatDate = (date?: string | Date | null) => {
+  if (!date) return '—';
+  try {
+    const d = parseDateSafe(date);
+    return new Intl.DateTimeFormat('pt-BR').format(d);
+  } catch {
+    return '—';
+  }
+};
+
+const getDueBadgeInfo = (dateVal?: string | Date | null) => {
+  const d = parseDateSafe(dateVal);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dMidnight = new Date(d);
+  dMidnight.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((dMidnight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (isNaN(diffDays)) {
+    return { label: 'Data Indefinida', isOverdue: false, isTodayDue: false, className: 'bg-muted text-muted-foreground' };
+  }
+  if (diffDays < 0) {
+    const abs = Math.abs(diffDays);
+    return {
+      label: abs === 1 ? 'Atrasado 1d' : `Atrasado ${abs}d`,
+      isOverdue: true,
+      isTodayDue: false,
+      className: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-300'
+    };
+  }
+  if (diffDays === 0) {
+    return {
+      label: 'Vence Hoje',
+      isOverdue: false,
+      isTodayDue: true,
+      className: 'border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold'
+    };
+  }
+  if (diffDays === 1) {
+    return {
+      label: 'Vence Amanhã',
+      isOverdue: false,
+      isTodayDue: false,
+      className: 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+    };
+  }
+  return {
+    label: `Em ${diffDays}d`,
+    isOverdue: false,
+    isTodayDue: false,
+    className: 'bg-muted text-muted-foreground'
+  };
 };
 
 const getPaymentMethodIcon = (method: string) => {
@@ -109,8 +198,14 @@ export const Payables: React.FC = () => {
     userSettings
   } = useFinance();
 
+  const [viewMode, setViewMode] = useState<'grouped' | 'table'>('grouped');
   const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [dueDateFilter, setDueDateFilter] = useState<'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'future'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'nearest_due' | 'highest_amount' | 'lowest_amount' | 'supplier_az'>('nearest_due');
+
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isNewTxDialogOpen, setIsNewTxDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
@@ -131,8 +226,28 @@ export const Payables: React.FC = () => {
         txn.status === 'pending'
     );
   }, [transactions]);
-  // Agrupar despesas pendentes por fornecedor (ou Sem Fornecedor se sId for indefinido) e filtrar por busca
+
+  // Categorias de despesa presentes
+  const expenseCategories = useMemo(() => {
+    const catMap = new Map<string, string>();
+    pendingTransactions.forEach(t => {
+      const cat = getCategoryById(t.categoryId);
+      if (cat) catMap.set(cat.id, cat.name);
+    });
+    return Array.from(catMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [pendingTransactions, getCategoryById]);
+
+  // Agrupar despesas pendentes por fornecedor e aplicar todos os filtros
   const groupedPayables = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
     const groups: Record<string, {
       supplierId: string;
       supplierName: string;
@@ -143,7 +258,11 @@ export const Payables: React.FC = () => {
     }> = {};
 
     pendingTransactions.forEach((txn) => {
-      // Filtrar lançamentos pelo searchQuery se fornecido
+      const txDate = new Date(txn.date);
+      const txDateMidnight = new Date(txDate);
+      txDateMidnight.setHours(0, 0, 0, 0);
+
+      // 1. Text search
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const sup = txn.supplierId ? getSupplierById(txn.supplierId) : null;
@@ -165,6 +284,33 @@ export const Payables: React.FC = () => {
         if (!matches) return;
       }
 
+      // 2. Due Date filter
+      if (dueDateFilter === 'overdue') {
+        if (txDateMidnight >= today) return;
+      } else if (dueDateFilter === 'today') {
+        if (txDateMidnight.getTime() !== today.getTime()) return;
+      } else if (dueDateFilter === 'this_week') {
+        if (txDateMidnight < today || txDateMidnight > endOfWeek) return;
+      } else if (dueDateFilter === 'this_month') {
+        if (txDate.getMonth() !== today.getMonth() || txDate.getFullYear() !== today.getFullYear()) return;
+      } else if (dueDateFilter === 'future') {
+        if (txDateMidnight <= endOfMonth) return;
+      }
+
+      // 3. Category filter
+      if (categoryFilter !== 'all' && txn.categoryId !== categoryFilter) {
+        return;
+      }
+
+      // 4. Payment Method filter
+      if (paymentMethodFilter !== 'all') {
+        if (paymentMethodFilter === 'none') {
+          if (txn.paymentMethod) return;
+        } else if (txn.paymentMethod !== paymentMethodFilter) {
+          return;
+        }
+      }
+
       const sId = txn.supplierId || 'unassigned';
       if (!groups[sId]) {
         const sup = txn.supplierId ? getSupplierById(txn.supplierId) : null;
@@ -180,20 +326,105 @@ export const Payables: React.FC = () => {
       groups[sId].transactions.push(txn);
       groups[sId].totalOwed += txn.amount;
 
-      const txDate = new Date(txn.date);
       if (!groups[sId].nearestDueDate || txDate < groups[sId].nearestDueDate) {
         groups[sId].nearestDueDate = txDate;
       }
     });
 
-    // Converter para array e ordenar em ordem alfabética (com "Sem Fornecedor" sempre ao final)
-    return Object.values(groups)
-      .sort((a, b) => {
-        if (a.supplierId === 'unassigned') return 1;
-        if (b.supplierId === 'unassigned') return -1;
-        return a.supplierName.localeCompare(b.supplierName, 'pt-BR', { sensitivity: 'base' });
-      });
-  }, [pendingTransactions, getSupplierById, getCategoryById, searchQuery]);
+    return Object.values(groups).sort((a, b) => {
+      if (sortBy === 'highest_amount') return b.totalOwed - a.totalOwed;
+      if (sortBy === 'lowest_amount') return a.totalOwed - b.totalOwed;
+      if (sortBy === 'nearest_due') {
+        if (!a.nearestDueDate && !b.nearestDueDate) return 0;
+        if (!a.nearestDueDate) return 1;
+        if (!b.nearestDueDate) return -1;
+        return a.nearestDueDate.getTime() - b.nearestDueDate.getTime();
+      }
+      // supplier_az
+      if (a.supplierId === 'unassigned') return 1;
+      if (b.supplierId === 'unassigned') return -1;
+      return a.supplierName.localeCompare(b.supplierName, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [pendingTransactions, getSupplierById, getCategoryById, searchQuery, dueDateFilter, categoryFilter, paymentMethodFilter, sortBy]);
+
+  // Lista plana de contas a pagar para o modo de visualização em tabela
+  const flatPayables = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return pendingTransactions.filter((txn) => {
+      const txDate = new Date(txn.date);
+      const txDateMidnight = new Date(txDate);
+      txDateMidnight.setHours(0, 0, 0, 0);
+
+      // 1. Text search
+      if (searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        const sup = txn.supplierId ? getSupplierById(txn.supplierId) : null;
+        const supplierName = sup?.name || 'Sem Fornecedor';
+        const cat = getCategoryById(txn.categoryId);
+        const categoryName = cat?.name || '';
+        const amountStr = txn.amount.toString();
+        const amountFormatted = formatCurrency(txn.amount);
+
+        const matches = 
+          supplierName.toLowerCase().includes(query) ||
+          txn.description.toLowerCase().includes(query) ||
+          (txn.reference && txn.reference.toLowerCase().includes(query)) ||
+          (txn.notes && txn.notes.toLowerCase().includes(query)) ||
+          categoryName.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query);
+
+        if (!matches) return false;
+      }
+
+      // 2. Due Date filter
+      if (dueDateFilter === 'overdue') {
+        if (txDateMidnight >= today) return false;
+      } else if (dueDateFilter === 'today') {
+        if (txDateMidnight.getTime() !== today.getTime()) return false;
+      } else if (dueDateFilter === 'this_week') {
+        if (txDateMidnight < today || txDateMidnight > endOfWeek) return false;
+      } else if (dueDateFilter === 'this_month') {
+        if (txDate.getMonth() !== today.getMonth() || txDate.getFullYear() !== today.getFullYear()) return false;
+      } else if (dueDateFilter === 'future') {
+        if (txDateMidnight <= endOfMonth) return false;
+      }
+
+      // 3. Category filter
+      if (categoryFilter !== 'all' && txn.categoryId !== categoryFilter) {
+        return false;
+      }
+
+      // 4. Payment Method filter
+      if (paymentMethodFilter !== 'all') {
+        if (paymentMethodFilter === 'none') {
+          if (txn.paymentMethod) return false;
+        } else if (txn.paymentMethod !== paymentMethodFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'highest_amount') return b.amount - a.amount;
+      if (sortBy === 'lowest_amount') return a.amount - b.amount;
+      if (sortBy === 'supplier_az') {
+        const supA = a.supplierId ? getSupplierById(a.supplierId)?.name || 'Sem Fornecedor' : 'Sem Fornecedor';
+        const supB = b.supplierId ? getSupplierById(b.supplierId)?.name || 'Sem Fornecedor' : 'Sem Fornecedor';
+        return supA.localeCompare(supB, 'pt-BR');
+      }
+      // nearest_due
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+  }, [pendingTransactions, getSupplierById, getCategoryById, searchQuery, dueDateFilter, categoryFilter, paymentMethodFilter, sortBy]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
@@ -515,126 +746,312 @@ export const Payables: React.FC = () => {
         </Card>
       )}
 
-      {/* Seção de Busca */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
+      {/* Seção de Filtros e Busca */}
+      <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2.5 p-3 bg-muted/20 border rounded-xl">
+        <div className="relative flex-1 min-w-[220px] w-full sm:w-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Buscar fornecedor, descrição, ref, valor..."
-            className="pl-8"
+            className="pl-8 h-9 text-xs"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-      </div>
 
-      {/* Lista de Contas a Pagar */}
-      <div className="space-y-3">
-        {groupedPayables.length === 0 ? (
-          <Card className="p-8 text-center border-dashed border-2">
-            <p className="text-muted-foreground">Nenhuma despesa pendente cadastrada com fornecedor.</p>
-          </Card>
-        ) : (
-          groupedPayables.map((group) => {
-            const isExpanded = !!expandedSuppliers[group.supplierId];
-            return (
-              <Card
-                key={group.supplierId}
-                className="overflow-hidden border border-border/50 shadow-sm"
-              >
-                <button
-                  onClick={() => toggleExpand(group.supplierId)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-4"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="p-2 bg-rose-50 rounded-full text-rose-500 shrink-0">
-                      <User className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-sm truncate text-foreground">{group.supplierName}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
-                        {group.contactInfo && <span>{group.contactInfo}</span>}
-                        <span>{group.transactions.length} {group.transactions.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}</span>
-                        {group.nearestDueDate && (
-                          <span>
-                            • Vencimento mais próximo: {formatDate(group.nearestDueDate)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total devido</p>
-                      <p className="font-bold text-rose-600 money-font text-sm sm:text-base">{formatCurrency(group.totalOwed)}</p>
-                    </div>
-                    {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                  </div>
-                </button>
+        {/* Due Date Filter */}
+        <Select value={dueDateFilter} onValueChange={(val: any) => setDueDateFilter(val)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[170px]">
+            <SelectValue placeholder="Vencimento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Datas</SelectItem>
+            <SelectItem value="overdue" className="text-red-600 font-semibold">🚨 Vencidas (Atraso)</SelectItem>
+            <SelectItem value="today" className="text-amber-600 font-semibold">⚡ Vence Hoje</SelectItem>
+            <SelectItem value="this_week" className="text-blue-600">📅 Esta Semana</SelectItem>
+            <SelectItem value="this_month">🗓️ Este Mês</SelectItem>
+            <SelectItem value="future">⏳ Próximos Meses</SelectItem>
+          </SelectContent>
+        </Select>
 
-                {isExpanded && (
-                  <div className="border-t bg-muted/10 p-4 space-y-3">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-left text-sm">
-                        <thead>
-                          <tr className="border-b text-muted-foreground font-medium text-xs">
-                            <th className="py-2 px-1">Descrição</th>
-                            <th className="py-2 px-1">Categoria</th>
-                            <th className="py-2 px-1">Vencimento</th>
-                            <th className="py-2 px-1">Forma</th>
-                            <th className="py-2 px-1">Referência</th>
-                            <th className="py-2 px-1 text-right">Valor</th>
-                            <th className="py-2 px-1 text-right">Ação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {group.transactions.map((tx) => {
-                            const cat = getCategoryById(tx.categoryId);
-                            return (
-                              <tr key={tx.id} className="hover:bg-muted/20">
-                                <td className="py-2 px-1 font-medium">{tx.description}</td>
-                                <td className="py-2 px-1 text-muted-foreground">{cat?.name || '—'}</td>
-                                <td className="py-2 px-1 font-medium text-muted-foreground">
-                                  {formatDate(tx.date)}
-                                </td>
-                                <td className="py-2 px-1">
-                                  {tx.paymentMethod ? (
-                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                      {getPaymentMethodIcon(tx.paymentMethod)}
-                                      {getPaymentMethodLabel(tx.paymentMethod, t)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground/60">—</span>
-                                  )}
-                                </td>
-                                <td className="py-2 px-1 text-muted-foreground">{tx.reference || '—'}</td>
-                                <td className="py-2 px-1 text-right font-bold text-rose-600 money-font">
-                                  {formatCurrency(tx.amount)}
-                                </td>
-                                <td className="py-2 px-1 text-right">
-                                  <Button
-                                    size="sm"
-                                    className="h-8 gap-1"
-                                    onClick={() => handleOpenPaymentDialog(tx)}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Baixar
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            );
-          })
+        {/* Category Filter */}
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[150px]">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Categorias</SelectItem>
+            {expenseCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        {/* Sort Order */}
+        <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[170px]">
+            <div className="flex items-center gap-1.5 truncate">
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Ordenar" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="nearest_due">📅 Vencimento mais urgente</SelectItem>
+            <SelectItem value="highest_amount">💰 Maior Valor Devido</SelectItem>
+            <SelectItem value="lowest_amount">📉 Menor Valor Devido</SelectItem>
+            <SelectItem value="supplier_az">🏢 Fornecedor (A-Z)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(searchQuery.trim() || dueDateFilter !== 'all' || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || sortBy !== 'nearest_due') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setDueDateFilter('all');
+              setCategoryFilter('all');
+              setPaymentMethodFilter('all');
+              setSortBy('nearest_due');
+            }}
+            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar
+          </Button>
         )}
       </div>
+
+      {/* Controles de Modo de Visualização */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+        <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-lg border w-fit">
+          <Button
+            variant={viewMode === 'grouped' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('grouped')}
+            className="h-8 text-xs gap-1.5 font-medium"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Agrupado por Fornecedor
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="h-8 text-xs gap-1.5 font-medium"
+          >
+            <List className="h-3.5 w-3.5" />
+            Listagem em Tabela ({flatPayables.length})
+          </Button>
+        </div>
+
+        <span className="text-xs text-muted-foreground font-medium">
+          {viewMode === 'grouped' 
+            ? `${groupedPayables.length} fornecedores com pendências`
+            : `${flatPayables.length} lançamentos a pagar`}
+        </span>
+      </div>
+
+      {/* Conteúdo Principal: Modo Agrupado OU Modo Tabela Plana */}
+      {viewMode === 'grouped' ? (
+        <div className="space-y-3">
+          {groupedPayables.length === 0 ? (
+            <Card className="p-8 text-center border-dashed border-2">
+              <p className="text-muted-foreground">Nenhuma despesa pendente cadastrada com fornecedor.</p>
+            </Card>
+          ) : (
+            groupedPayables.map((group) => {
+              const isExpanded = !!expandedSuppliers[group.supplierId];
+              return (
+                <Card
+                  key={group.supplierId}
+                  className="overflow-hidden border border-border/50 shadow-sm"
+                >
+                  <button
+                    onClick={() => toggleExpand(group.supplierId)}
+                    className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="p-2 bg-rose-50 rounded-full text-rose-500 shrink-0">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm truncate text-foreground">{group.supplierName}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
+                          {group.contactInfo && <span>{group.contactInfo}</span>}
+                          <span>{group.transactions.length} {group.transactions.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}</span>
+                          {group.nearestDueDate && (
+                            <span>
+                              • Vencimento mais próximo: {formatDate(group.nearestDueDate)}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total devido</p>
+                        <p className="font-bold text-rose-600 money-font text-sm sm:text-base">{formatCurrency(group.totalOwed)}</p>
+                      </div>
+                      {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t bg-muted/10 p-4 space-y-3">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-sm">
+                          <thead>
+                            <tr className="border-b text-muted-foreground font-medium text-xs">
+                              <th className="py-2 px-1">Descrição</th>
+                              <th className="py-2 px-1">Categoria</th>
+                              <th className="py-2 px-1">Vencimento</th>
+                              <th className="py-2 px-1">Forma</th>
+                              <th className="py-2 px-1">Referência</th>
+                              <th className="py-2 px-1 text-right">Valor</th>
+                              <th className="py-2 px-1 text-right">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {group.transactions.map((tx) => {
+                              const cat = getCategoryById(tx.categoryId);
+                              return (
+                                <tr key={tx.id} className="hover:bg-muted/20">
+                                  <td className="py-2 px-1 font-medium">{tx.description}</td>
+                                  <td className="py-2 px-1 text-muted-foreground">{cat?.name || '—'}</td>
+                                  <td className="py-2 px-1 font-medium text-muted-foreground">
+                                    {formatDate(tx.date)}
+                                  </td>
+                                  <td className="py-2 px-1">
+                                    {tx.paymentMethod ? (
+                                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        {getPaymentMethodIcon(tx.paymentMethod)}
+                                        {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-1 text-muted-foreground font-mono text-xs">{tx.reference || '—'}</td>
+                                  <td className="py-2 px-1 text-right font-bold text-rose-600 money-font">
+                                    {formatCurrency(tx.amount)}
+                                  </td>
+                                  <td className="py-2 px-1 text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleOpenPaymentDialog(tx)}
+                                      className="h-8 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      Dar Baixa
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        /* MODO TABELA PLANA */
+        <Card className="border shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            {flatPayables.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="font-medium">Nenhum lançamento encontrado com os filtros selecionados.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[140px]">Vencimento</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Fornecedor</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Forma Pagamento</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right w-[120px]">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {flatPayables.map((tx) => {
+                      const sup = tx.supplierId ? getSupplierById(tx.supplierId) : null;
+                      const cat = getCategoryById(tx.categoryId);
+                      const badgeInfo = getDueBadgeInfo(tx.date);
+
+                      return (
+                        <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-red-50/10")}>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="space-y-0.5">
+                              <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
+                              <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
+                                {badgeInfo.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
+                              {tx.reference && (
+                                <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                              )}
+                              {tx.notes && (
+                                <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-medium text-foreground">
+                              {sup?.name || <span className="text-muted-foreground italic">Sem Fornecedor</span>}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {cat?.name || '—'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {tx.paymentMethod ? (
+                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                {getPaymentMethodIcon(tx.paymentMethod)}
+                                {getPaymentMethodLabel(tx.paymentMethod)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-sm text-rose-600">
+                            {formatCurrency(tx.amount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenPaymentDialog(tx)}
+                              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Pagar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dialog de Liquidação de Despesa */}
       {selectedTx && (

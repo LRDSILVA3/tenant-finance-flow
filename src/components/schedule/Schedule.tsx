@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, User, DollarSign,
   Pencil, Trash2, CheckCircle2, XCircle, PlayCircle, Loader2, Settings2,
-  CalendarIcon, AlertCircle
+  CalendarIcon, AlertCircle, Filter, X, Search
 } from 'lucide-react';
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -119,6 +119,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Agenda Day filters
+  const [dayFilterCollaborator, setDayFilterCollaborator] = useState<string>('all');
+  const [dayFilterServiceType, setDayFilterServiceType] = useState<string>('all');
+  const [dayFilterStatus, setDayFilterStatus] = useState<AppointmentStatus | 'all'>('all');
+
   // Modals
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -164,6 +169,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
   // History filters
   const [histSearch, setHistSearch] = useState('');
   const [histStatus, setHistStatus] = useState<AppointmentStatus | 'all'>('all');
+  const [histFilterCollaborator, setHistFilterCollaborator] = useState<string>('all');
+  const [histFilterServiceType, setHistFilterServiceType] = useState<string>('all');
 
   // ── Load ────────────────────────────────────────────────────────────────
 
@@ -193,9 +200,27 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
     const dayEnd = endOfDay(selectedDay).getTime();
     return appointments.filter((a) => {
       const t = a.scheduledAt.getTime();
-      return t >= dayStart && t <= dayEnd;
+      const inDay = t >= dayStart && t <= dayEnd;
+      if (!inDay) return false;
+
+      if (dayFilterStatus !== 'all' && a.status !== dayFilterStatus) return false;
+      if (dayFilterCollaborator !== 'all') {
+        if (dayFilterCollaborator === 'none') {
+          if (a.collaboratorId) return false;
+        } else if (a.collaboratorId !== dayFilterCollaborator) {
+          return false;
+        }
+      }
+      if (dayFilterServiceType !== 'all') {
+        if (dayFilterServiceType === 'none') {
+          if (a.serviceTypeId) return false;
+        } else if (a.serviceTypeId !== dayFilterServiceType) {
+          return false;
+        }
+      }
+      return true;
     }).sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime());
-  }, [appointments, selectedDay]);
+  }, [appointments, selectedDay, dayFilterStatus, dayFilterCollaborator, dayFilterServiceType]);
 
   // ── History list ────────────────────────────────────────────────────────
 
@@ -206,10 +231,26 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
         const matchStatus = histStatus === 'all' || a.status === histStatus;
         const custName = customers.find(c => c.id === a.customerId)?.name ?? '';
         const matchSearch = !q || a.title.toLowerCase().includes(q) || custName.toLowerCase().includes(q);
-        return matchStatus && matchSearch;
+        if (!matchStatus || !matchSearch) return false;
+
+        if (histFilterCollaborator !== 'all') {
+          if (histFilterCollaborator === 'none') {
+            if (a.collaboratorId) return false;
+          } else if (a.collaboratorId !== histFilterCollaborator) {
+            return false;
+          }
+        }
+        if (histFilterServiceType !== 'all') {
+          if (histFilterServiceType === 'none') {
+            if (a.serviceTypeId) return false;
+          } else if (a.serviceTypeId !== histFilterServiceType) {
+            return false;
+          }
+        }
+        return true;
       })
       .sort((a, b) => b.scheduledAt.getTime() - a.scheduledAt.getTime());
-  }, [appointments, customers, histSearch, histStatus]);
+  }, [appointments, customers, histSearch, histStatus, histFilterCollaborator, histFilterServiceType]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -614,30 +655,92 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
 
         {/* ── Tab: Agenda ─────────────────────────────────────────────────── */}
         <TabsContent value="agenda" className="space-y-4">
-          {/* Day navigator */}
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => subDays(d, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Input
-              type="date"
-              value={selectedDay ? new Date(selectedDay.getTime() - selectedDay.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val) {
-                  setSelectedDay(new Date(val + 'T12:00:00'));
-                }
-              }}
-              className="w-[150px] h-9 text-sm"
-            />
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => addDays(d, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {!isToday(selectedDay) && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedDay(new Date())}>
-                Hoje
+          {/* Day navigator & Day filters */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-3 bg-muted/20 border rounded-xl">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => subDays(d, 1))}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            )}
+              <Input
+                type="date"
+                value={selectedDay ? new Date(selectedDay.getTime() - selectedDay.getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setSelectedDay(new Date(val + 'T12:00:00'));
+                  }
+                }}
+                className="w-[140px] h-8 text-xs"
+              />
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedDay(d => addDays(d, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isToday(selectedDay) && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedDay(new Date())}>
+                  Hoje
+                </Button>
+              )}
+            </div>
+
+            {/* Day quick filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Collaborator */}
+              {collaborators && collaborators.length > 0 && (
+                <Select value={dayFilterCollaborator} onValueChange={setDayFilterCollaborator}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]">
+                    <SelectValue placeholder="Colaborador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Colaboradores</SelectItem>
+                    <SelectItem value="none">Sem Colaborador</SelectItem>
+                    {collaborators.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Service Type */}
+              {serviceTypes.length > 0 && (
+                <Select value={dayFilterServiceType} onValueChange={setDayFilterServiceType}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]">
+                    <SelectValue placeholder="Tipo de Serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Serviços</SelectItem>
+                    <SelectItem value="none">Sem Tipo</SelectItem>
+                    {serviceTypes.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Status */}
+              <Select value={dayFilterStatus} onValueChange={(v) => setDayFilterStatus(v as AppointmentStatus | 'all')}>
+                <SelectTrigger className="h-8 text-xs w-[130px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  {(Object.keys(STATUS_CONFIG) as AppointmentStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>{STATUS_CONFIG[s].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(dayFilterCollaborator !== 'all' || dayFilterServiceType !== 'all' || dayFilterStatus !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setDayFilterCollaborator('all');
+                    setDayFilterServiceType('all');
+                    setDayFilterStatus('all');
+                  }}
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  title="Limpar filtros"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Day appointments */}
@@ -648,7 +751,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
           ) : dayAppointments.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-25" />
-              <p className="font-medium">Nenhum agendamento para este dia.</p>
+              <p className="font-medium">Nenhum agendamento para os filtros selecionados.</p>
               <Button variant="outline" className="mt-4 gap-2" onClick={openCreateAppt}>
                 <Plus className="h-4 w-4" /> Adicionar agendamento
               </Button>
@@ -662,16 +765,49 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
 
         {/* ── Tab: Histórico ──────────────────────────────────────────────── */}
         <TabsContent value="history" className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              placeholder="Buscar por título ou cliente..."
-              value={histSearch}
-              onChange={(e) => setHistSearch(e.target.value)}
-              className="sm:max-w-64"
-            />
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/20 border rounded-xl">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título ou cliente..."
+                value={histSearch}
+                onChange={(e) => setHistSearch(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+
+            {/* Collaborator */}
+            {collaborators && collaborators.length > 0 && (
+              <Select value={histFilterCollaborator} onValueChange={setHistFilterCollaborator}>
+                <SelectTrigger className="h-8 text-xs w-[140px]">
+                  <SelectValue placeholder="Colaborador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Colaboradores</SelectItem>
+                  <SelectItem value="none">Sem Colaborador</SelectItem>
+                  {collaborators.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Service Type */}
+            {serviceTypes.length > 0 && (
+              <Select value={histFilterServiceType} onValueChange={setHistFilterServiceType}>
+                <SelectTrigger className="h-8 text-xs w-[140px]">
+                  <SelectValue placeholder="Tipo de Serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Serviços</SelectItem>
+                  <SelectItem value="none">Sem Tipo</SelectItem>
+                  {serviceTypes.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Status */}
             <Select value={histStatus} onValueChange={(v) => setHistStatus(v as AppointmentStatus | 'all')}>
-              <SelectTrigger className="sm:w-44">
-                <SelectValue />
+              <SelectTrigger className="h-8 text-xs w-[130px]">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
@@ -680,6 +816,23 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
                 ))}
               </SelectContent>
             </Select>
+
+            {(histSearch.trim() || histStatus !== 'all' || histFilterCollaborator !== 'all' || histFilterServiceType !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setHistSearch('');
+                  setHistStatus('all');
+                  setHistFilterCollaborator('all');
+                  setHistFilterServiceType('all');
+                }}
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                title="Limpar filtros"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
 
           <Card>
