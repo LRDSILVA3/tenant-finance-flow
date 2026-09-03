@@ -16,7 +16,10 @@
   - Local State: `useState` / `useMemo` / `useCallback`.
 
 ## Component Reuse & UI Mandates
-- **Component Reuse**: NEVER reinvent or duplicate components. Always reuse established UI components (e.g. `SearchableSelect`, `MoneyInput`) and hooks (`useTransactionDescriptions`, `useTransactionReferences`).
+- **DRY & Zero Wheel Reinvention (MANDATÓRIO)**: 
+  - **NUNCA crie componentes, modais, formulários ou lógicas duplicadas/simplificadas** quando já existirem equivalentes no sistema.
+  - Antes de criar qualquer funcionalidade, pesquise na base de código se já existe um modal ou componente consolidado (ex: `ProductDialog`, `ServiceTypeDialog`, `TransactionDialog`, `SearchableSelect`, `MoneyInput`).
+  - Se um modal/componente estiver embutido diretamente em uma tela, **EXTRAIA-O para um componente reutilizável** compartilhado (em `src/components/...`) e utilize-o em ambos os locais, preservando 100% das funcionalidades consolidadas (busca EAN, margens, fornecedores, validades, etc.).
 - **Modal Design**: Modals with extensive forms/content MUST use `max-h-[90vh]`, `flex flex-col`, fixed Header/Footer, and internal scroll `overflow-y-auto` to prevent viewport clipping.
 - **Hardware & Multi-Input Support**: Always provide clear visual labels and badges for hardware scanners (USB/Bluetooth barcode guns) alongside camera scanning and manual fallback.
 - **SPA Routing**: Maintain SPA routing rewrite files (`vercel.json`, `public/_redirects`, `public/.htaccess`) to prevent 404 errors on direct URL accesses.

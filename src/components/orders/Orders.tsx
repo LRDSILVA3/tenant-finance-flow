@@ -26,7 +26,7 @@ import {
   Receipt, ArrowRight, CheckCircle2, Clock, X, Sparkles, Percent, Tag,
   CreditCard, Barcode, CalendarIcon, Eye, RotateCcw, AlertTriangle, ChevronRight,
   TrendingUp, Users, Check, AlertCircle, ShoppingBag, Download, Smartphone,
-  Copy, Wifi, WifiOff, RefreshCw
+  Copy, Wifi, WifiOff, RefreshCw, Store
 } from 'lucide-react';
 import { OrderReceiptDialog } from './OrderReceiptDialog';
 import { generateOrderPdf } from './OrderPdf';
@@ -78,7 +78,7 @@ interface CartItem {
   discountAmount: number;
 }
 
-export const Orders: React.FC = () => {
+export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavigateToStorePos }) => {
   const { currentClient, collaborators, categories, customPaymentMethods = [], userSettings } = useFinance();
   const { addTransaction, loadTransactions } = useTransactions();
 
@@ -791,6 +791,18 @@ export const Orders: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {onNavigateToStorePos && (
+              <Button
+                size="sm"
+                onClick={onNavigateToStorePos}
+                className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm"
+              >
+                <Store className="h-4 w-4" />
+                <span className="hidden sm:inline">Modo Loja (PDV Touch)</span>
+                <span className="sm:hidden">Modo Loja</span>
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"

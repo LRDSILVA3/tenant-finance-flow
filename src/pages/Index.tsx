@@ -18,10 +18,12 @@ import { Payables } from '@/components/payables/Payables';
 import { Suppliers } from '@/components/suppliers/Suppliers';
 import { Orders } from '@/components/orders/Orders';
 import { ServiceOrders } from '@/components/service-orders/ServiceOrders';
+import { StorePos } from '@/components/pos/StorePos';
 import { Loader2 } from 'lucide-react';
 import { SystemTour } from '@/components/layout/SystemTour';
+import { cn } from '@/lib/utils';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'store_pos' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -94,7 +96,9 @@ const Index: React.FC = () => {
       case 'inventory':
         return <Inventory />;
       case 'orders':
-        return <Orders />;
+        return <Orders onNavigateToStorePos={() => setCurrentView('store_pos')} />;
+      case 'store_pos':
+        return <StorePos onBackToOrders={() => setCurrentView('orders')} />;
       case 'service_orders':
         return <ServiceOrders />;
       case 'suppliers':
@@ -140,7 +144,14 @@ const Index: React.FC = () => {
         currentReportTab={activeReportTab}
         onReportTabChange={setActiveReportTab}
       />
-      <main className="flex-1 overflow-y-auto container px-4 sm:px-6 py-6">{renderView()}</main>
+      <main className={cn(
+        "flex-1 container px-4 sm:px-6",
+        currentView === 'store_pos'
+          ? "py-2 overflow-hidden flex flex-col min-h-0"
+          : "py-6 overflow-y-auto"
+      )}>
+        {renderView()}
+      </main>
       <SystemTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
     </div>
   );

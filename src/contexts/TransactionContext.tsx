@@ -189,8 +189,11 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       }
       await loadTransactions(transaction.clientId);
       toast({ title: "Lançamento salvo" });
+      return insertedTx;
     } else if (txError) {
-      toast({ title: "Erro ao salvar lançamento", variant: "destructive" });
+      console.error("Erro ao inserir transação:", txError);
+      toast({ title: "Erro ao salvar lançamento", description: txError.message, variant: "destructive" });
+      return null;
     }
   }, [user, loadTransactions]);
 

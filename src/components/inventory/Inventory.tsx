@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { ProductDialog } from './ProductDialog';
 import { 
   Package, 
   Plus, 
@@ -2201,203 +2202,13 @@ export const Inventory: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Product Dialog */}
-      <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
-          <form onSubmit={handleSaveProduct} className="flex flex-col h-full overflow-hidden">
-            <DialogHeader className="p-6 pb-3 border-b shrink-0">
-              <DialogTitle>{selectedProduct ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
-              <DialogDescription>Insira as informações do produto contábil e seus valores.</DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[60vh]">
-              <div className="space-y-1">
-                <Label htmlFor="prod-name">Nome do Produto *</Label>
-                <Input
-                  id="prod-name"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm(p => ({ ...p, name: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="prod-cat">Categoria do Produto</Label>
-                  <Input
-                    id="prod-cat"
-                    value={productForm.category}
-                    onChange={(e) => setProductForm(p => ({ ...p, category: e.target.value }))}
-                    placeholder="Ex: Bebidas, Roupas, Cosméticos..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="prod-unit">Unidade de Medida</Label>
-                  <Select
-                    value={productForm.unit}
-                    onValueChange={(v) => setProductForm(p => ({ ...p, unit: v }))}
-                  >
-                    <SelectTrigger id="prod-unit">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UN">Unidade (UN)</SelectItem>
-                      <SelectItem value="KG">Quilo (KG)</SelectItem>
-                      <SelectItem value="L">Litro (L)</SelectItem>
-                      <SelectItem value="PCT">Pacote (PCT)</SelectItem>
-                      <SelectItem value="CX">Caixa (CX)</SelectItem>
-                      <SelectItem value="M">Metro (M)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 col-span-1">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="prod-sku">Código / SKU</Label>
-                    {productForm.sku && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-4 p-0 text-[10px] text-amber-600 hover:text-amber-700 gap-1 font-normal"
-                        title="Buscar nome do produto online por código de barras"
-                        onClick={async () => {
-                          toast({ title: "Buscando informações do código de barras..." });
-                          const info = await fetchEanInfo(productForm.sku);
-                          if (info && info.name) {
-                            setProductForm(p => ({ ...p, name: info.name, category: info.category || p.category }));
-                            toast({ title: "✨ Produto localizado!", description: `Preenchido: ${info.name}` });
-                          } else {
-                            toast({ title: "Não localizado", description: "Código de barras não encontrado no catálogo global.", variant: "destructive" });
-                          }
-                        }}
-                      >
-                        <Sparkles className="h-2.5 w-2.5" />
-                        Buscar Nome
-                      </Button>
-                    )}
-                  </div>
-                  <Input
-                    id="prod-sku"
-                    value={productForm.sku}
-                    onChange={(e) => setProductForm(p => ({ ...p, sku: e.target.value }))}
-                    placeholder="Código de barras"
-                  />
-                </div>
-                <div className="space-y-1 col-span-1">
-                  <Label htmlFor="prod-loc">Localização Física</Label>
-                  <Input
-                    id="prod-loc"
-                    value={productForm.location}
-                    onChange={(e) => setProductForm(p => ({ ...p, location: e.target.value }))}
-                    placeholder="Ex: Prateleira A1"
-                  />
-                </div>
-                <div className="space-y-1 col-span-1">
-                  <Label htmlFor="prod-supplier">Fornecedor</Label>
-                  <Select 
-                    value={productForm.supplierId} 
-                    onValueChange={(v) => setProductForm(p => ({ ...p, supplierId: v }))}
-                  >
-                    <SelectTrigger id="prod-supplier">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(suppliers || []).map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="prod-cost">Preço de Custo (Valor Pago) *</Label>
-                  <MoneyInput
-                    id="prod-cost"
-                    value={productForm.costPrice}
-                    onChange={(val) => setProductForm(p => ({ ...p, costPrice: val }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="prod-sale">Preço de Venda *</Label>
-                  <MoneyInput
-                    id="prod-sale"
-                    value={productForm.salePrice}
-                    onChange={(val) => setProductForm(p => ({ ...p, salePrice: val }))}
-                  />
-                </div>
-              </div>
-
-              {/* Indicador de Margem de Lucro / Markup */}
-              {productForm.costPrice > 0 && (
-                <div className="p-3 border rounded-lg bg-emerald-50/40 text-emerald-800 text-xs flex justify-between items-center font-medium animate-in fade-in slide-in-from-top-1">
-                  <span className="flex items-center gap-1">
-                    💰 Lucro Estimado: <strong className="text-emerald-700 font-bold">{formatCurrency(productForm.salePrice - productForm.costPrice)}</strong>
-                  </span>
-                  <span>
-                    📈 Markup / Margem: <strong className="text-emerald-700 font-bold">+{(((productForm.salePrice - productForm.costPrice) / productForm.costPrice) * 100).toFixed(1)}%</strong>
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="prod-min">Estoque Mínimo</Label>
-                  <Input
-                    id="prod-min"
-                    type="number"
-                    min="0"
-                    value={productForm.minStock}
-                    onChange={(e) => setProductForm(p => ({ ...p, minStock: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-                {!selectedProduct && (
-                  <div className="space-y-1">
-                    <Label htmlFor="prod-initial">Estoque Inicial</Label>
-                    <Input
-                      id="prod-initial"
-                      type="number"
-                      min="0"
-                      value={productForm.initialStock}
-                      onChange={(e) => setProductForm(p => ({ ...p, initialStock: parseInt(e.target.value) || 0 }))}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="prod-expiration">Data de Vencimento</Label>
-                <Input
-                  id="prod-expiration"
-                  type="date"
-                  value={productForm.expirationDate}
-                  onChange={(e) => setProductForm(p => ({ ...p, expirationDate: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="prod-desc">Descrição / Especificações</Label>
-                <Textarea
-                  id="prod-desc"
-                  value={productForm.description}
-                  onChange={(e) => setProductForm(p => ({ ...p, description: e.target.value }))}
-                  placeholder="Detalhes adicionais sobre o produto, marca, cor, tamanho..."
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="p-4 bg-muted/30 border-t shrink-0">
-              <Button type="button" variant="outline" onClick={() => setIsProductModalOpen(false)}>Cancelar</Button>
-              <Button type="submit">Salvar Produto</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Product Dialog Reutilizável */}
+      <ProductDialog
+        open={isProductModalOpen}
+        onOpenChange={setIsProductModalOpen}
+        product={selectedProduct}
+        onSuccess={loadProducts}
+      />
 
 
 

@@ -26,7 +26,8 @@ import {
   Truck,
   PlusCircle,
   ShoppingCart,
-  ClipboardList
+  ClipboardList,
+  Store
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'store_pos' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
 interface NavigationProps {
   currentView?: View;
@@ -62,7 +63,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   // Helpers de estado ativo para grupos do menu suspenso
   const isFinanceActive = activeId === 'transactions' || activeId === 'receivables' || activeId === 'payables';
-  const isIncluirActive = activeId === 'orders' || activeId === 'service_orders';
+  const isIncluirActive = activeId === 'orders' || activeId === 'service_orders' || activeId === 'store_pos';
   const isCadastrosActive = activeId === 'customers' || activeId === 'suppliers' || activeId === 'schedule' || activeId === 'inventory';
 
   const handleNavClick = (view: View | 'admin') => {
@@ -227,7 +228,23 @@ export const Navigation: React.FC<NavigationProps> = ({
                 Incluir
                 <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 bg-card border border-border shadow-lg">
+              <DropdownMenuContent align="start" className="w-56 bg-card border border-border shadow-lg">
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('store_pos')}
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'store_pos' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <Store className="h-4 w-4 text-emerald-600" />
+                  <div>
+                    <p className="font-medium text-xs leading-none flex items-center gap-1">
+                      Modo Loja (PDV Touch)
+                      <Badge className="bg-emerald-600 text-white text-[8px] h-3.5 px-1 py-0 uppercase">Novo</Badge>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Frente de caixa rápida com botões</p>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleNavClick('orders')}
                   className={cn(
@@ -237,8 +254,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                 >
                   <ShoppingCart className="h-4 w-4 text-primary" />
                   <div>
-                    <p className="font-medium text-xs leading-none">Pedido</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Carrinho e venda de estoque</p>
+                    <p className="font-medium text-xs leading-none">Pedido de Venda</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Catálogo e histórico de pedidos</p>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem

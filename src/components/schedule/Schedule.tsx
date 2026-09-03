@@ -24,6 +24,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { ServiceTypeDialog } from './ServiceTypeDialog';
 import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, User, DollarSign,
   Pencil, Trash2, CheckCircle2, XCircle, PlayCircle, Loader2, Settings2,
@@ -1142,46 +1143,13 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Modal: Tipo de Serviço ──────────────────────────────────────────── */}
-      <Dialog open={isStOpen} onOpenChange={setIsStOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{editingSt ? 'Editar Tipo' : 'Novo Tipo de Serviço'}</DialogTitle>
-            <DialogDescription>Configure nome, duração e preço padrão para agilizar os agendamentos.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="st-name">Nome *</Label>
-              <Input
-                id="st-name"
-                value={stForm.name}
-                onChange={(e) => setStForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Ex: Corte de cabelo"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Duração (min)</Label>
-                <Input
-                  type="number" min={5}
-                  value={stForm.durationMinutes}
-                  onChange={(e) => setStForm(f => ({ ...f, durationMinutes: parseInt(e.target.value) || 60 }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Preço (R$)</Label>
-                <MoneyInput value={stForm.price} onChange={(v) => setStForm(f => ({ ...f, price: v }))} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveSt} disabled={saving}>
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ── Modal: Tipo de Serviço Reutilizável ──────────────────────────── */}
+      <ServiceTypeDialog
+        open={isStOpen}
+        onOpenChange={setIsStOpen}
+        serviceType={editingSt}
+        onSuccess={loadAll}
+      />
 
       {/* ── Modal: Registrar Receita do Agendamento ──────────────────────────── */}
       <Dialog open={isRevenueDialogOpen} onOpenChange={setIsRevenueDialogOpen}>

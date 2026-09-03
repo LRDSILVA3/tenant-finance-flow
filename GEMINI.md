@@ -12,6 +12,7 @@
 
 ### 1. Research & Strategy
 - Search the codebase using `grep_search` and `glob`.
+- **Zero Wheel Reinvention**: Always inspect existing components, dialogs, and utilities before creating any UI or logic. Extract and reuse established official components (e.g. `ProductDialog`, `ServiceTypeDialog`, `TransactionDialog`).
 - Check `ENGINEERING.md` for style guides before proposing changes.
 
 ### 2. Execution & Validation
