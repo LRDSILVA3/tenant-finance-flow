@@ -92,7 +92,6 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
     categories: financeCategories = [],
     currentClient,
     addTransaction,
-    updateProductStock,
   } = useFinance();
 
   // Produtos Reais carregados do Supabase
@@ -538,14 +537,26 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       // 5. Baixa de estoque para itens físicos
       for (const item of cart) {
         if (item.productId && !item.isService) {
-          await updateProductStock(
-            item.productId,
-            item.quantity,
-            'out',
-            `Venda PDV Modo Loja #${orderNumber}`
-          );
+          const product = products.find((p) => p.id === item.productId);
+          await supabase.from('stock_movements').insert({
+            client_id: currentClient.id,
+            product_id: item.productId,
+            type: 'out',
+            quantity: item.quantity,
+            cost_price: item.costPrice || 0,
+            notes: `Venda PDV Modo Loja #${orderNumber}`,
+          });
+
+          if (product) {
+            const currentStock = Number(product.current_stock || 0);
+            const newStock = Math.max(0, currentStock - item.quantity);
+            await supabase.from('products').update({ current_stock: newStock }).eq('id', item.productId);
+          }
         }
       }
+
+      // Recarrega o catálogo atualizado
+      await loadProducts();
 
       // Som de Caixa Registradora
       playBeep(1200, 0.15);

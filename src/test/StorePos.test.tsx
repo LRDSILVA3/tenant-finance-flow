@@ -64,7 +64,8 @@ const mockCustomers = [
 
 describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
   const mockAddTransaction = vi.fn().mockResolvedValue({ id: 'tx-123' });
-  const mockUpdateProductStock = vi.fn().mockResolvedValue(true);
+  const mockStockMovementInsert = vi.fn().mockResolvedValue({ data: null, error: null });
+  const mockProductUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,7 +78,6 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
       categories: [{ id: 'cat-1', name: 'Vendas de Produtos / PDV', type: 'income' }],
       currentClient: { id: 'client-123', name: 'Supermercado Exemplo' },
       addTransaction: mockAddTransaction,
-      updateProductStock: mockUpdateProductStock,
     });
 
     const mockOrderInsert = vi.fn().mockReturnValue({
@@ -117,6 +117,7 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
               }),
             }),
           }),
+          update: mockProductUpdate,
         };
       }
       if (table === 'customers') {
@@ -139,6 +140,9 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
       if (table === 'order_items') {
         return { insert: mockOrderItemsInsert };
       }
+      if (table === 'stock_movements') {
+        return { insert: mockStockMovementInsert };
+      }
       if (table === 'service_types') {
         return {
           select: vi.fn().mockReturnValue({
@@ -158,6 +162,7 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
       return {
         select: vi.fn().mockReturnThis(),
         insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
       };
     });
   });
@@ -203,11 +208,13 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
           paymentMethod: 'pix',
         })
       );
-      expect(mockUpdateProductStock).toHaveBeenCalledWith(
-        'p-1',
-        1,
-        'out',
-        expect.stringContaining('Venda PDV Modo Loja')
+      expect(mockStockMovementInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          product_id: 'p-1',
+          quantity: 1,
+          type: 'out',
+          notes: expect.stringContaining('Venda PDV Modo Loja'),
+        })
       );
     });
   });
