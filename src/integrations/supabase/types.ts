@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -451,6 +451,362 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          cost_price: number
+          created_at: string
+          discount_amount: number
+          id: string
+          order_id: string
+          product_id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          order_id: string
+          product_id: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          client_id: string
+          collaborator_id: string | null
+          created_at: string
+          customer_id: string | null
+          discount_amount: number
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          payment_method: string | null
+          payment_status: string
+          status: string
+          subtotal_amount: number
+          total_amount: number
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          payment_method?: string | null
+          payment_status?: string
+          status?: string
+          subtotal_amount?: number
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          payment_method?: string | null
+          payment_status?: string
+          status?: string
+          subtotal_amount?: number
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_order_products: {
+        Row: {
+          cost_price: number
+          created_at: string
+          discount_amount: number
+          id: string
+          product_id: string
+          quantity: number
+          service_order_id: string
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          product_id: string
+          quantity?: number
+          service_order_id: string
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          product_id?: string
+          quantity?: number
+          service_order_id?: string
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_products_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_order_services: {
+        Row: {
+          collaborator_id: string | null
+          created_at: string
+          discount_amount: number
+          id: string
+          name: string
+          quantity: number
+          service_order_id: string
+          service_type_id: string | null
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          collaborator_id?: string | null
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          name: string
+          quantity?: number
+          service_order_id: string
+          service_type_id?: string | null
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          collaborator_id?: string | null
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          name?: string
+          quantity?: number
+          service_order_id?: string
+          service_type_id?: string | null
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_services_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_services_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_services_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_orders: {
+        Row: {
+          client_id: string
+          collaborator_id: string | null
+          completed_at: string | null
+          created_at: string
+          customer_id: string | null
+          discount_amount: number
+          equipment_info: string | null
+          id: string
+          notes: string | null
+          os_number: string
+          payment_method: string | null
+          payment_status: string
+          products_total: number
+          reported_defect: string | null
+          scheduled_at: string | null
+          services_total: number
+          status: string
+          technical_diagnosis: string | null
+          title: string
+          total_amount: number
+          transaction_id: string | null
+          updated_at: string
+          warranty_terms: string | null
+        }
+        Insert: {
+          client_id: string
+          collaborator_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number
+          equipment_info?: string | null
+          id?: string
+          notes?: string | null
+          os_number: string
+          payment_method?: string | null
+          payment_status?: string
+          products_total?: number
+          reported_defect?: string | null
+          scheduled_at?: string | null
+          services_total?: number
+          status?: string
+          technical_diagnosis?: string | null
+          title: string
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+          warranty_terms?: string | null
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number
+          equipment_info?: string | null
+          id?: string
+          notes?: string | null
+          os_number?: string
+          payment_method?: string | null
+          payment_status?: string
+          products_total?: number
+          reported_defect?: string | null
+          scheduled_at?: string | null
+          services_total?: number
+          status?: string
+          technical_diagnosis?: string | null
+          title?: string
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+          warranty_terms?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
         ]

@@ -281,4 +281,113 @@ export interface Invoice {
   updatedAt: Date;
 }
 
+// ─── Pedidos (Venda Comercial / PDV / Carrinho de Estoque) ─────────────────────
+
+export type OrderStatus = 'draft' | 'pending' | 'completed' | 'cancelled';
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  costPrice: number;
+  discountAmount: number;
+  totalPrice: number;
+  productName?: string;
+  productSku?: string;
+  createdAt: Date;
+}
+
+export interface Order {
+  id: string;
+  clientId: string;
+  orderNumber: string;
+  customerId?: string;
+  collaboratorId?: string;
+  status: OrderStatus;
+  subtotalAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  paymentMethod?: PaymentMethod;
+  paymentStatus: TransactionStatus;
+  dueDate?: Date;
+  notes?: string;
+  transactionId?: string;
+  items?: OrderItem[];
+  customer?: Customer;
+  collaborator?: Collaborator;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Ordens de Serviço (OS - Serviços & Peças) ────────────────────────────────
+
+export type ServiceOrderStatus = 
+  | 'budget'        // Orçamento
+  | 'approved'      // Aprovado
+  | 'in_progress'   // Em Andamento
+  | 'waiting_parts' // Aguardando Peças
+  | 'completed'     // Concluído
+  | 'invoiced'      // Faturado
+  | 'cancelled';    // Cancelado
+
+export interface ServiceOrderService {
+  id: string;
+  serviceOrderId: string;
+  serviceTypeId?: string;
+  collaboratorId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  discountAmount: number;
+  totalPrice: number;
+  createdAt: Date;
+}
+
+export interface ServiceOrderProduct {
+  id: string;
+  serviceOrderId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  costPrice: number;
+  discountAmount: number;
+  totalPrice: number;
+  productName?: string;
+  productSku?: string;
+  createdAt: Date;
+}
+
+export interface ServiceOrder {
+  id: string;
+  clientId: string;
+  osNumber: string;
+  customerId?: string;
+  collaboratorId?: string;
+  status: ServiceOrderStatus;
+  title: string;
+  equipmentInfo?: string;
+  reportedDefect?: string;
+  technicalDiagnosis?: string;
+  scheduledAt?: Date;
+  completedAt?: Date;
+  warrantyTerms?: string;
+  servicesTotal: number;
+  productsTotal: number;
+  discountAmount: number;
+  totalAmount: number;
+  paymentMethod?: PaymentMethod;
+  paymentStatus: TransactionStatus;
+  transactionId?: string;
+  notes?: string;
+  services?: ServiceOrderService[];
+  products?: ServiceOrderProduct[];
+  customer?: Customer;
+  collaborator?: Collaborator;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
 

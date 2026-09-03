@@ -40,25 +40,31 @@ export const SystemTour: React.FC<SystemTourProps> = ({ open, onClose }) => {
       icon: <ArrowRightLeft className="h-8 w-8 text-primary" />
     },
     {
-      title: "3. Clientes, Agenda e Estoque 👥",
+      title: "3. Incluir: Pedidos & Ordens de Serviço 🛒🛠️",
+      description: "Agilidade comercial máxima! Crie pedidos de venda com carrinho dinâmico do estoque e emita Ordens de Serviço completas com mão de obra, peças consumidas e termo de garantia.",
+      selector: '[data-tour="nav-incluir"]',
+      icon: <Sparkles className="h-8 w-8 text-primary" />
+    },
+    {
+      title: "4. Clientes, Agenda e Estoque 👥",
       description: "Gerencie toda a sua operação! Cadastre clientes e fornecedores, agende serviços diários com faturamento automático e controle o estoque por lotes e validades.",
       selector: '[data-tour="nav-cadastros"]',
       icon: <Users className="h-8 w-8 text-primary" />
     },
     {
-      title: "4. Relatórios Completos 📈",
+      title: "5. Relatórios Completos 📈",
       description: "Acompanhe a saúde do seu negócio através do DRE Simplificado, demonstrativos de repasses/comissões, projeções de caixa e análise de margens por categoria.",
       selector: '[data-tour="nav-relatorios"]',
       icon: <BarChart3 className="h-8 w-8 text-primary" />
     },
     {
-      title: "5. Troca de Empresa 🏢",
+      title: "6. Troca de Empresa 🏢",
       description: "Caso você gerencie mais de uma empresa ou unidade, utilize este seletor de clientes no cabeçalho para alternar instantaneamente entre elas.",
       selector: '[data-tour="client-select"]',
       icon: <Building2 className="h-8 w-8 text-primary" />
     },
     {
-      title: "6. Central de Alertas e Notificações 🔔",
+      title: "7. Central de Alertas e Notificações 🔔",
       description: "O sino no cabeçalho avisa em tempo real sobre alertas importantes do sistema, como vencimentos de produtos do estoque ou níveis críticos de armazenamento.",
       selector: '[data-tour="notifications-bell"]',
       icon: <Bell className="h-8 w-8 text-primary" />

@@ -99,7 +99,7 @@ describe('Customers CRM Component', () => {
       expect(screen.getAllByText('Ana Souza').length).toBeGreaterThan(0);
     });
 
-    const searchInput = screen.getByPlaceholderText('Buscar por nome, email...');
+    const searchInput = screen.getByPlaceholderText(/Buscar por nome/i);
     
     // Buscar por um nome inexistente
     fireEvent.change(searchInput, { target: { value: 'Inexistente' } });

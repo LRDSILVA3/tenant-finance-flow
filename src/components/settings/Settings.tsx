@@ -7,6 +7,7 @@ import { ChartOfAccounts } from '@/components/chart-of-accounts/ChartOfAccounts'
 import { Collaborators } from '@/components/settings/Collaborators';
 import { Team } from '@/components/settings/Team';
 import { SubscriptionTab } from '@/components/settings/SubscriptionTab';
+import { PdfCustomizationTab } from '@/components/settings/PdfCustomizationTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -15,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2 } from 'lucide-react';
+import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -136,6 +137,10 @@ export const Settings: React.FC = () => {
           <TabsTrigger value="chart-of-accounts" className="flex items-center gap-2">
             <List className="h-4 w-4" />
             {t.chartOfAccounts}
+          </TabsTrigger>
+          <TabsTrigger value="pdf-customization" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Documentos & PDFs
           </TabsTrigger>
           {isOwner && (
             <TabsTrigger value="team" className="flex items-center gap-2">
@@ -431,6 +436,9 @@ export const Settings: React.FC = () => {
 
         <TabsContent value="chart-of-accounts">
           <ChartOfAccounts />
+        </TabsContent>
+        <TabsContent value="pdf-customization">
+          <PdfCustomizationTab />
         </TabsContent>
         {userSettings.enableCommission && (
           <TabsContent value="collaborators">

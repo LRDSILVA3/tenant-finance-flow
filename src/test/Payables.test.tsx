@@ -163,7 +163,7 @@ describe('Payables Component', () => {
     expect(screen.getByText('Frete de Mercadoria B')).toBeInTheDocument();
 
     // Clicar em "Baixar" na primeira transação (tx-1 de 150.00)
-    const payButtons = screen.getAllByRole('button', { name: /Baixar/i });
+    const payButtons = screen.getAllByRole('button', { name: /Dar Baixa|Baixar/i });
     fireEvent.click(payButtons[0]);
 
     // O modal deve ser exibido com os detalhes
@@ -175,7 +175,7 @@ describe('Payables Component', () => {
     render(<Payables />);
 
     fireEvent.click(screen.getByRole('button', { name: /Distribuidora Alpha/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /Baixar/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Dar Baixa|Baixar/i })[0]);
 
     // Clicar no botão Confirmar Pagamento
     const confirmButton = screen.getByRole('button', { name: /Confirmar Pagamento/i });
@@ -193,7 +193,7 @@ describe('Payables Component', () => {
     render(<Payables />);
 
     fireEvent.click(screen.getByRole('button', { name: /Distribuidora Alpha/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /Baixar/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Dar Baixa|Baixar/i })[0]);
 
     const amountInput = screen.getByLabelText(/Valor Pago/i);
     // Alterar valor pago de 150 para 100 (digitando 10000 centavos)
@@ -232,7 +232,7 @@ describe('Payables Component', () => {
     render(<Payables />);
 
     fireEvent.click(screen.getByRole('button', { name: /Distribuidora Alpha/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /Baixar/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Baixar|Dar Baixa/i })[0]);
 
     const amountInput = screen.getByLabelText(/Valor Pago/i);
     // Alterar valor pago de 150 para 100

@@ -89,7 +89,7 @@ export const Suppliers: React.FC = () => {
   // Map of suppliers with pending expense balance
   const supplierPendingBalanceMap = useMemo(() => {
     const map = new Map<string, number>();
-    transactions.forEach(t => {
+    (transactions || []).forEach(t => {
       if (t.type === 'expense' && t.status === 'pending' && t.supplierId) {
         map.set(t.supplierId, (map.get(t.supplierId) || 0) + t.amount);
       }

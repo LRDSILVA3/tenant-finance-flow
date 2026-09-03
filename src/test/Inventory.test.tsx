@@ -122,7 +122,7 @@ describe('Inventory Component - Controle de Lote de Estoque', () => {
     });
 
     // Clicar no botão de Ajustar Estoque
-    const adjustBtn = screen.getByTitle('Movimentar estoque');
+    const adjustBtn = screen.getByTitle(/Movimentar estoque/i);
     fireEvent.click(adjustBtn);
     expect(screen.getByText('Movimentação de Estoque')).toBeInTheDocument();
   });
@@ -135,7 +135,7 @@ describe('Inventory Component - Controle de Lote de Estoque', () => {
     });
 
     // Clicamos no botão para abrir o modal de movimentação
-    const adjustBtn = screen.getByTitle('Movimentar estoque');
+    const adjustBtn = screen.getByTitle(/Movimentar estoque/i);
     fireEvent.click(adjustBtn);
 
     // Modal aberto. Verificar se os campos de Lote (Vencimento/Custo) aparecem quando o tipo é "Entrada (+)"

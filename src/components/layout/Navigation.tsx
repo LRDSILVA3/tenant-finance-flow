@@ -23,7 +23,10 @@ import {
   Calculator,
   Layers,
   Percent,
-  Truck
+  Truck,
+  PlusCircle,
+  ShoppingCart,
+  ClipboardList
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -35,7 +38,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
 interface NavigationProps {
   currentView?: View;
@@ -59,6 +62,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   // Helpers de estado ativo para grupos do menu suspenso
   const isFinanceActive = activeId === 'transactions' || activeId === 'receivables' || activeId === 'payables';
+  const isIncluirActive = activeId === 'orders' || activeId === 'service_orders';
   const isCadastrosActive = activeId === 'customers' || activeId === 'suppliers' || activeId === 'schedule' || activeId === 'inventory';
 
   const handleNavClick = (view: View | 'admin') => {
@@ -204,6 +208,51 @@ export const Navigation: React.FC<NavigationProps> = ({
                 >
                   <Wallet className="h-4 w-4 text-muted-foreground" />
                   Contas a Pagar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Menu Incluir (Dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                data-tour="nav-incluir"
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 relative outline-none',
+                  isIncluirActive
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Incluir
+                <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 bg-card border border-border shadow-lg">
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('orders')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'orders' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <ShoppingCart className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="font-medium text-xs leading-none">Pedido</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Carrinho e venda de estoque</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('service_orders')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                    activeId === 'service_orders' && "bg-accent text-accent-foreground font-semibold"
+                  )}
+                >
+                  <ClipboardList className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="font-medium text-xs leading-none">Ordem de Serviço</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Mão de obra e peças</p>
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

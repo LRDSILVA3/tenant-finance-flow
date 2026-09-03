@@ -16,10 +16,12 @@ import { Notifications } from '@/components/notifications/Notifications';
 import { Receivables } from '@/components/receivables/Receivables';
 import { Payables } from '@/components/payables/Payables';
 import { Suppliers } from '@/components/suppliers/Suppliers';
+import { Orders } from '@/components/orders/Orders';
+import { ServiceOrders } from '@/components/service-orders/ServiceOrders';
 import { Loader2 } from 'lucide-react';
 import { SystemTour } from '@/components/layout/SystemTour';
 
-type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
+type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
@@ -91,6 +93,10 @@ const Index: React.FC = () => {
         );
       case 'inventory':
         return <Inventory />;
+      case 'orders':
+        return <Orders />;
+      case 'service_orders':
+        return <ServiceOrders />;
       case 'suppliers':
         return <Suppliers />;
       case 'reports':

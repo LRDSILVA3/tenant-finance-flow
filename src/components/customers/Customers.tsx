@@ -109,7 +109,7 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
   // Map of customers with pending receivable balance
   const customerPendingBalanceMap = useMemo(() => {
     const map = new Map<string, number>();
-    transactions.forEach(t => {
+    (transactions || []).forEach(t => {
       if (t.type === 'income' && t.status === 'pending' && t.customerId) {
         map.set(t.customerId, (map.get(t.customerId) || 0) + t.amount);
       }

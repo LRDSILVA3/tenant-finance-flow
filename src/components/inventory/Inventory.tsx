@@ -1381,7 +1381,7 @@ export const Inventory: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="all">Todos Fornecedores</SelectItem>
                       <SelectItem value="none">Sem Fornecedor</SelectItem>
-                      {suppliers.map((s) => (
+                      {(suppliers || []).map((s) => (
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1581,7 +1581,7 @@ export const Inventory: React.FC = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                title="Entrada / Saída de estoque"
+                                title="Movimentar estoque / Entrada e Saída"
                                 onClick={() => openAdjustmentModal(p)}
                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                               >

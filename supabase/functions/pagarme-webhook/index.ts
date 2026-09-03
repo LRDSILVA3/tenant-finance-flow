@@ -172,6 +172,8 @@ serve(async (req) => {
           })
           .eq('provider_subscription_id', providerSubscriptionId);
       }
+    }
+
     if (eventType === "invoice.created") {
       const providerSubscriptionId = data.subscription_id || data.subscription?.id;
       const PAGARME_SECRET_KEY = Deno.env.get("PAGARME_SECRET_KEY");
