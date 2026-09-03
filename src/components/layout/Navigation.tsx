@@ -238,10 +238,10 @@ export const Navigation: React.FC<NavigationProps> = ({
                 >
                   <Store className="h-4 w-4 text-emerald-600" />
                   <div>
-                    <p className="font-medium text-xs leading-none flex items-center gap-1">
+                    <div className="font-medium text-xs leading-none flex items-center gap-1">
                       Modo Loja (PDV Touch)
                       <Badge className="bg-emerald-600 text-white text-[8px] h-3.5 px-1 py-0 uppercase">Novo</Badge>
-                    </p>
+                    </div>
                     <p className="text-[10px] text-muted-foreground mt-0.5">Frente de caixa rápida com botões</p>
                   </div>
                 </DropdownMenuItem>
