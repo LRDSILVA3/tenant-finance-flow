@@ -218,4 +218,32 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
       );
     });
   });
+
+  it('deve abrir o modal de seleção de clientes com busca e filtros ao clicar no seletor', async () => {
+    render(<StorePos />);
+
+    // Clica no seletor de cliente
+    const customerSelector = screen.getByText('Cliente Balcão');
+    fireEvent.click(customerSelector);
+
+    // Deve abrir o modal de seleção com busca e lista
+    expect(await screen.findByText('Selecionar Cliente')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Pesquisar por nome, telefone, documento/i)).toBeInTheDocument();
+    expect(screen.getByText('📱 Com Telefone')).toBeInTheDocument();
+    expect(screen.getByText('👤 Pessoa Física (CPF)')).toBeInTheDocument();
+    expect(screen.getByText('+ Novo Cliente')).toBeInTheDocument();
+  });
+
+  it('deve abrir o modal de seleção de atendentes ao clicar no seletor de vendedor', async () => {
+    render(<StorePos />);
+
+    // Clica no seletor de atendente
+    const collaboratorSelector = screen.getByText('Nenhum / Balcão');
+    fireEvent.click(collaboratorSelector);
+
+    // Deve abrir o modal de seleção de atendente
+    expect(await screen.findByText('Selecionar Atendente / Vendedor')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Pesquisar atendente por nome/i)).toBeInTheDocument();
+    expect(screen.getByText('+ Novo Atendente')).toBeInTheDocument();
+  });
 });

@@ -15,6 +15,8 @@ import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
 import { ProductDialog } from '@/components/inventory/ProductDialog';
 import { ServiceTypeDialog } from '@/components/schedule/ServiceTypeDialog';
+import { CustomerPickerDialog } from '@/components/pos/CustomerPickerDialog';
+import { CollaboratorPickerDialog } from '@/components/pos/CollaboratorPickerDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +39,7 @@ import {
   QrCode,
   FileText,
   User,
+  UserCheck,
   Tag,
   Maximize2,
   Minimize2,
@@ -129,6 +132,8 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
+  const [isCollaboratorPickerOpen, setIsCollaboratorPickerOpen] = useState(false);
 
   // Atalho de Teclado Foco e Scroll do Cupom
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -918,40 +923,72 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
               )}
             </div>
 
-            {/* Identificação de Cliente & Vendedor */}
+            {/* Identificação de Cliente & Vendedor (Modais de Busca com Filtros) */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <Label className="text-[9.5px] text-muted-foreground">Cliente</Label>
-                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                  <SelectTrigger className="h-7 text-xs mt-0.5">
-                    <SelectValue placeholder="Cliente Balcão" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Cliente Balcão</SelectItem>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between mb-0.5">
+                  <Label className="text-[9.5px] text-muted-foreground font-medium">Cliente</Label>
+                  {selectedCustomerId !== 'none' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomerId('none')}
+                      className="text-[9px] text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerPickerOpen(true)}
+                  className={cn(
+                    'w-full h-7 px-2 rounded-md border text-left flex items-center justify-between gap-1 transition-all text-xs shadow-2xs group',
+                    selectedCustomerId !== 'none'
+                      ? 'bg-primary/5 border-primary/40 text-foreground'
+                      : 'bg-background hover:bg-muted/40 text-muted-foreground border-border'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 truncate">
+                    <User className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                    <span className={cn('truncate font-medium text-xs', selectedCustomerId === 'none' ? 'text-muted-foreground' : 'text-foreground font-semibold')}>
+                      {customers.find((c) => c.id === selectedCustomerId)?.name || 'Cliente Balcão'}
+                    </span>
+                  </div>
+                  <Search className="h-3 w-3 text-muted-foreground shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
 
               <div>
-                <Label className="text-[9.5px] text-muted-foreground">Vendedor / Atendente</Label>
-                <Select value={selectedCollaboratorId} onValueChange={setSelectedCollaboratorId}>
-                  <SelectTrigger className="h-7 text-xs mt-0.5">
-                    <SelectValue placeholder="Nenhum" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum / Balcão</SelectItem>
-                    {collaborators.map((col) => (
-                      <SelectItem key={col.id} value={col.id}>
-                        {col.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between mb-0.5">
+                  <Label className="text-[9.5px] text-muted-foreground font-medium">Vendedor / Atendente</Label>
+                  {selectedCollaboratorId !== 'none' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCollaboratorId('none')}
+                      className="text-[9px] text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCollaboratorPickerOpen(true)}
+                  className={cn(
+                    'w-full h-7 px-2 rounded-md border text-left flex items-center justify-between gap-1 transition-all text-xs shadow-2xs group',
+                    selectedCollaboratorId !== 'none'
+                      ? 'bg-indigo-500/5 border-indigo-500/40 text-foreground'
+                      : 'bg-background hover:bg-muted/40 text-muted-foreground border-border'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 truncate">
+                    <UserCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-indigo-600 transition-colors" />
+                    <span className={cn('truncate font-medium text-xs', selectedCollaboratorId === 'none' ? 'text-muted-foreground' : 'text-foreground font-semibold')}>
+                      {collaborators.find((col) => col.id === selectedCollaboratorId)?.name || 'Nenhum / Balcão'}
+                    </span>
+                  </div>
+                  <Search className="h-3 w-3 text-muted-foreground shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
             </div>
           </div>
@@ -1278,6 +1315,27 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         open={isNewServiceModalOpen}
         onOpenChange={setIsNewServiceModalOpen}
         onSuccess={loadServiceTypes}
+      />
+
+      {/* MODAL DE SELEÇÃO DE CLIENTE COM BUSCA E FILTROS */}
+      <CustomerPickerDialog
+        open={isCustomerPickerOpen}
+        onOpenChange={setIsCustomerPickerOpen}
+        customers={customers}
+        selectedCustomerId={selectedCustomerId}
+        onSelectCustomer={setSelectedCustomerId}
+        onCustomerCreated={(newCust) => {
+          setCustomers((prev) => [newCust, ...prev]);
+        }}
+      />
+
+      {/* MODAL DE SELEÇÃO DE ATENDENTE / VENDEDOR COM BUSCA */}
+      <CollaboratorPickerDialog
+        open={isCollaboratorPickerOpen}
+        onOpenChange={setIsCollaboratorPickerOpen}
+        collaborators={collaborators}
+        selectedCollaboratorId={selectedCollaboratorId}
+        onSelectCollaborator={setSelectedCollaboratorId}
       />
 
       {/* MODAL DE COMPROVANTE & IMPRESSÃO APÓS CONCLUSÃO */}
