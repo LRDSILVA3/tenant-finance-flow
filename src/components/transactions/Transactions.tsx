@@ -93,11 +93,15 @@ import {
   Wallet,
   Search,
   SlidersHorizontal,
-  ShoppingBag
+  ShoppingBag,
+  Eye
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
+import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
+import { generateOrderPdf } from '@/components/orders/OrderPdf';
+import { Order } from '@/types/finance';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -240,6 +244,7 @@ export const Transactions: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
+  const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -1050,10 +1055,40 @@ export const Transactions: React.FC = () => {
                                 </span>
                               )}
                               {transaction.orderId && (
-                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium flex items-center gap-1 mt-0.5">
-                                  <ShoppingBag className="h-3 w-3 text-primary" />
-                                  Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}
-                                </span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                      if (order) setSelectedOrderForView(order);
+                                    }}
+                                    className="text-[10px] text-muted-foreground bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer"
+                                    title="Clique para visualizar o recibo do pedido"
+                                  >
+                                    <ShoppingBag className="h-3 w-3 text-primary" />
+                                    <span>Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}</span>
+                                    <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                      if (order) {
+                                        generateOrderPdf(order, currentClient?.name);
+                                        toast({
+                                          title: "PDF Gerado",
+                                          description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                        });
+                                      }
+                                    }}
+                                    className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
+                                    title="Baixar PDF do Pedido"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1169,10 +1204,40 @@ export const Transactions: React.FC = () => {
                               </span>
                             )}
                             {transaction.orderId && (
-                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                                <ShoppingBag className="h-2.5 w-2.5 text-primary" />
-                                Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                    if (order) setSelectedOrderForView(order);
+                                  }}
+                                  className="text-[9px] text-muted-foreground bg-muted hover:bg-primary/10 hover:text-primary px-1.5 py-0.5 rounded font-medium flex items-center gap-1 transition-colors"
+                                  title="Clique para visualizar o pedido"
+                                >
+                                  <ShoppingBag className="h-2.5 w-2.5 text-primary" />
+                                  <span>Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}</span>
+                                  <Eye className="h-2 w-2 ml-0.5 opacity-60" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                    if (order) {
+                                      generateOrderPdf(order, currentClient?.name);
+                                      toast({
+                                        title: "PDF Gerado",
+                                        description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                      });
+                                    }
+                                  }}
+                                  className="text-[9px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-0.5 rounded transition-colors"
+                                  title="Baixar PDF"
+                                >
+                                  <Download className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1438,6 +1503,13 @@ export const Transactions: React.FC = () => {
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
         onImportSuccess={() => loadTransactions(currentClient.id)}
+      />
+
+      <OrderReceiptDialog
+        order={selectedOrderForView}
+        open={!!selectedOrderForView}
+        onOpenChange={(isOpen) => !isOpen && setSelectedOrderForView(null)}
+        companyName={currentClient?.name}
       />
     </div>
   );

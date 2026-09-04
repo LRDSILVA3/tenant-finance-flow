@@ -51,9 +51,14 @@ import {
   ArrowUpDown,
   LayoutGrid,
   List,
-  ShoppingBag
+  ShoppingBag,
+  Eye,
+  Download
 } from 'lucide-react';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
+import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
+import { generateOrderPdf } from '@/components/orders/OrderPdf';
+import { Order } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -188,6 +193,7 @@ const getPaymentMethodLabel = (method: string, t: any) => {
 export const Receivables: React.FC = () => {
   const {
     t,
+    currentClient,
     transactions,
     customers,
     categories,
@@ -210,6 +216,7 @@ export const Receivables: React.FC = () => {
   const [sortBy, setSortBy] = useState<'nearest_due' | 'highest_amount' | 'lowest_amount' | 'customer_az'>('nearest_due');
 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
   const [isNewTxDialogOpen, setIsNewTxDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -896,10 +903,40 @@ export const Receivables: React.FC = () => {
                                     </span>
                                   )}
                                   {tx.orderId && (
-                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1">
-                                      <ShoppingBag className="h-3 w-3 text-primary" />
-                                      Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}
-                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                          if (order) setSelectedOrderForView(order);
+                                        }}
+                                        className="text-[10px] bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
+                                        title="Clique para visualizar o recibo do pedido"
+                                      >
+                                        <ShoppingBag className="h-3 w-3 text-primary" />
+                                        <span>Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}</span>
+                                        <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                          if (order) {
+                                            generateOrderPdf(order, currentClient?.name);
+                                            toast({
+                                              title: "PDF Gerado",
+                                              description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                            });
+                                          }
+                                        }}
+                                        className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
+                                        title="Baixar PDF do Pedido"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -991,10 +1028,40 @@ export const Receivables: React.FC = () => {
                                   <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
                                 )}
                                 {tx.orderId && (
-                                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1">
-                                    <ShoppingBag className="h-3 w-3 text-primary" />
-                                    Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}
-                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                        if (order) setSelectedOrderForView(order);
+                                      }}
+                                      className="text-[10px] bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
+                                      title="Clique para visualizar o recibo do pedido"
+                                    >
+                                      <ShoppingBag className="h-3 w-3 text-primary" />
+                                      <span>Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}</span>
+                                      <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                        if (order) {
+                                          generateOrderPdf(order, currentClient?.name);
+                                          toast({
+                                            title: "PDF Gerado",
+                                            description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                          });
+                                        }
+                                      }}
+                                      className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
+                                      title="Baixar PDF do Pedido"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                               {tx.notes && (
@@ -1288,6 +1355,13 @@ export const Receivables: React.FC = () => {
         defaultType="income"
         defaultStatus="pending"
         disabledType={true}
+      />
+
+      <OrderReceiptDialog
+        order={selectedOrderForView}
+        open={!!selectedOrderForView}
+        onOpenChange={(isOpen) => !isOpen && setSelectedOrderForView(null)}
+        companyName={currentClient?.name}
       />
     </div>
   );

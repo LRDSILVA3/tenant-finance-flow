@@ -152,6 +152,33 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       .order('created_at', { ascending: false });
 
     if (!error && data) {
+      const orderIds = data.map((o: any) => o.id);
+      let itemsByOrder: Record<string, any[]> = {};
+
+      if (orderIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('order_items')
+          .select('*, product:products(name, sku)')
+          .in('order_id', orderIds);
+
+        (itemsData || []).forEach((item: any) => {
+          if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+          itemsByOrder[item.order_id].push({
+            id: item.id,
+            orderId: item.order_id,
+            productId: item.product_id,
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unit_price),
+            costPrice: Number(item.cost_price || 0),
+            discountAmount: Number(item.discount_amount || 0),
+            totalPrice: Number(item.total_price),
+            productName: item.product?.name,
+            productSku: item.product?.sku,
+            createdAt: new Date(item.created_at),
+          });
+        });
+      }
+
       setOrders(data.map((o: any) => ({
         id: o.id,
         clientId: o.client_id,
@@ -167,6 +194,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
         dueDate: o.due_date ? new Date(o.due_date) : undefined,
         notes: o.notes || undefined,
         transactionId: o.transaction_id || undefined,
+        items: itemsByOrder[o.id] || [],
         customer: o.customer ? {
           id: o.customer.id,
           clientId: o.client_id,

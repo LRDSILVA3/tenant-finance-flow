@@ -336,4 +336,58 @@ describe('TransactionDialog Component', () => {
       );
     });
   });
+
+  it('deve exibir os botões de Visualizar e Baixar quando um pedido estiver vinculado', () => {
+    const mockTxWithOrder: Transaction = {
+      id: 'tx-with-order',
+      clientId: 'client-123',
+      categoryId: 'cat-1',
+      type: 'income',
+      amount: 250.00,
+      description: 'Pedido de Venda #PED-1001',
+      date: new Date('2026-08-01T12:00:00'),
+      orderId: 'order-1',
+      createdAt: new Date(),
+    };
+
+    render(
+      <TransactionDialog
+        open={true}
+        onOpenChange={mockOnOpenChange}
+        editingTransaction={mockTxWithOrder}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Visualizar/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Baixar/i })).toBeInTheDocument();
+  });
+
+  it('deve bloquear a alteração do pedido quando a transação já possuir pedido vinculado', () => {
+    const mockTxWithOrder: Transaction = {
+      id: 'tx-with-order',
+      clientId: 'client-123',
+      categoryId: 'cat-1',
+      type: 'income',
+      amount: 250.00,
+      description: 'Pedido de Venda #PED-1001',
+      date: new Date('2026-08-01T12:00:00'),
+      orderId: 'order-1',
+      createdAt: new Date(),
+    };
+
+    render(
+      <TransactionDialog
+        open={true}
+        onOpenChange={mockOnOpenChange}
+        editingTransaction={mockTxWithOrder}
+      />
+    );
+
+    expect(screen.getByText('Pedido de Venda (Vinculado)')).toBeInTheDocument();
+    expect(screen.getByText('O pedido vinculado não pode ser alterado em lançamentos existentes.')).toBeInTheDocument();
+
+    const orderSelectTrigger = document.querySelector('#orderId');
+    expect(orderSelectTrigger).toBeDisabled();
+  });
 });
+

@@ -42,11 +42,17 @@ import {
   CheckCircle2,
   Trash2,
   Plus,
-  ShoppingBag
+  ShoppingBag,
+  Eye,
+  Download,
+  Lock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
+import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
+import { generateOrderPdf } from '@/components/orders/OrderPdf';
+import { Order } from '@/types/finance';
 
 interface TransactionDialogProps {
   open: boolean;
@@ -110,12 +116,14 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   const { hasFeature } = useFeatureAccess();
   const isPaymentMethodsLocked = !hasFeature('payment_methods');
   const isCommissionsLocked = !hasFeature('commissions');
+  const isOrderLocked = Boolean(editingTransaction && (editingTransaction.orderId || orders.some(o => o.transactionId === editingTransaction.id)));
 
   const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
   const { referenceGroups } = useTransactionReferences(transactions);
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
 
   const [formData, setFormData] = useState({
     type: defaultType,
@@ -355,7 +363,8 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-none !top-0 !left-0 !right-0 !bottom-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-4xl sm:h-[95vh] sm:max-h-[95vh] sm:rounded-lg rounded-none !flex !flex-col !p-0 !gap-0 overflow-hidden">
         <DialogHeader className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:pt-6 pb-2 border-b">
           <DialogTitle>
@@ -554,11 +563,56 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="orderId" className="flex items-center gap-1.5">
-                  <ShoppingBag className="h-3.5 w-3.5 text-primary" />
-                  <span>Pedido de Venda (Opcional)</span>
-                </Label>
+                <div className="flex items-center justify-between gap-1 min-h-[20px]">
+                  <Label htmlFor="orderId" className="flex items-center gap-1.5 cursor-pointer">
+                    {isOrderLocked ? (
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <ShoppingBag className="h-3.5 w-3.5 text-primary" />
+                    )}
+                    <span>{isOrderLocked ? "Pedido de Venda (Vinculado)" : "Pedido de Venda (Opcional)"}</span>
+                  </Label>
+                  {formData.orderId && formData.orderId !== 'none' && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
+                        onClick={() => {
+                          const order = orders.find(o => o.id === formData.orderId);
+                          if (order) setSelectedOrderForView(order);
+                        }}
+                        title="Visualizar Recibo e Detalhes do Pedido"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Visualizar</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-300 dark:border-emerald-700/50"
+                        onClick={() => {
+                          const order = orders.find(o => o.id === formData.orderId);
+                          if (order) {
+                            generateOrderPdf(order, currentClient?.name);
+                            toast({
+                              title: "PDF Gerado",
+                              description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                            });
+                          }
+                        }}
+                        title="Baixar PDF Comercial do Pedido"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Baixar</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <Select
+                  disabled={isOrderLocked}
                   value={formData.orderId || 'none'}
                   onValueChange={(val) => {
                     const selectedOrderId = val === 'none' ? '' : val;
@@ -588,7 +642,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
                     }
                   }}
                 >
-                  <SelectTrigger id="orderId">
+                  <SelectTrigger id="orderId" className={cn(isOrderLocked && "opacity-80 cursor-not-allowed bg-muted/40")}>
                     <SelectValue placeholder="Vincular a um pedido..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -609,6 +663,12 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
                     })}
                   </SelectContent>
                 </Select>
+                {isOrderLocked && (
+                  <p className="text-[11px] text-muted-foreground italic flex items-center gap-1 mt-1">
+                    <Lock className="h-3 w-3 inline shrink-0" />
+                    O pedido vinculado não pode ser alterado em lançamentos existentes.
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -852,5 +912,13 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <OrderReceiptDialog
+      order={selectedOrderForView}
+      open={!!selectedOrderForView}
+      onOpenChange={(isOpen) => !isOpen && setSelectedOrderForView(null)}
+      companyName={currentClient?.name}
+    />
+  </>
   );
 };
