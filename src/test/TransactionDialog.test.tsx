@@ -250,7 +250,7 @@ describe('TransactionDialog Component', () => {
     });
   });
 
-  it('deve exibir o campo de Pedido de Venda para receitas e permitir vinculação com auto-preenchimento', async () => {
+  it('deve manter o select de Pedido de Venda bloqueado por padrão na criação de novo lançamento', () => {
     render(
       <TransactionDialog
         open={true}
@@ -259,41 +259,11 @@ describe('TransactionDialog Component', () => {
       />
     );
 
-    expect(screen.getByText('Pedido de Venda (Opcional)')).toBeInTheDocument();
+    expect(screen.getByText('Pedido de Venda')).toBeInTheDocument();
+    expect(screen.getByText('Pedidos de venda são gerados e vinculados automaticamente pelo módulo de Vendas / PDV.')).toBeInTheDocument();
 
-    // Selecionar categoria
-    const categoryButton = screen.getAllByRole('combobox').find(el => el.textContent?.includes('Categoria'));
-    fireEvent.click(categoryButton!);
-    fireEvent.click(screen.getByText('1.01 - Venda de Produtos'));
-
-    // Clicar no select de pedido
-    const orderSelectTrigger = screen.getByRole('combobox', { name: /Pedido de Venda/i }) || screen.getByText('Vincular a um pedido...').closest('button');
-    if (orderSelectTrigger) {
-      fireEvent.click(orderSelectTrigger);
-      const orderOption = screen.getByText(/#PED-1001/);
-      fireEvent.click(orderOption);
-    }
-
-    // Clicar em salvar
-    const saveButton = screen.getByRole('button', { name: 'Salvar Lançamento' });
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockAddTransaction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'income',
-          categoryId: 'cat-1',
-          orderId: 'order-1',
-          amount: 250,
-          reference: 'PED-1001',
-          description: 'Pedido de Venda #PED-1001',
-          customerId: 'cust-1',
-          paymentMethod: 'pix',
-          status: 'paid',
-        }),
-        undefined
-      );
-    });
+    const orderSelectTrigger = document.querySelector('#orderId');
+    expect(orderSelectTrigger).toBeDisabled();
   });
 
   it('deve carregar orderId existente em modo de edição e enviar no update', async () => {
@@ -384,7 +354,7 @@ describe('TransactionDialog Component', () => {
     );
 
     expect(screen.getByText('Pedido de Venda (Vinculado)')).toBeInTheDocument();
-    expect(screen.getByText('O pedido vinculado não pode ser alterado em lançamentos existentes.')).toBeInTheDocument();
+    expect(screen.getByText('Este lançamento está vinculado a um pedido de venda e não pode ser alterado.')).toBeInTheDocument();
 
     const orderSelectTrigger = document.querySelector('#orderId');
     expect(orderSelectTrigger).toBeDisabled();

@@ -564,13 +564,9 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-1 min-h-[20px]">
-                  <Label htmlFor="orderId" className="flex items-center gap-1.5 cursor-pointer">
-                    {isOrderLocked ? (
-                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                    ) : (
-                      <ShoppingBag className="h-3.5 w-3.5 text-primary" />
-                    )}
-                    <span>{isOrderLocked ? "Pedido de Venda (Vinculado)" : "Pedido de Venda (Opcional)"}</span>
+                  <Label htmlFor="orderId" className="flex items-center gap-1.5 cursor-not-allowed">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{formData.orderId && formData.orderId !== 'none' ? "Pedido de Venda (Vinculado)" : "Pedido de Venda"}</span>
                   </Label>
                   {formData.orderId && formData.orderId !== 'none' && (
                     <div className="flex items-center gap-1">
@@ -612,38 +608,12 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
                   )}
                 </div>
                 <Select
-                  disabled={isOrderLocked}
+                  disabled={true}
                   value={formData.orderId || 'none'}
-                  onValueChange={(val) => {
-                    const selectedOrderId = val === 'none' ? '' : val;
-                    updateFormField('orderId', selectedOrderId);
-                    if (selectedOrderId) {
-                      const order = orders.find(o => o.id === selectedOrderId);
-                      if (order) {
-                        if (order.customerId && (!formData.customerId || formData.customerId === 'none')) {
-                          updateFormField('customerId', order.customerId);
-                        }
-                        if (formData.amount <= 0 && order.totalAmount > 0) {
-                          updateFormField('amount', order.totalAmount);
-                        }
-                        if (!formData.reference && order.orderNumber) {
-                          updateFormField('reference', order.orderNumber);
-                        }
-                        if (!formData.description) {
-                          updateFormField('description', `Pedido de Venda #${order.orderNumber}`);
-                        }
-                        if (order.paymentMethod && !formData.paymentMethod) {
-                          updateFormField('paymentMethod', order.paymentMethod);
-                        }
-                        if (order.paymentStatus) {
-                          updateFormField('status', order.paymentStatus);
-                        }
-                      }
-                    }
-                  }}
+                  onValueChange={() => {}}
                 >
-                  <SelectTrigger id="orderId" className={cn(isOrderLocked && "opacity-80 cursor-not-allowed bg-muted/40")}>
-                    <SelectValue placeholder="Vincular a um pedido..." />
+                  <SelectTrigger id="orderId" className="opacity-80 cursor-not-allowed bg-muted/40">
+                    <SelectValue placeholder="Nenhum pedido vinculado" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhum pedido</SelectItem>
@@ -663,12 +633,12 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
                     })}
                   </SelectContent>
                 </Select>
-                {isOrderLocked && (
-                  <p className="text-[11px] text-muted-foreground italic flex items-center gap-1 mt-1">
-                    <Lock className="h-3 w-3 inline shrink-0" />
-                    O pedido vinculado não pode ser alterado em lançamentos existentes.
-                  </p>
-                )}
+                <p className="text-[11px] text-muted-foreground italic flex items-center gap-1 mt-1">
+                  <Lock className="h-3 w-3 inline shrink-0" />
+                  {formData.orderId && formData.orderId !== 'none'
+                    ? "Este lançamento está vinculado a um pedido de venda e não pode ser alterado."
+                    : "Pedidos de venda são gerados e vinculados automaticamente pelo módulo de Vendas / PDV."}
+                </p>
               </div>
             </div>
           ) : (
