@@ -92,15 +92,15 @@ export const CollaboratorPickerDialog: React.FC<CollaboratorPickerDialogProps> =
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-        {/* Cabeçalho */}
-        <DialogHeader className="p-4 pb-3 border-b bg-muted/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+        {/* Cabeçalho com pr-12 para não sobrepor o botão X de fechar */}
+        <DialogHeader className="p-4 pb-3 border-b bg-muted/20 pr-12">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
                 <UserCheck className="h-5 w-5" />
               </div>
-              <div>
-                <DialogTitle className="text-base font-bold">Selecionar Atendente / Vendedor</DialogTitle>
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-bold truncate">Selecionar Atendente / Vendedor</DialogTitle>
                 <DialogDescription className="text-xs">
                   Vincule o colaborador responsável pela venda para comissionamento e relatórios.
                 </DialogDescription>
@@ -109,7 +109,7 @@ export const CollaboratorPickerDialog: React.FC<CollaboratorPickerDialogProps> =
             <Button
               size="sm"
               onClick={() => setIsAddingNew(true)}
-              className="text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+              className="text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs shrink-0"
             >
               <UserPlus className="h-3.5 w-3.5" />
               + Novo Atendente

@@ -11,7 +11,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Search,
@@ -27,9 +26,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { useFinance } from '@/contexts/FinanceContext';
+import { CustomerDialog } from '@/components/customers/CustomerDialog';
 
 interface CustomerPickerDialogProps {
   open: boolean;
@@ -48,17 +45,11 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
   onSelectCustomer,
   onCustomerCreated,
 }) => {
-  const { currentClient } = useFinance();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'with_phone' | 'individual' | 'legal'>('all');
   
-  // Quick Add Customer Inline Modal
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickName, setQuickName] = useState('');
-  const [quickPhone, setQuickPhone] = useState('');
-  const [quickDocument, setQuickDocument] = useState('');
-  const [quickPersonType, setQuickPersonType] = useState<'individual' | 'legal'>('individual');
-  const [savingCustomer, setSavingCustomer] = useState(false);
+  // Official CustomerDialog Modal
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
 
   // Filter and Search Customers
   const filteredCustomers = useMemo(() => {
@@ -87,68 +78,12 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
     setSearch('');
   };
 
-  const handleQuickAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickName.trim()) {
-      toast({ title: 'Nome obrigatório', description: 'Informe o nome do cliente.', variant: 'destructive' });
-      return;
-    }
-    if (!currentClient?.id) return;
-
-    setSavingCustomer(true);
-    try {
-      const payload = {
-        client_id: currentClient.id,
-        name: quickName.trim(),
-        phone: quickPhone.trim() || null,
-        document: quickDocument.trim() || null,
-        person_type: quickPersonType,
-        is_active: true,
-      };
-
-      const { data, error } = await supabase
-        .from('customers')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const created: Customer = {
-        id: data.id,
-        clientId: data.client_id,
-        name: data.name,
-        phone: data.phone || undefined,
-        document: data.document || undefined,
-        personType: data.person_type || 'individual',
-        isActive: data.is_active,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-      };
-
-      toast({
-        title: 'Cliente cadastrado com sucesso! 🎉',
-        description: `${created.name} foi adicionado e selecionado.`,
-      });
-
+  const handleCustomerCreatedSuccess = (newCust?: Customer) => {
+    if (newCust) {
       if (onCustomerCreated) {
-        onCustomerCreated(created);
+        onCustomerCreated(newCust);
       }
-
-      // Reset & Select
-      setQuickName('');
-      setQuickPhone('');
-      setQuickDocument('');
-      setIsQuickAddOpen(false);
-      handleSelect(created.id);
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao cadastrar cliente',
-        description: err.message || 'Falha ao salvar no banco.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSavingCustomer(false);
+      handleSelect(newCust.id);
     }
   };
 
@@ -156,15 +91,15 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-          {/* Cabeçalho */}
-          <DialogHeader className="p-4 pb-3 border-b bg-muted/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          {/* Cabeçalho com pr-12 para não sobrepor o botão X de fechar */}
+          <DialogHeader className="p-4 pb-3 border-b bg-muted/20 pr-12">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
                   <Users className="h-5 w-5" />
                 </div>
-                <div>
-                  <DialogTitle className="text-base font-bold">Selecionar Cliente</DialogTitle>
+                <div className="min-w-0">
+                  <DialogTitle className="text-base font-bold truncate">Selecionar Cliente</DialogTitle>
                   <DialogDescription className="text-xs">
                     Busque por nome, CPF/CNPJ ou telefone para vincular à venda.
                   </DialogDescription>
@@ -172,8 +107,8 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
               </div>
               <Button
                 size="sm"
-                onClick={() => setIsQuickAddOpen(true)}
-                className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                onClick={() => setIsNewCustomerModalOpen(true)}
+                className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs shrink-0"
               >
                 <UserPlus className="h-3.5 w-3.5" />
                 + Novo Cliente
@@ -304,14 +239,11 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    setQuickName(search);
-                    setIsQuickAddOpen(true);
-                  }}
+                  onClick={() => setIsNewCustomerModalOpen(true)}
                   className="text-xs gap-1 mt-1"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Cadastrar "{search}"
+                  Cadastrar Novo Cliente
                 </Button>
               </div>
             ) : (
@@ -407,103 +339,12 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal Rápido de Cadastro de Cliente */}
-      <Dialog open={isQuickAddOpen} onOpenChange={setIsQuickAddOpen}>
-        <DialogContent className="max-w-md">
-          <form onSubmit={handleQuickAdd} className="space-y-4">
-            <DialogHeader>
-              <DialogTitle className="text-sm font-bold flex items-center gap-1.5">
-                <UserPlus className="h-4 w-4 text-emerald-600" />
-                Cadastrar Novo Cliente Rápido
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Preencha os dados básicos para incluir e selecionar este cliente imediatamente.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <Label className="text-xs font-semibold">Tipo de Pessoa</Label>
-                <div className="flex gap-2 mt-1">
-                  <Button
-                    type="button"
-                    variant={quickPersonType === 'individual' ? 'default' : 'outline'}
-                    size="sm"
-                    className="flex-1 text-xs h-7"
-                    onClick={() => setQuickPersonType('individual')}
-                  >
-                    Pessoa Física (CPF)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={quickPersonType === 'legal' ? 'default' : 'outline'}
-                    size="sm"
-                    className="flex-1 text-xs h-7"
-                    onClick={() => setQuickPersonType('legal')}
-                  >
-                    Pessoa Jurídica (CNPJ)
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold">Nome Completo / Razão Social *</Label>
-                <Input
-                  required
-                  placeholder="Ex: João da Silva / Silva Mercantil"
-                  value={quickName}
-                  onChange={(e) => setQuickName(e.target.value)}
-                  className="text-xs h-8 mt-1"
-                  autoFocus
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs font-semibold">WhatsApp / Telefone</Label>
-                  <Input
-                    placeholder="(00) 00000-0000"
-                    value={quickPhone}
-                    onChange={(e) => setQuickPhone(e.target.value)}
-                    className="text-xs h-8 mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold">
-                    {quickPersonType === 'legal' ? 'CNPJ' : 'CPF'}
-                  </Label>
-                  <Input
-                    placeholder={quickPersonType === 'legal' ? '00.000.000/0000-00' : '000.000.000-00'}
-                    value={quickDocument}
-                    onChange={(e) => setQuickDocument(e.target.value)}
-                    className="text-xs h-8 mt-1"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => setIsQuickAddOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={savingCustomer}
-                className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-              >
-                {savingCustomer ? 'Salvando...' : 'Salvar & Selecionar'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* MODAL OFICIAL DO SISTEMA PARA CADASTRO DE CLIENTES (Zero Wheel Reinvention) */}
+      <CustomerDialog
+        open={isNewCustomerModalOpen}
+        onOpenChange={setIsNewCustomerModalOpen}
+        onSuccess={handleCustomerCreatedSuccess}
+      />
     </>
   );
 };

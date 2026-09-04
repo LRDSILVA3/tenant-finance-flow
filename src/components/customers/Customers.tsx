@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { CustomerDialog } from '@/components/customers/CustomerDialog';
 import {
   Users, Plus, Search, Pencil, Trash2, UserCheck, UserX,
   Phone, Mail, FileText, Loader2, CalendarDays, Cake, Wallet, Filter, ArrowUpDown, X
@@ -167,29 +168,11 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
 
   const openCreate = () => {
     setSelectedCustomer(null);
-    setForm(emptyForm);
-    setErrors({});
     setIsModalOpen(true);
   };
 
   const openEdit = (c: Customer) => {
     setSelectedCustomer(c);
-    setForm({
-      name: c.name,
-      phone: c.phone ?? '',
-      email: c.email ?? '',
-      document: c.document ?? '',
-      personType: c.personType ?? 'individual',
-      birthDate: c.birthDate ?? '',
-      cep: c.cep ?? '',
-      street: c.street ?? '',
-      number: c.number ?? '',
-      neighborhood: c.neighborhood ?? '',
-      city: c.city ?? '',
-      state: c.state ?? '',
-      notes: c.notes ?? '',
-    });
-    setErrors({});
     setIsModalOpen(true);
   };
 
@@ -606,190 +589,18 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
         </CardContent>
       </Card>
 
-      {/* Create / Edit Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-3 border-b shrink-0">
-            <DialogTitle>{selectedCustomer ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
-            <DialogDescription>
-              {selectedCustomer
-                ? 'Altere as informações do cliente abaixo.'
-                : 'Preencha os dados para cadastrar um novo cliente.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[60vh]">
-            <div className="space-y-1.5">
-              <Label htmlFor="cust-name" className={cn(errors.name && 'text-destructive')}>
-                Nome *
-              </Label>
-              <Input
-                id="cust-name"
-                value={form.name}
-                onChange={(e) => { setForm(f => ({ ...f, name: e.target.value })); setErrors(er => ({ ...er, name: '' })); }}
-                className={cn(errors.name && 'border-destructive')}
-                placeholder="Nome completo ou empresa"
-              />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="cust-ptype">Tipo de Pessoa</Label>
-                <Select
-                  value={form.personType}
-                  onValueChange={(val) => setForm(f => ({ ...f, personType: val as 'individual' | 'legal' }))}
-                >
-                  <SelectTrigger id="cust-ptype">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Pessoa Física (PF)</SelectItem>
-                    <SelectItem value="legal">Pessoa Jurídica (PJ)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cust-bday">Data de Nascimento</Label>
-                <Input
-                  id="cust-bday"
-                  type="date"
-                  value={form.birthDate}
-                  onChange={(e) => setForm(f => ({ ...f, birthDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="cust-doc">{form.personType === 'legal' ? 'CNPJ' : 'CPF'}</Label>
-                <Input
-                  id="cust-doc"
-                  value={form.document}
-                  onChange={(e) => setForm(f => ({ ...f, document: e.target.value }))}
-                  placeholder={form.personType === 'legal' ? '00.000.000/0000-00' : '000.000.000-00'}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cust-phone">Telefone / WhatsApp</Label>
-                <Input
-                  id="cust-phone"
-                  value={form.phone}
-                  onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="cust-email" className={cn(errors.email && 'text-destructive')}>
-                Email
-              </Label>
-              <Input
-                id="cust-email"
-                type="email"
-                value={form.email}
-                onChange={(e) => { setForm(f => ({ ...f, email: e.target.value })); setErrors(er => ({ ...er, email: '' })); }}
-                className={cn(errors.email && 'border-destructive')}
-                placeholder="cliente@email.com"
-              />
-              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-            </div>
-
-            {/* Endereço Completo */}
-            <div className="space-y-3 pt-2 border-t">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Endereço Completo</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1 col-span-1">
-                  <Label htmlFor="cust-cep" className="text-xs">CEP</Label>
-                  <Input
-                    id="cust-cep"
-                    value={form.cep}
-                    onChange={(e) => setForm(f => ({ ...f, cep: e.target.value }))}
-                    placeholder="00000-000"
-                    className="h-8 text-xs"
-                  />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <Label htmlFor="cust-street" className="text-xs">Rua / Logradouro</Label>
-                  <Input
-                    id="cust-street"
-                    value={form.street}
-                    onChange={(e) => setForm(f => ({ ...f, street: e.target.value }))}
-                    placeholder="Av. Paulista"
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1 col-span-1">
-                  <Label htmlFor="cust-num" className="text-xs">Número</Label>
-                  <Input
-                    id="cust-num"
-                    value={form.number}
-                    onChange={(e) => setForm(f => ({ ...f, number: e.target.value }))}
-                    placeholder="1000"
-                    className="h-8 text-xs"
-                  />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <Label htmlFor="cust-neigh" className="text-xs">Bairro</Label>
-                  <Input
-                    id="cust-neigh"
-                    value={form.neighborhood}
-                    onChange={(e) => setForm(f => ({ ...f, neighborhood: e.target.value }))}
-                    placeholder="Bela Vista"
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1 col-span-2">
-                  <Label htmlFor="cust-city" className="text-xs">Cidade</Label>
-                  <Input
-                    id="cust-city"
-                    value={form.city}
-                    onChange={(e) => setForm(f => ({ ...f, city: e.target.value }))}
-                    placeholder="São Paulo"
-                    className="h-8 text-xs"
-                  />
-                </div>
-                <div className="space-y-1 col-span-1">
-                  <Label htmlFor="cust-state" className="text-xs">Estado / UF</Label>
-                  <Input
-                    id="cust-state"
-                    value={form.state}
-                    onChange={(e) => setForm(f => ({ ...f, state: e.target.value.toUpperCase() }))}
-                    placeholder="SP"
-                    maxLength={2}
-                    className="h-8 text-xs uppercase"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label htmlFor="cust-notes">Observações</Label>
-              <Textarea
-                id="cust-notes"
-                value={form.notes}
-                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder="Informações adicionais sobre o cliente..."
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="p-4 bg-muted/30 border-t shrink-0">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar Cliente'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Official Reusable Customer Dialog */}
+      <CustomerDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        customer={selectedCustomer}
+        onSuccess={() => {
+          loadCustomers();
+          if (currentClient) {
+            reloadContextCustomers(currentClient.id);
+          }
+        }}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

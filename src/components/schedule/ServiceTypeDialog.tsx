@@ -114,7 +114,7 @@ export const ServiceTypeDialog: React.FC<ServiceTypeDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={handleSave}>
-          <DialogHeader>
+          <DialogHeader className="pr-10">
             <DialogTitle className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-indigo-600" />
               {serviceType?.id ? 'Editar Tipo de Serviço' : 'Novo Tipo de Serviço'}

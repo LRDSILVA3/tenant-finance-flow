@@ -236,7 +236,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <form onSubmit={handleSave} className="flex flex-col h-full overflow-hidden">
-          <DialogHeader className="p-6 pb-3 border-b shrink-0">
+          <DialogHeader className="p-6 pb-3 pr-12 border-b shrink-0">
             <DialogTitle>{product?.id ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
             <DialogDescription>Insira as informações do produto contábil e seus valores.</DialogDescription>
           </DialogHeader>
