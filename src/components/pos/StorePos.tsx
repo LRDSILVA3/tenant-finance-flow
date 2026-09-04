@@ -115,6 +115,14 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
 
+  const selectedCustomer = useMemo(() => {
+    return customers.find((c) => c.id === selectedCustomerId);
+  }, [customers, selectedCustomerId]);
+
+  const selectedCollaborator = useMemo(() => {
+    return collaborators.find((c) => c.id === selectedCollaboratorId);
+  }, [collaborators, selectedCollaboratorId]);
+
   // Filtros do Catálogo Touch
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -130,6 +138,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [completing, setCompleting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
@@ -410,7 +419,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       } else if (e.key === 'F10') {
         e.preventDefault();
         if (cart.length > 0 && !completing) {
-          handleFinalizeOrder();
+          setIsConfirmModalOpen(true);
         }
       }
     };
@@ -599,6 +608,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       };
 
       setCompletedOrder(createdOrder);
+      setIsConfirmModalOpen(false);
       setIsReceiptOpen(true);
 
       // Limpar formulário para a próxima venda
@@ -1197,7 +1207,17 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             <Button
               size="lg"
               disabled={cart.length === 0 || completing}
-              onClick={handleFinalizeOrder}
+              onClick={() => {
+                if (cart.length === 0) {
+                  toast({
+                    title: 'Carrinho vazio',
+                    description: 'Adicione pelo menos um produto ou serviço para finalizar a venda.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                setIsConfirmModalOpen(true);
+              }}
               className="w-full h-11 text-xs sm:text-sm font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all active:scale-[0.98] shrink-0"
             >
               <CheckCircle2 className="h-4 w-4" />
@@ -1206,6 +1226,140 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           </div>
         </div>
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE VENDA */}
+      <Dialog open={isConfirmModalOpen} onOpenChange={setIsConfirmModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="pr-12">
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" />
+              Confirmar Finalização de Venda
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Confira os dados da venda antes de confirmar o recebimento e emitir o comprovante.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* CARD DE TOTAL */}
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 flex flex-col items-center justify-center text-center">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                Valor Total a Pagar
+              </span>
+              <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                {formatCurrency(grandTotal)}
+              </span>
+              {globalDiscount > 0 && (
+                <span className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5 font-medium">
+                  (Desconto de {formatCurrency(globalDiscount)} aplicado)
+                </span>
+              )}
+            </div>
+
+            {/* DETALHES DA VENDA */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg border bg-muted/30 flex flex-col">
+                <span className="text-[11px] text-muted-foreground font-medium">Itens no Pedido</span>
+                <span className="font-bold text-foreground mt-0.5">
+                  {cart.reduce((acc, i) => acc + i.quantity, 0)}{' '}
+                  {cart.reduce((acc, i) => acc + i.quantity, 0) === 1 ? 'item' : 'itens'} ({cart.length}{' '}
+                  {cart.length === 1 ? 'tipo' : 'tipos'})
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-muted/30 flex flex-col">
+                <span className="text-[11px] text-muted-foreground font-medium">Forma de Pagamento</span>
+                <span className="font-bold text-foreground capitalize mt-0.5 flex items-center gap-1.5">
+                  {paymentMethod === 'pix' && <QrCode className="h-3.5 w-3.5 text-emerald-600" />}
+                  {paymentMethod === 'cash' && <DollarSign className="h-3.5 w-3.5 text-emerald-600" />}
+                  {paymentMethod === 'credit_card' && <CreditCard className="h-3.5 w-3.5 text-blue-600" />}
+                  {paymentMethod === 'debit_card' && <CreditCard className="h-3.5 w-3.5 text-amber-600" />}
+                  {paymentMethod === 'bank_slip' && <FileText className="h-3.5 w-3.5 text-purple-600" />}
+                  {paymentMethod === 'transfer' && <Layers className="h-3.5 w-3.5 text-indigo-600" />}
+                  {paymentMethod === 'pix'
+                    ? 'PIX'
+                    : paymentMethod === 'cash'
+                    ? 'Dinheiro'
+                    : paymentMethod === 'credit_card'
+                    ? 'Cartão de Crédito'
+                    : paymentMethod === 'debit_card'
+                    ? 'Cartão de Débito'
+                    : paymentMethod === 'bank_slip'
+                    ? 'Boleto Bancário'
+                    : paymentMethod === 'transfer'
+                    ? 'Transferência / TED'
+                    : paymentMethod}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-muted/30 flex flex-col">
+                <span className="text-[11px] text-muted-foreground font-medium">Cliente</span>
+                <span
+                  className="font-bold text-foreground truncate mt-0.5"
+                  title={selectedCustomer?.name || 'Cliente Balcão'}
+                >
+                  {selectedCustomer?.name || 'Cliente Balcão'}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-muted/30 flex flex-col">
+                <span className="text-[11px] text-muted-foreground font-medium">Atendente / Vendedor</span>
+                <span
+                  className="font-bold text-foreground truncate mt-0.5"
+                  title={selectedCollaborator?.name || 'Não informado'}
+                >
+                  {selectedCollaborator?.name || 'Não informado'}
+                </span>
+              </div>
+            </div>
+
+            {/* TROCO SE DINHEIRO */}
+            {paymentMethod === 'cash' && cashGiven > 0 && (
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex justify-between items-center text-xs">
+                <div>
+                  <span className="text-muted-foreground">Valor Recebido: </span>
+                  <span className="font-semibold">{formatCurrency(cashGiven)}</span>
+                </div>
+                <div>
+                  <span className="text-amber-800 dark:text-amber-300 font-medium">Troco a Devolver: </span>
+                  <span className="font-black text-amber-600 dark:text-amber-400">{formatCurrency(changeDue)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmModalOpen(false)}
+              disabled={completing}
+              className="text-xs"
+            >
+              Voltar / Revisar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleFinalizeOrder}
+              disabled={completing}
+              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              autoFocus
+            >
+              {completing ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Confirmar Venda
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE PIX RÁPIDO */}
       <Dialog open={isPixModalOpen} onOpenChange={setIsPixModalOpen}>

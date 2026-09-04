@@ -189,7 +189,7 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
     expect(screen.getAllByText(/12,00/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('deve finalizar a venda, criar pedido, dar baixa no estoque e registrar transação', async () => {
+  it('deve abrir o modal de confirmação ao clicar em finalizar venda e só concluir após confirmar', async () => {
     render(<StorePos />);
 
     // Adiciona produto
@@ -199,6 +199,15 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
     // Clica em Finalizar Venda (F10)
     const finalizeButton = screen.getByRole('button', { name: /FINALIZAR VENDA/i });
     fireEvent.click(finalizeButton);
+
+    // Deve abrir o modal de confirmação de venda
+    expect(await screen.findByText('Confirmar Finalização de Venda')).toBeInTheDocument();
+    expect(screen.getByText('Valor Total a Pagar')).toBeInTheDocument();
+    expect(screen.getByText('Voltar / Revisar')).toBeInTheDocument();
+
+    // Clica no botão de confirmar dentro do modal
+    const confirmButton = screen.getByRole('button', { name: /Confirmar Venda/i });
+    fireEvent.click(confirmButton);
 
     await waitFor(() => {
       expect(mockAddTransaction).toHaveBeenCalledWith(
@@ -217,6 +226,28 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
         })
       );
     });
+  });
+
+  it('deve permitir cancelar a confirmação de venda e voltar ao cupom sem alterar itens', async () => {
+    render(<StorePos />);
+
+    // Adiciona produto
+    const productCard = await screen.findByText('Coca-Cola 2 Litros');
+    fireEvent.click(productCard);
+
+    // Clica em Finalizar Venda (F10)
+    const finalizeButton = screen.getByRole('button', { name: /FINALIZAR VENDA/i });
+    fireEvent.click(finalizeButton);
+
+    // Abre modal e clica em Voltar / Revisar
+    expect(await screen.findByText('Confirmar Finalização de Venda')).toBeInTheDocument();
+    const cancelButton = screen.getByRole('button', { name: /Voltar \/ Revisar/i });
+    fireEvent.click(cancelButton);
+
+    // Não deve ter chamado addTransaction
+    expect(mockAddTransaction).not.toHaveBeenCalled();
+    // O item continua no cupom
+    expect(screen.getByText('1 item')).toBeInTheDocument();
   });
 
   it('deve abrir o modal de seleção de clientes com busca e filtros ao clicar no seletor', async () => {
