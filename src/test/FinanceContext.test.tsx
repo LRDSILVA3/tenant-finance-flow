@@ -96,6 +96,7 @@ describe('FinanceContext & Provider', () => {
       loadCustomers: vi.fn(),
       loadCustomPaymentMethods: vi.fn(),
       loadSuppliers: vi.fn(),
+      loadOrders: vi.fn(),
       addTransaction: mockAddTransaction,
       updateTransaction: vi.fn(),
       deleteTransaction: vi.fn(),
@@ -112,7 +113,9 @@ describe('FinanceContext & Provider', () => {
       collaborators: [],
       customers: [],
       customPaymentMethods: [],
-      suppliers: []
+      suppliers: [],
+      orders: [],
+      getOrderById: vi.fn(),
     } as any);
   });
 

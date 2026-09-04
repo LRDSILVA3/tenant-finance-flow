@@ -1273,6 +1273,7 @@ export type Database = {
           description: string
           id: string
           notes: string | null
+          order_id: string | null
           payment_method: string | null
           recurring_id: string | null
           reference: string | null
@@ -1291,6 +1292,7 @@ export type Database = {
           description: string
           id?: string
           notes?: string | null
+          order_id?: string | null
           payment_method?: string | null
           recurring_id?: string | null
           reference?: string | null
@@ -1309,6 +1311,7 @@ export type Database = {
           description?: string
           id?: string
           notes?: string | null
+          order_id?: string | null
           payment_method?: string | null
           recurring_id?: string | null
           reference?: string | null
@@ -1337,6 +1340,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {

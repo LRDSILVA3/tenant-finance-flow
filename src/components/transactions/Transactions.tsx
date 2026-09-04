@@ -92,7 +92,8 @@ import {
   FileText,
   Wallet,
   Search,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ShoppingBag
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -184,6 +185,8 @@ export const Transactions: React.FC = () => {
     customPaymentMethods = [],
     suppliers,
     getSupplierById,
+    orders = [],
+    getOrderById,
   } = useFinance();
   const { loadTransactions } = useTransactions();
 
@@ -1046,6 +1049,12 @@ export const Transactions: React.FC = () => {
                                   Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
                                 </span>
                               )}
+                              {transaction.orderId && (
+                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium flex items-center gap-1 mt-0.5">
+                                  <ShoppingBag className="h-3 w-3 text-primary" />
+                                  Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -1157,6 +1166,12 @@ export const Transactions: React.FC = () => {
                             {transaction.supplierId && (
                               <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
                                 Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
+                              </span>
+                            )}
+                            {transaction.orderId && (
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                <ShoppingBag className="h-2.5 w-2.5 text-primary" />
+                                Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}
                               </span>
                             )}
                           </div>

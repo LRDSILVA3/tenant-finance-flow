@@ -36,9 +36,16 @@ vi.mock('@/integrations/supabase/client', () => ({
           delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ error: null }) }),
         } as any;
       }
+      const defaultQuery: any = {
+        data: [],
+        error: null,
+        eq: vi.fn().mockImplementation(() => defaultQuery),
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      };
       return {
-        select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ data: [], error: null }) }),
+        select: vi.fn().mockReturnValue(defaultQuery),
         insert: vi.fn().mockReturnValue({ error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ error: null }) }),
         delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ error: null }) }),
       } as any;
     }),

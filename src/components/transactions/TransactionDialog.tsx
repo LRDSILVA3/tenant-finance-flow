@@ -41,7 +41,8 @@ import {
   FileText,
   CheckCircle2,
   Trash2,
-  Plus
+  Plus,
+  ShoppingBag
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -92,6 +93,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     categories = [],
     collaborators = [],
     customers = [],
+    orders = [],
     getCategoriesByType,
     addTransaction,
     updateTransaction,
@@ -130,6 +132,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     commissions: [] as { collaboratorId: string; commissionAmount: number }[],
     customerId: '',
     supplierId: '',
+    orderId: '',
     isRecurring: false,
     recurrenceType: 'count' as 'count' | 'until',
     repeatCount: 1,
@@ -159,6 +162,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           })) : [],
           customerId: editingTransaction.customerId || '',
           supplierId: editingTransaction.supplierId || '',
+          orderId: editingTransaction.orderId || orders.find(o => o.transactionId === editingTransaction.id)?.id || '',
           isRecurring: !!editingTransaction.recurringId,
           recurrenceType: 'count',
           repeatCount: 1,
@@ -180,6 +184,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           commissions: [],
           customerId: '',
           supplierId: '',
+          orderId: '',
           isRecurring: false,
           recurrenceType: 'count',
           repeatCount: 1,
@@ -188,7 +193,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
       }
       setErrors({});
     }
-  }, [open, editingTransaction, defaultType, defaultStatus]);
+  }, [open, editingTransaction, defaultType, defaultStatus, orders]);
 
   const updateFormField = (field: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -280,6 +285,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     const commissions = formData.commissions || [];
     const customerId = formData.customerId && formData.customerId !== 'none' ? formData.customerId : undefined;
     const supplierId = formData.supplierId && formData.supplierId !== 'none' ? formData.supplierId : undefined;
+    const orderId = formData.orderId && formData.orderId !== 'none' ? formData.orderId : undefined;
 
     const category = categories.find(c => c.id === formData.categoryId);
     const finalDescription = formData.description?.trim() || category?.name || (formData.type === 'income' ? 'Receita' : 'Despesa');
@@ -299,6 +305,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           commissions,
           customerId,
           supplierId,
+          orderId,
         });
         toast({
           title: "Lançamento Atualizado",
@@ -324,6 +331,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           commissions,
           customerId,
           supplierId,
+          orderId,
         }, recurrence);
 
         toast({
@@ -524,24 +532,84 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           </div>
 
           {formData.type === 'income' ? (
-            <div className="space-y-2">
-              <Label htmlFor="customerId">Cliente (Opcional)</Label>
-              <Select
-                value={formData.customerId || 'none'}
-                onValueChange={(val) => updateFormField('customerId', val === 'none' ? '' : val)}
-              >
-                <SelectTrigger id="customerId">
-                  <SelectValue placeholder="Selecione um cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerId">Cliente (Opcional)</Label>
+                <Select
+                  value={formData.customerId || 'none'}
+                  onValueChange={(val) => updateFormField('customerId', val === 'none' ? '' : val)}
+                >
+                  <SelectTrigger id="customerId">
+                    <SelectValue placeholder="Selecione um cliente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="orderId" className="flex items-center gap-1.5">
+                  <ShoppingBag className="h-3.5 w-3.5 text-primary" />
+                  <span>Pedido de Venda (Opcional)</span>
+                </Label>
+                <Select
+                  value={formData.orderId || 'none'}
+                  onValueChange={(val) => {
+                    const selectedOrderId = val === 'none' ? '' : val;
+                    updateFormField('orderId', selectedOrderId);
+                    if (selectedOrderId) {
+                      const order = orders.find(o => o.id === selectedOrderId);
+                      if (order) {
+                        if (order.customerId && (!formData.customerId || formData.customerId === 'none')) {
+                          updateFormField('customerId', order.customerId);
+                        }
+                        if (formData.amount <= 0 && order.totalAmount > 0) {
+                          updateFormField('amount', order.totalAmount);
+                        }
+                        if (!formData.reference && order.orderNumber) {
+                          updateFormField('reference', order.orderNumber);
+                        }
+                        if (!formData.description) {
+                          updateFormField('description', `Pedido de Venda #${order.orderNumber}`);
+                        }
+                        if (order.paymentMethod && !formData.paymentMethod) {
+                          updateFormField('paymentMethod', order.paymentMethod);
+                        }
+                        if (order.paymentStatus) {
+                          updateFormField('status', order.paymentStatus);
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger id="orderId">
+                    <SelectValue placeholder="Vincular a um pedido..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum pedido</SelectItem>
+                    {orders.map((o) => {
+                      const cust = customers.find(c => c.id === o.customerId) || o.customer;
+                      const formattedTotal = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(o.totalAmount || 0);
+                      return (
+                        <SelectItem key={o.id} value={o.id}>
+                          <div className="flex items-center justify-between gap-2 w-full text-left">
+                            <span className="font-medium">#{o.orderNumber}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {cust?.name ? `${cust.name} • ` : ''}{formattedTotal}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">

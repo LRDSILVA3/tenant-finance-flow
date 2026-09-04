@@ -92,6 +92,7 @@ export interface Transaction {
   commissions?: TransactionCommission[];
   customerId?: string;
   supplierId?: string;
+  orderId?: string;
   recurringId?: string;
   createdAt: Date;
 }

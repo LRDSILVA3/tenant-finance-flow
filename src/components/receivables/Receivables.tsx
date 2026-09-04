@@ -50,7 +50,8 @@ import {
   Filter,
   ArrowUpDown,
   LayoutGrid,
-  List
+  List,
+  ShoppingBag
 } from 'lucide-react';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { toast } from '@/hooks/use-toast';
@@ -195,7 +196,9 @@ export const Receivables: React.FC = () => {
     getCustomerById,
     updateTransaction,
     addTransaction,
-    userSettings
+    userSettings,
+    orders = [],
+    getOrderById
   } = useFinance();
 
   const [viewMode, setViewMode] = useState<'grouped' | 'table'>('grouped');
@@ -885,11 +888,17 @@ export const Receivables: React.FC = () => {
                               className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-card gap-3 hover:bg-muted/20 transition-colors"
                             >
                               <div className="space-y-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-medium text-sm text-foreground">{tx.description}</span>
                                   {tx.reference && (
                                     <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
                                       Ref: {tx.reference}
+                                    </span>
+                                  )}
+                                  {tx.orderId && (
+                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1">
+                                      <ShoppingBag className="h-3 w-3 text-primary" />
+                                      Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}
                                     </span>
                                   )}
                                 </div>
@@ -977,9 +986,17 @@ export const Receivables: React.FC = () => {
                           <TableCell>
                             <div>
                               <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
-                              {tx.reference && (
-                                <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
-                              )}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                {tx.reference && (
+                                  <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                                )}
+                                {tx.orderId && (
+                                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1">
+                                    <ShoppingBag className="h-3 w-3 text-primary" />
+                                    Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}
+                                  </span>
+                                )}
+                              </div>
                               {tx.notes && (
                                 <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
                               )}

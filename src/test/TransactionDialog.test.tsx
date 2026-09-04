@@ -51,6 +51,23 @@ const mockCollaborators = [
   { id: 'col-1', name: 'João Silva' },
 ];
 
+const mockOrders = [
+  {
+    id: 'order-1',
+    clientId: 'client-123',
+    orderNumber: 'PED-1001',
+    customerId: 'cust-1',
+    status: 'completed',
+    subtotalAmount: 250,
+    discountAmount: 0,
+    totalAmount: 250,
+    paymentMethod: 'pix',
+    paymentStatus: 'paid',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
 const mockTranslations = {
   addTransaction: 'Adicionar Lançamento',
   editTransaction: 'Editar Lançamento',
@@ -89,6 +106,8 @@ describe('TransactionDialog Component', () => {
       collaborators: mockCollaborators,
       customers: mockCustomers,
       suppliers: mockSuppliers,
+      orders: mockOrders,
+      getOrderById: (id: string) => mockOrders.find(o => o.id === id),
       getCategoriesByType: (type: string) => mockCategories.filter(c => c.type === type),
       addTransaction: mockAddTransaction,
       updateTransaction: mockUpdateTransaction,
@@ -228,6 +247,93 @@ describe('TransactionDialog Component', () => {
         })
       );
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    });
+  });
+
+  it('deve exibir o campo de Pedido de Venda para receitas e permitir vinculação com auto-preenchimento', async () => {
+    render(
+      <TransactionDialog
+        open={true}
+        onOpenChange={mockOnOpenChange}
+        defaultType="income"
+      />
+    );
+
+    expect(screen.getByText('Pedido de Venda (Opcional)')).toBeInTheDocument();
+
+    // Selecionar categoria
+    const categoryButton = screen.getAllByRole('combobox').find(el => el.textContent?.includes('Categoria'));
+    fireEvent.click(categoryButton!);
+    fireEvent.click(screen.getByText('1.01 - Venda de Produtos'));
+
+    // Clicar no select de pedido
+    const orderSelectTrigger = screen.getByRole('combobox', { name: /Pedido de Venda/i }) || screen.getByText('Vincular a um pedido...').closest('button');
+    if (orderSelectTrigger) {
+      fireEvent.click(orderSelectTrigger);
+      const orderOption = screen.getByText(/#PED-1001/);
+      fireEvent.click(orderOption);
+    }
+
+    // Clicar em salvar
+    const saveButton = screen.getByRole('button', { name: 'Salvar Lançamento' });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockAddTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'income',
+          categoryId: 'cat-1',
+          orderId: 'order-1',
+          amount: 250,
+          reference: 'PED-1001',
+          description: 'Pedido de Venda #PED-1001',
+          customerId: 'cust-1',
+          paymentMethod: 'pix',
+          status: 'paid',
+        }),
+        undefined
+      );
+    });
+  });
+
+  it('deve carregar orderId existente em modo de edição e enviar no update', async () => {
+    const mockTxWithOrder: Transaction = {
+      id: 'tx-with-order',
+      clientId: 'client-123',
+      categoryId: 'cat-1',
+      type: 'income',
+      amount: 250.00,
+      description: 'Pedido de Venda #PED-1001',
+      reference: 'PED-1001',
+      date: new Date('2026-08-01T12:00:00'),
+      paymentMethod: 'pix',
+      status: 'paid',
+      customerId: 'cust-1',
+      orderId: 'order-1',
+      createdAt: new Date(),
+    };
+
+    render(
+      <TransactionDialog
+        open={true}
+        onOpenChange={mockOnOpenChange}
+        editingTransaction={mockTxWithOrder}
+      />
+    );
+
+    const saveButton = screen.getByRole('button', { name: 'Salvar Lançamento' });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockUpdateTransaction).toHaveBeenCalledWith(
+        'tx-with-order',
+        expect.objectContaining({
+          type: 'income',
+          amount: 250,
+          categoryId: 'cat-1',
+          orderId: 'order-1',
+        })
+      );
     });
   });
 });

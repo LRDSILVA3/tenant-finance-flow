@@ -8,7 +8,7 @@ import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 
-import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier } from '@/types/finance';
+import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier, Order } from '@/types/finance';
 
 interface UserSettings {
   enablePaymentMethods: boolean;
@@ -63,6 +63,7 @@ interface FinanceContextType {
   transactions: Transaction[];
   collaborators: Collaborator[];
   customers: Customer[];
+  orders: Order[];
   customPaymentMethods: CustomPaymentMethod[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
@@ -83,6 +84,8 @@ interface FinanceContextType {
   suppliers: Supplier[];
   loadSuppliers: (clientId: string) => Promise<void>;
   getSupplierById: (id: string) => Supplier | undefined;
+  loadOrders: (clientId: string) => Promise<void>;
+  getOrderById: (id: string) => Order | undefined;
 
   // Notifications
   notifications: SystemNotification[];
@@ -112,7 +115,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     loadCollaborators,
     loadCustomers,
     loadCustomPaymentMethods,
-    loadSuppliers
+    loadSuppliers,
+    loadOrders
   } = tx;
 
   const [language, setLanguage] = useState<Language>('pt');
@@ -606,15 +610,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   useEffect(() => {
     if (currentClient?.id) {
-      loadSubscription(currentClient.id);
-      loadCategories(currentClient.id);
-      loadTransactions(currentClient.id);
-      loadCollaborators(currentClient.id);
-      loadCustomers(currentClient.id);
-      loadCustomPaymentMethods(currentClient.id);
-      loadSuppliers(currentClient.id);
+      if (typeof loadSubscription === 'function') loadSubscription(currentClient.id);
+      if (typeof loadCategories === 'function') loadCategories(currentClient.id);
+      if (typeof loadTransactions === 'function') loadTransactions(currentClient.id);
+      if (typeof loadCollaborators === 'function') loadCollaborators(currentClient.id);
+      if (typeof loadCustomers === 'function') loadCustomers(currentClient.id);
+      if (typeof loadCustomPaymentMethods === 'function') loadCustomPaymentMethods(currentClient.id);
+      if (typeof loadSuppliers === 'function') loadSuppliers(currentClient.id);
+      if (typeof loadOrders === 'function') loadOrders(currentClient.id);
     }
-  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers]);
+  }, [currentClient?.id, loadSubscription, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers, loadOrders]);
 
   // Sync settings with plan and subscription status
   useEffect(() => {
@@ -699,6 +704,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     getCollaboratorById: (id: string) => tx.collaborators.find(c => c.id === id),
     getCustomerById: (id: string) => tx.customers.find(c => c.id === id),
     getSupplierById: (id: string) => tx.suppliers.find(s => s.id === id),
+    getOrderById: (id: string) => tx.orders.find(o => o.id === id),
     
     // Notifications
     notifications,

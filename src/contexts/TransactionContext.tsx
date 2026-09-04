@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, TransactionStatus, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice, Supplier } from '@/types/finance';
+import { Category, Transaction, Collaborator, TransactionType, PaymentMethod, TransactionStatus, Customer, CustomPaymentMethod, ClientAsaasConfig, Invoice, Supplier, Order } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 
 interface TransactionContextType {
@@ -11,14 +11,16 @@ interface TransactionContextType {
   collaborators: Collaborator[];
   customers: Customer[];
   suppliers: Supplier[];
+  orders: Order[];
   customPaymentMethods: CustomPaymentMethod[];
   loadCategories: (clientId: string) => Promise<void>;
   loadTransactions: (clientId: string) => Promise<void>;
   loadCollaborators: (clientId: string) => Promise<void>;
   loadCustomers: (clientId: string) => Promise<void>;
   loadSuppliers: (clientId: string) => Promise<void>;
+  loadOrders: (clientId: string) => Promise<void>;
   loadCustomPaymentMethods: (clientId: string) => Promise<void>;
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => Promise<any>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string, recurringOption?: 'single' | 'future' | 'all') => Promise<void>;
   addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Promise<Category | null>;
@@ -41,6 +43,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customPaymentMethods, setCustomPaymentMethods] = useState<CustomPaymentMethod[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const loadCustomPaymentMethods = useCallback(async (clientId: string) => {
     const { data, error } = await supabase.from('client_payment_methods').select('*').eq('client_id', clientId);
@@ -111,6 +114,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       })) : [],
       customerId: t.customer_id || undefined,
       supplierId: t.supplier_id || undefined,
+      orderId: t.order_id || undefined,
       recurringId: t.recurring_id || undefined,
       createdAt: new Date(t.created_at)
     })));
@@ -140,7 +144,52 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     })));
   }, []);
 
+  const loadOrders = useCallback(async (clientId: string) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, customer:customers(id, name, phone, document), collaborator:collaborators(id, name)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
 
+    if (!error && data) {
+      setOrders(data.map((o: any) => ({
+        id: o.id,
+        clientId: o.client_id,
+        orderNumber: o.order_number,
+        customerId: o.customer_id || undefined,
+        collaboratorId: o.collaborator_id || undefined,
+        status: o.status as any,
+        subtotalAmount: Number(o.subtotal_amount),
+        discountAmount: Number(o.discount_amount),
+        totalAmount: Number(o.total_amount),
+        paymentMethod: o.payment_method,
+        paymentStatus: o.payment_status as any,
+        dueDate: o.due_date ? new Date(o.due_date) : undefined,
+        notes: o.notes || undefined,
+        transactionId: o.transaction_id || undefined,
+        customer: o.customer ? {
+          id: o.customer.id,
+          clientId: o.client_id,
+          name: o.customer.name,
+          phone: o.customer.phone,
+          document: o.customer.document,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } : undefined,
+        collaborator: o.collaborator ? {
+          id: o.collaborator.id,
+          userId: '',
+          clientId: o.client_id,
+          name: o.collaborator.name,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } : undefined,
+        createdAt: new Date(o.created_at),
+        updatedAt: new Date(o.updated_at),
+      })));
+    }
+  }, []);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>, recurrence?: { count?: number; until?: Date }) => {
     if (!user) return;
@@ -159,6 +208,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       status: transaction.status || 'paid',
       customer_id: transaction.customerId || null,
       supplier_id: transaction.supplierId || null,
+      order_id: transaction.orderId || null,
       recurring_id: recurringId
     };
 
@@ -169,6 +219,13 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       .single();
 
     if (!txError && insertedTx) {
+      if (transaction.orderId) {
+        await supabase
+          .from('orders')
+          .update({ transaction_id: insertedTx.id })
+          .eq('id', transaction.orderId);
+      }
+
       if (transaction.commissions && transaction.commissions.length > 0) {
         const commissionsData = transaction.commissions.map((comm) => ({
           user_id: user.id,
@@ -188,6 +245,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
       }
       await loadTransactions(transaction.clientId);
+      await loadOrders(transaction.clientId);
       toast({ title: "Lançamento salvo" });
       return insertedTx;
     } else if (txError) {
@@ -195,7 +253,7 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       toast({ title: "Erro ao salvar lançamento", description: txError.message, variant: "destructive" });
       return null;
     }
-  }, [user, loadTransactions]);
+  }, [user, loadTransactions, loadOrders]);
 
   const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
     const updateData: Record<string, any> = {};
@@ -210,10 +268,31 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (updates.status !== undefined) updateData.status = updates.status;
     if (updates.customerId !== undefined) updateData.customer_id = updates.customerId || null;
     if (updates.supplierId !== undefined) updateData.supplier_id = updates.supplierId || null;
+    if (updates.orderId !== undefined) updateData.order_id = updates.orderId || null;
 
     const { error: txError, data } = await supabase.from('transactions').update(updateData).eq('id', id).select().single();
     
     if (!txError && data) {
+      if (updates.orderId !== undefined) {
+        if (updates.orderId) {
+          await supabase
+            .from('orders')
+            .update({ transaction_id: null })
+            .eq('transaction_id', id)
+            .neq('id', updates.orderId);
+
+          await supabase
+            .from('orders')
+            .update({ transaction_id: id })
+            .eq('id', updates.orderId);
+        } else {
+          await supabase
+            .from('orders')
+            .update({ transaction_id: null })
+            .eq('transaction_id', id);
+        }
+      }
+
       if (updates.commissions !== undefined) {
         if (!user) return;
         
@@ -247,11 +326,12 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       }
 
       await loadTransactions(data.client_id);
+      await loadOrders(data.client_id);
       toast({ title: "Lançamento atualizado" });
     } else if (txError) {
       toast({ title: "Erro ao atualizar lançamento", variant: "destructive" });
     }
-  }, [user, loadTransactions]);
+  }, [user, loadTransactions, loadOrders]);
 
   const deleteTransaction = useCallback(async (id: string, recurringOption: 'single' | 'future' | 'all' = 'single') => {
     const transactionToDelete = transactions.find(t => t.id === id);
@@ -269,9 +349,10 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     const { error } = await query;
     if (!error) {
       await loadTransactions(transactionToDelete.clientId);
+      await loadOrders(transactionToDelete.clientId);
       toast({ title: "Lançamento excluído" });
     }
-  }, [transactions, loadTransactions]);
+  }, [transactions, loadTransactions, loadOrders]);
 
   const addCategory = useCallback(async (category: Omit<Category, 'id' | 'createdAt'>) => {
     if (!user) return null;
@@ -341,13 +422,13 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [collaborators, loadCollaborators]);
 
   const value = React.useMemo(() => ({
-    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers,
+    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, orders, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers, loadOrders,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator,
     addCustomPaymentMethod, deleteCustomPaymentMethod
   }), [
-    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers,
+    categories, transactions, collaborators, customers, customPaymentMethods, suppliers, orders, loadCategories, loadTransactions, loadCollaborators, loadCustomers, loadCustomPaymentMethods, loadSuppliers, loadOrders,
     addTransaction, updateTransaction, deleteTransaction, 
     addCategory, updateCategory, deleteCategory,
     addCollaborator, updateCollaborator, deleteCollaborator,
