@@ -18,11 +18,12 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
   onScan,
   active = true,
   className,
-  autoStart = true,
+  autoStart = false,
   placeholderText = 'Aponte a câmera para o código de barras ou QR code',
 }) => {
   const containerId = useRef(`device-cam-reader-${Math.random().toString(36).substring(2, 9)}`).current;
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [hasUserStarted, setHasUserStarted] = useState(autoStart);
   const [isScanning, setIsScanning] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
   const startCamera = async (cameraId?: string) => {
     setError(null);
     setIsStarting(true);
+    setHasUserStarted(true);
 
     try {
       await stopCamera();
@@ -161,7 +163,10 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
   };
 
   useEffect(() => {
-    if (active && autoStart) {
+    if (!active) {
+      stopCamera();
+      setHasUserStarted(false);
+    } else if (active && autoStart && hasUserStarted) {
       const timer = setTimeout(() => {
         startCamera(selectedCameraId);
       }, 150);
@@ -169,11 +174,15 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
         clearTimeout(timer);
         stopCamera();
       };
-    } else {
-      stopCamera();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, autoStart]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   return (
     <div className={cn('flex flex-col items-center w-full space-y-3', className)}>
@@ -209,17 +218,22 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
         {/* Estado: Câmera Pausada ou Desativada */}
         {!isScanning && !isStarting && !error && (
           <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white space-y-3 p-4 text-center">
-            <Camera className="h-10 w-10 text-muted-foreground opacity-60" />
+            <div className="p-3 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-emerald-400">
+              <Camera className="h-8 w-8" />
+            </div>
             <div>
-              <p className="text-xs font-medium text-slate-300">Câmera em pausa</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Toque no botão abaixo para ligar a câmera</p>
+              <p className="text-xs font-bold text-slate-100">Leitor de Câmera Desligado</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 max-w-[220px]">
+                Toque no botão para ativar a câmera deste aparelho e começar a ler códigos.
+              </p>
             </div>
             <Button
+              type="button"
               size="sm"
               onClick={() => startCamera(selectedCameraId)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 h-8"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-2 h-9 px-4 font-bold shadow-md active:scale-95 transition-all"
             >
-              <Play className="h-3.5 w-3.5" /> Ligar Câmera
+              <Play className="h-3.5 w-3.5 fill-current" /> Ativar Câmera
             </Button>
           </div>
         )}
