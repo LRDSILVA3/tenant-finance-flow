@@ -152,9 +152,9 @@ export const SupportWidget: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4">
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[60] flex flex-col items-end gap-3 sm:gap-4">
       {isOpen && (
-        <Card className="w-[350px] sm:w-[400px] h-[500px] shadow-2xl flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <Card className="w-[calc(100vw-2rem)] sm:w-[400px] max-h-[calc(100vh-8rem)] sm:max-h-none h-[500px] shadow-2xl flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
           <CardHeader className="bg-primary text-primary-foreground rounded-t-xl p-4 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-2">
               <Headset className="h-5 w-5" />
