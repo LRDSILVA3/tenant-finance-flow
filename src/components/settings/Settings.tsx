@@ -124,6 +124,7 @@ export const Settings: React.FC = () => {
         <p className="page-subtitle">{t.settingsSubtitle}</p>
       </div>
 
+      <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-4 flex flex-nowrap overflow-x-auto no-scrollbar justify-start p-1 w-full gap-1 h-auto bg-muted/50 border rounded-lg">
           <TabsTrigger value="general" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <SettingsIcon className="h-4 w-4" />
