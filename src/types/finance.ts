@@ -237,6 +237,28 @@ export interface Appointment {
   updatedAt: Date;
 }
 
+// ─── Escala de Trabalho & Horários de Atendimento ─────────────────────────────
+
+export interface TimeInterval {
+  start: string; // Ex: "08:00"
+  end: string;   // Ex: "12:00"
+}
+
+export interface DaySchedule {
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  isOpen: boolean;                      // true = dia de trabalho, false = folga
+  intervals: TimeInterval[];            // Ex: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "18:00" }]
+}
+
+export interface WorkSchedule {
+  id?: string;
+  clientId: string;
+  collaboratorId?: string | null; // null = Horário Geral da Empresa, UUID = Colaborador específico
+  days: DaySchedule[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface SystemNotification {
   id: string;
   type: 'low_stock' | 'expired_product' | 'expiring_product' | 'plan_expiration' | 'invoice_authorized' | 'invoice_error' | 'margin_warning' | 'birthday';

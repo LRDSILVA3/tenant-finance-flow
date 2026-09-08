@@ -1,5 +1,5 @@
-import React from 'react';
-import { Appointment, AppointmentStatus, Customer } from '@/types/finance';
+import { Appointment, AppointmentStatus, Customer, WorkSchedule } from '@/types/finance';
+import { getHourStatus } from '@/services/shiftService';
 import { Button } from '@/components/ui/button';
 import { format, addMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ import {
   Pencil,
   Trash2,
   Plus,
+  Coffee,
+  Moon,
 } from 'lucide-react';
 
 interface Props {
@@ -20,6 +22,7 @@ interface Props {
   appointments: Appointment[];
   customers: Customer[];
   collaborators?: { id: string; name: string }[];
+  activeSchedule?: WorkSchedule | null;
   statusConfig: Record<AppointmentStatus, { label: string; color: string; badgeClass: string }>;
   nextStatusMap: Partial<Record<AppointmentStatus, AppointmentStatus>>;
   onOpenCreate: (timeSlot?: string) => void;
@@ -36,6 +39,7 @@ export const ScheduleTimelineView: React.FC<Props> = ({
   appointments,
   customers,
   collaborators,
+  activeSchedule,
   statusConfig,
   nextStatusMap,
   onOpenCreate,
@@ -56,31 +60,68 @@ export const ScheduleTimelineView: React.FC<Props> = ({
             const h = a.scheduledAt.getHours();
             return h === hour;
           });
+          const hourStatus = getHourStatus(hour, selectedDay, activeSchedule);
 
           return (
             <div
               key={hour}
-              className="flex flex-col sm:flex-row items-stretch min-h-[72px] transition-colors hover:bg-muted/10 group"
+              className={cn(
+                'flex flex-col sm:flex-row items-stretch min-h-[72px] transition-colors group',
+                hourStatus === 'break' ? 'bg-amber-500/[0.03]' : hourStatus === 'closed' ? 'bg-muted/10' : 'hover:bg-muted/10'
+              )}
             >
               {/* Coluna de Horário */}
               <div className="w-full sm:w-20 sm:min-w-[80px] p-2.5 sm:p-3 sm:border-r flex items-center justify-between sm:justify-start sm:flex-col sm:items-start text-xs font-mono font-semibold text-muted-foreground bg-muted/20 sm:bg-transparent">
-                <span>{hourLabel}</span>
+                <span className="flex items-center gap-1">
+                  {hourLabel}
+                  {hourStatus === 'break' && <Coffee className="h-3 w-3 text-amber-500 inline" title="Intervalo / Pausa" />}
+                </span>
                 <span className="text-[10px] font-normal text-muted-foreground/60 sm:hidden">
-                  {slotAppointments.length > 0 ? `${slotAppointments.length} atendimento(s)` : 'Livre'}
+                  {slotAppointments.length > 0 ? `${slotAppointments.length} atendimento(s)` : hourStatus === 'break' ? 'Intervalo' : hourStatus === 'closed' ? 'Fechado' : 'Livre'}
                 </span>
               </div>
 
               {/* Área de Conteúdo do Horário */}
               <div className="flex-1 p-2 sm:p-3 space-y-2">
                 {slotAppointments.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenCreate(hourLabel)}
-                    className="w-full h-full min-h-[44px] rounded-lg border border-dashed border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-xs text-muted-foreground/60 hover:text-primary py-2 px-3 group/btn text-left"
-                  >
-                    <Plus className="h-3.5 w-3.5 group-hover/btn:scale-110 transition-transform text-primary/60" />
-                    <span>Horário livre — clique para agendar às {hourLabel}</span>
-                  </button>
+                  hourStatus === 'break' ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCreate(hourLabel)}
+                      className="w-full h-full min-h-[44px] rounded-lg border border-dashed border-amber-300 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-950/20 hover:bg-amber-50 hover:border-amber-400 transition-all flex items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-300 py-2 px-3 group/btn text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Coffee className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>Intervalo / Pausa de expediente (ex: almoço)</span>
+                      </div>
+                      <span className="text-[11px] text-amber-700/70 hover:underline flex items-center gap-1">
+                        <Plus className="h-3 w-3" /> Agendar encaixe às {hourLabel}
+                      </span>
+                    </button>
+                  ) : hourStatus === 'closed' ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCreate(hourLabel)}
+                      className="w-full h-full min-h-[44px] rounded-lg border border-dashed border-muted-foreground/15 hover:border-primary/40 hover:bg-muted/20 transition-all flex items-center justify-between gap-2 text-xs text-muted-foreground/50 hover:text-foreground py-2 px-3 group/btn text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Moon className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        <span>Fora do expediente normal</span>
+                      </div>
+                      <span className="text-[11px] text-primary/70 hover:underline flex items-center gap-1">
+                        <Plus className="h-3 w-3" /> Agendar às {hourLabel}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCreate(hourLabel)}
+                      className="w-full h-full min-h-[44px] rounded-lg border border-dashed border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-xs text-muted-foreground/60 hover:text-primary py-2 px-3 group/btn text-left"
+                    >
+                      <Plus className="h-3.5 w-3.5 group-hover/btn:scale-110 transition-transform text-primary/60" />
+                      <span>Horário livre — clique para agendar às {hourLabel}</span>
+                    </button>
+                  )
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {slotAppointments.map(appt => {

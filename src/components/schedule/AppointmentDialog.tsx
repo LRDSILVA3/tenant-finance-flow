@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useFinance } from '@/contexts/FinanceContext';
-import { Customer, Appointment, ServiceType } from '@/types/finance';
+import { Customer, Appointment, ServiceType, WorkSchedule } from '@/types/finance';
+import { getScheduleForCollaborator, isWithinWorkSchedule } from '@/services/shiftService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +38,7 @@ import {
   AlertCircle,
   Wrench,
   User,
+  Coffee,
 } from 'lucide-react';
 
 interface AppointmentDialogProps {
@@ -50,6 +52,7 @@ interface AppointmentDialogProps {
   appointments: Appointment[];
   customers: Customer[];
   serviceTypes: ServiceType[];
+  schedules?: WorkSchedule[];
   onSuccess: () => void;
   onCustomerCreated?: (newCustomer: Customer) => void;
 }
@@ -65,6 +68,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   appointments,
   customers,
   serviceTypes,
+  schedules,
   onSuccess,
   onCustomerCreated,
 }) => {
@@ -191,6 +195,16 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     if (!customerId || customerId === 'none') return [];
     return conflicts.filter(c => c.customerId === customerId);
   }, [conflicts, customerId]);
+
+  // Verificação de conformidade com a Escala de Trabalho (Turnos / Almoço / Folga)
+  const shiftValidation = useMemo(() => {
+    if (!targetInterval || !schedules || schedules.length === 0) {
+      return { isWithin: true };
+    }
+    const targetCollabId = collaboratorId && collaboratorId !== 'none' ? collaboratorId : null;
+    const sched = getScheduleForCollaborator(schedules, targetCollabId);
+    return isWithinWorkSchedule(targetInterval.start, durationMinutes, sched);
+  }, [targetInterval, schedules, collaboratorId, durationMinutes]);
 
   // Validação do formulário
   const validate = () => {
@@ -463,6 +477,24 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 rows={2}
               />
             </div>
+
+            {/* Aviso de Fora da Escala / Intervalo de Almoço */}
+            {!shiftValidation.isWithin && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700/60 p-3 space-y-1">
+                <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                  <Coffee className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div>
+                    <p>Aviso: Horário Fora da Escala de Atendimento</p>
+                    <p className="text-[11px] font-normal text-amber-700 dark:text-amber-400/90 mt-0.5">
+                      {shiftValidation.reason}
+                    </p>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400/80 italic mt-0.5">
+                      Você pode prosseguir com o agendamento caso se trate de um atendimento extraordinário ou encaixe.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Alerta de Conflitos / Choque de Horários */}
             {conflicts.length > 0 && (

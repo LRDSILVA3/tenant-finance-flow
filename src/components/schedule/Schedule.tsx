@@ -6,7 +6,8 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useTransactions } from '@/contexts/TransactionContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Customer, Appointment, AppointmentStatus, ServiceType, PaymentMethod, TransactionStatus } from '@/types/finance';
+import { Customer, Appointment, AppointmentStatus, ServiceType, PaymentMethod, TransactionStatus, WorkSchedule } from '@/types/finance';
+import { fetchWorkSchedules, saveWorkSchedule, getScheduleForCollaborator } from '@/services/shiftService';
 import { format, startOfDay, endOfDay, addDays, subDays, isToday, addMinutes } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { AppointmentDialog } from './AppointmentDialog';
 import { ScheduleTimelineView } from './ScheduleTimelineView';
 import { ScheduleWeekView } from './ScheduleWeekView';
 import { ScheduleCollaboratorsView } from './ScheduleCollaboratorsView';
+import { ScheduleShiftManager } from './ScheduleShiftManager';
 import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, User, DollarSign,
   Pencil, Trash2, CheckCircle2, XCircle, PlayCircle, Loader2, Settings2,
@@ -124,6 +126,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
   const [editingSt, setEditingSt] = useState<ServiceType | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
+
   const [createDialogParams, setCreateDialogParams] = useState<{
     date?: Date;
     timeSlot?: string;
@@ -153,20 +157,43 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
     if (!currentClient) return;
     setLoading(true);
 
-    const [apptRes, custRes, stRes] = await Promise.all([
+    const [apptRes, custRes, stRes, schedulesData] = await Promise.all([
       supabase.from('appointments').select('*').eq('client_id', currentClient.id).order('scheduled_at'),
       supabase.from('customers').select('*').eq('client_id', currentClient.id).eq('is_active', true).order('name'),
       supabase.from('service_types').select('*').eq('client_id', currentClient.id).order('name'),
+      fetchWorkSchedules(currentClient.id),
     ]);
 
     if (!apptRes.error && apptRes.data) setAppointments(apptRes.data.map(mapAppointment));
     if (!custRes.error && custRes.data) setCustomers(custRes.data.map(mapCustomer));
     if (!stRes.error && stRes.data) setServiceTypes(stRes.data.map(mapServiceType));
+    if (schedulesData) setWorkSchedules(schedulesData);
 
     setLoading(false);
   }, [currentClient]);
 
   useEffect(() => { if (currentClient) loadAll(); }, [currentClient, loadAll]);
+
+  // Escala ativa para a linha do tempo e verificação
+  const activeSchedule = useMemo(() => {
+    const targetCollabId = dayFilterCollaborator !== 'all' && dayFilterCollaborator !== 'none'
+      ? dayFilterCollaborator
+      : null;
+    return getScheduleForCollaborator(workSchedules, targetCollabId);
+  }, [workSchedules, dayFilterCollaborator]);
+
+  const handleSaveWorkSchedule = async (schedule: WorkSchedule) => {
+    const saved = await saveWorkSchedule(schedule);
+    setWorkSchedules(prev => {
+      const idx = prev.findIndex(s => s.collaboratorId === saved.collaboratorId);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = saved;
+        return copy;
+      }
+      return [...prev, saved];
+    });
+  };
 
   // ── Day filtered list ───────────────────────────────────────────────────
 
@@ -526,9 +553,12 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
       </div>
 
       <Tabs defaultValue="agenda">
-        <TabsList className="mb-4 grid grid-cols-3 w-full sm:w-auto sm:inline-flex">
+        <TabsList className="mb-4 grid grid-cols-4 w-full sm:w-auto sm:inline-flex">
           <TabsTrigger value="agenda" className="gap-2 text-xs sm:text-sm">
             <CalendarDays className="h-4 w-4" /> <span className="hidden sm:inline">Agenda</span><span className="sm:hidden">Agenda</span>
+          </TabsTrigger>
+          <TabsTrigger value="shifts" className="gap-2 text-xs sm:text-sm">
+            <Clock className="h-4 w-4" /> <span className="hidden sm:inline">Escala de Trabalho</span><span className="sm:hidden">Escalas</span>
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2 text-xs sm:text-sm">
             <Clock className="h-4 w-4" /> Histórico
@@ -719,6 +749,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
               appointments={dayAppointments}
               customers={customers}
               collaborators={collaborators}
+              activeSchedule={activeSchedule}
               statusConfig={STATUS_CONFIG}
               nextStatusMap={NEXT_STATUS}
               onOpenCreate={(timeSlot) => openCreateAppt(selectedDay, timeSlot)}
@@ -930,6 +961,16 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Tab: Escala de Trabalho & Horários ──────────────────────────── */}
+        <TabsContent value="shifts" className="space-y-4">
+          <ScheduleShiftManager
+            clientId={currentClient.id}
+            schedules={workSchedules}
+            collaborators={collaborators}
+            onSaveSchedule={handleSaveWorkSchedule}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* ── Modal Oficial de Agendamento com Conflitos e Cliente Inline ─────── */}
@@ -944,6 +985,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
         appointments={appointments}
         customers={customers}
         serviceTypes={serviceTypes}
+        schedules={workSchedules}
         onSuccess={loadAll}
         onCustomerCreated={(newCustomer) => {
           setCustomers(prev => [...prev.filter(c => c.id !== newCustomer.id), newCustomer]);
