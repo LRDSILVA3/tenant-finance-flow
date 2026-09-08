@@ -147,7 +147,6 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [isCollaboratorPickerOpen, setIsCollaboratorPickerOpen] = useState(false);
@@ -1239,10 +1238,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
               <div className="grid grid-cols-3 gap-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setPaymentMethod('pix');
-                    setIsPixModalOpen(true);
-                  }}
+                  onClick={() => setPaymentMethod('pix')}
                   className={cn(
                     'p-1.5 rounded-lg border text-center text-xs font-bold flex flex-col items-center gap-0.5 transition-all',
                     paymentMethod === 'pix'
@@ -1545,46 +1541,6 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                   Confirmar Venda
                 </>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* MODAL DE PIX RÁPIDO */}
-      <Dialog open={isPixModalOpen} onOpenChange={setIsPixModalOpen}>
-        <DialogContent className="max-w-sm text-center">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center justify-center gap-2 text-emerald-600">
-              <QrCode className="h-5 w-5" />
-              Pagamento via PIX
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Apresente o QR Code abaixo ao cliente no balcão:
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col items-center justify-center space-y-3 py-3">
-            <div className="p-3 bg-white rounded-xl shadow-md border border-slate-200">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  `PIX|VALOR:${grandTotal}|CLIENTE:${currentClient?.name || 'Previna'}`
-                )}`}
-                alt="QR Code PIX"
-                className="w-40 h-40"
-              />
-            </div>
-            <div className="text-center">
-              <span className="text-xs text-muted-foreground">Valor a Pagar:</span>
-              <p className="text-xl font-black text-emerald-600">{formatCurrency(grandTotal)}</p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              className="w-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => setIsPixModalOpen(false)}
-            >
-              Confirmar PIX e Continuar
             </Button>
           </DialogFooter>
         </DialogContent>
