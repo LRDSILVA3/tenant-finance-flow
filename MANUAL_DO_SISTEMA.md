@@ -1,182 +1,187 @@
 # 📘 Manual Completo e Guia do Usuário — Plataforma Previna (Tenant Finance Flow)
 
-Bem-vindo à documentação oficial e completa da plataforma **Previna**. Este guia foi elaborado para apresentar detalhadamente todas as funcionalidades, fluxos operacionais, regras de negócio e interfaces do sistema, acompanhado das telas e capturas reais de cada módulo.
+Bem-vindo à documentação oficial e completa da plataforma **Previna**. Este guia foi elaborado para apresentar detalhadamente todas as funcionalidades, fluxos operacionais, regras de negócio e interfaces do sistema, acompanhado das telas e capturas reais de cada módulo (com todas as 29 telas limpas capturadas diretamente da aplicação ao vivo).
+
+> 💡 **Dica de Visualização**: Você também pode abrir o arquivo compilado em PDF **[MANUAL_DO_SISTEMA.pdf](./MANUAL_DO_SISTEMA.pdf)** ou a versão web com fotos embutidas **[MANUAL_DO_SISTEMA.html](./MANUAL_DO_SISTEMA.html)** para folhear como um livro com todas as imagens integradas.
 
 ---
 
 ## 📑 Sumário
 
-1. [Visão Geral e Arquitetura da Plataforma](#1-visão-geral-e-arquitetura-da-plataforma)
+1. [Visão Geral e Landing Page Institucional](#1-visão-geral-e-landing-page-institucional)
 2. [Acesso, Autenticação e Segurança](#2-acesso-autenticação-e-segurança)
-3. [Dashboard Principal & Indicadores Executivos](#3-dashboard-principal--indicadores-executivos)
-4. [Módulo Financeiro (Lançamentos, Recebíveis e Pagáveis)](#4-módulo-financeiro)
-5. [Vendas, Atendimento & Frente de Caixa (PDV Touch)](#5-vendas-atendimento--frente-de-caixa-pdv-touch)
-6. [Ordens de Serviço e Pedidos de Venda](#6-ordens-de-serviço-e-pedidos-de-venda)
-7. [Cadastros & CRM (Clientes e Fornecedores)](#7-cadastros--crm-clientes-e-fornecedores)
-8. [Agenda de Serviços & Gestão de Escalas de Trabalho](#8-agenda-de-serviços--gestão-de-escalas-de-trabalho)
-9. [Estoque, Hub de Perecíveis & Validades](#9-estoque-hub-de-perecíveis--validades)
-10. [Relatórios Gerenciais, DRE e Kardex](#10-relatórios-gerenciais-dre-e-kardex)
-11. [Central de Notificações & Alertas](#11-central-de-notificações--alertas)
-12. [Configurações, Formas de Pagamento & Planos](#12-configurações-formas-de-pagamento--planos)
-13. [Experiência Mobile e Responsividade Touch](#13-experiência-mobile-e-responsividade-touch)
+3. [Dashboard Principal & Inteligência Financeira](#3-dashboard-principal--inteligência-financeira)
+4. [Lançamentos Financeiros (Extrato Geral)](#4-lançamentos-financeiros-extrato-geral)
+5. [Modal Unificado de Lançamentos (TransactionDialog)](#5-modal-unificado-de-lançamentos)
+6. [Gestão de Contas a Receber](#6-gestão-de-contas-a-receber)
+7. [Gestão de Contas a Pagar](#7-gestão-de-contas-a-pagar)
+8. [Modo Loja & Frente de Caixa Touch (PDV)](#8-modo-loja--frente-de-caixa-touch-pdv)
+9. [Pedidos de Venda](#9-pedidos-de-venda)
+10. [Ordens de Serviço (O.S.)](#10-ordens-de-serviço-os)
+11. [Gestão de Clientes (CRM)](#11-gestão-de-clientes-crm)
+12. [Gestão de Fornecedores](#12-gestão-de-fornecedores)
+13. [Agenda de Serviços & Grade Horária Diária](#13-agenda-de-serviços--grade-horária-diária)
+14. [Gestão de Escalas de Trabalho (Agenda)](#14-gestão-de-escalas-de-trabalho-agenda)
+15. [Estoque, Hub de Perecíveis & Validades](#15-estoque-hub-de-perecíveis--validades)
+16. [Relatórios Gerenciais (Suite Completa de 8 Relatórios)](#16-relatórios-gerenciais-suite-completa)
+    * 16.1 [DRE Simplificado](#161-dre-simplificado)
+    * 16.2 [Comissões de Atendentes](#162-comissões-de-atendentes)
+    * 16.3 [Distribuição de Despesas](#163-distribuição-de-despesas)
+    * 16.4 [Fluxo de Caixa Projetado](#164-fluxo-de-caixa-projetado)
+    * 16.5 [Ponto de Equilíbrio (Break-Even)](#165-ponto-de-equilíbrio-break-even)
+    * 16.6 [Contas Pagar / Receber (Provisões)](#166-contas-pagar--receber-provisões)
+    * 16.7 [Análise de Margens](#167-análise-de-margens)
+    * 16.8 [Estoque, Curva ABC e Kardex](#168-estoque-curva-abc-e-kardex)
+17. [Central de Notificações & Alertas](#17-central-de-notificações--alertas)
+18. [Configurações da Empresa & Formas de Pagamento](#18-configurações-da-empresa--formas-de-pagamento)
+19. [Faturamento, Planos & Quotas de NFS-e](#19-faturamento-planos--quotas-de-nfs-e)
+20. [Experiência Mobile & Responsividade Touch](#20-experiência-mobile--responsividade-touch)
 
 ---
 
-## 1. Visão Geral e Arquitetura da Plataforma
+## 1. Visão Geral e Landing Page Institucional
 
-O **Previna** é um ecossistema SaaS multi-tenant completo voltado para gestão financeira, comercial, estoque e agendamentos de prestadores de serviço e comércios.
+A porta de entrada da plataforma apresenta a proposta de valor, planos comerciais, depoimentos e canal de suporte para novos clientes.
 
-### Principais Pilares do Sistema:
-* **Multi-tenancy com Isolamento RLS**: Segurança em nível de linha (Row Level Security via Supabase), garantindo que os dados de cada empresa sejam totalmente blindados.
-* **Automação Financeira**: Integração nativa entre Vendas, Ordens de Serviço, Estoque e Fluxo de Caixa.
-* **PDV Touch Ultrarrápido**: Frente de caixa ágil com atalhos de teclado, suporte a leitor de código de barras USB e pareamento com câmera de celular.
-* **Agenda Inteligente**: Múltiplas visões com detecção em tempo real de choque de horários e gestão flexível de escalas de colaboradores com turnos/almoço.
-* **Gestão de Validades & Curva ABC**: Inventário completo com rastreamento Kardex e controle de perecíveis.
+![Landing Page Previna](./docs/prints/01_landing_page.png)
+
+* **Navegação Intuitiva**: Apresentação clara dos módulos da solução (Financeiro, PDV, Estoque, Vendas e Agenda).
+* **Conversão Direta**: Botões de chamada para ação direcionando para teste grátis ou autenticação.
+* **Tabela Comercial**: Detalhamento dos planos de assinatura e recursos incluídos.
 
 ---
 
 ## 2. Acesso, Autenticação e Segurança
 
-### 2.1 Landing Page Pública Institucional
-A porta de entrada da plataforma apresenta a proposta de valor, planos comerciais, depoimentos e canal de suporte.
-
-![Landing Page Previna](./docs/prints/01_landing_page.png)
-
-* **Navegação Intuitiva**: Apresentação clara dos recursos (Financeiro, PDV, Estoque, Agenda).
-* **Conversão Direta**: Botões de chamada para ação direcionando para teste grátis ou autenticação.
-
-### 2.2 Autenticação Segura (Login / Cadastro)
-Acesso centralizado com criptografia de ponta a ponta e proteção contra acessos não autorizados.
+Acesso centralizado com criptografia de ponta a ponta e proteção multi-tenant via Row Level Security (RLS).
 
 ![Tela de Autenticação](./docs/prints/02_login_auth.png)
 
-* **Login Rápido**: Acesso por e-mail e senha com validação em tempo real.
-* **Recuperação de Senha**: Fluxo simplificado de redefinição via e-mail corporativo.
+* **Login Seguro**: Acesso por e-mail e senha com validação em tempo real.
+* **Recuperação de Acesso**: Fluxo automatizado de redefinição de senha por e-mail.
 * **Criação de Conta**: Cadastro em 1 clique com direcionamento automático para o onboarding guiado.
 
 ---
 
-## 3. Dashboard Principal & Indicadores Executivos
+## 3. Dashboard Principal & Inteligência Financeira
 
-O painel central reúne a saúde financeira e operacional do negócio em um único lugar, permitindo tomadas de decisão imediatas baseadas em dados consolidados.
+O painel central reúne a saúde financeira e operacional do negócio em tempo real, permitindo decisões imediatas baseadas em dados consolidados.
 
 ![Dashboard Principal](./docs/prints/03_dashboard_principal.png)
 
-### Elementos da Tela:
-1. **Cards de Resumo (KPIs)**:
-   * **Faturamento Bruto**: Total de receitas consolidadas no período selecionado.
-   * **Despesas Totais**: Gastos operacionais, compras e custos fixos liquidados.
-   * **Saldo Líquido**: Lucro real obtido com indicador comparativo de evolução percentual.
-   * **Previsão de Recebíveis / Pagáveis**: Visão instantânea dos valores em aberto.
-2. **Gráfico de Fluxo de Caixa Mensal**:
-   * Comparativo em barras (Verde/Azul para Entradas, Vermelho para Saídas) evidenciando a sazonalidade e tendências do negócio.
-3. **Distribuição de Despesas por Categoria**:
-   * Gráfico de pizza interativo exibindo o peso de cada centro de custo (aluguel, fornecedores, folha, marketing).
-4. **Lançamentos Recentes & Atalhos**:
-   * Tabela resumida com as últimas transações e botões de atalho rápido no topo para lançar receitas ou despesas com um clique.
+* **Cards de Indicadores (KPIs)**: Faturamento Bruto, Despesas Totais, Saldo Líquido e Contas em Aberto.
+* **Gráfico de Fluxo de Caixa Mensal**: Comparativo em barras (Entradas vs Saídas) para análise de sazonalidade.
+* **Distribuição de Despesas por Categoria**: Gráfico de pizza interativo exibindo o peso de cada centro de custo.
+* **Lançamentos Recentes & Atalhos**: Tabela com as últimas transações e botões no topo para novo lançamento rápido.
 
 ---
 
-## 4. Módulo Financeiro
+## 4. Lançamentos Financeiros (Extrato Geral)
 
-O módulo financeiro do Previna gerencia todas as entradas, saídas, parcelamentos e baixas com total rastreabilidade.
-
-### 4.1 Lançamentos Financeiros (Extrato Geral)
-Visualização completa em tabela de todas as transações da empresa.
+Visualização completa em tabela de todas as movimentações financeiras da empresa.
 
 ![Lançamentos Financeiros](./docs/prints/04_lancamentos_financeiros.png)
 
-* **Filtros Dinâmicos**: Filtre por período, tipo (Receita/Despesa), status (Pago/Pendente), categorias com busca textual inteligente e formas de pagamento.
-* **Exportação Multiformato**: Geração de relatórios em PDF corporativo e planilhas Excel (.xlsx/.csv).
-* **Badges Visuais**: Identificação imediata se a conta está quitada, pendente ou vinculada a um Pedido de Venda.
+* **Filtros Dinâmicos**: Período, tipo (Receita/Despesa), status (Pago/Pendente), categorias com busca textual inteligente e formas de pagamento.
+* **Exportação Multiformato**: Download em PDF corporativo e planilhas editáveis Excel (.xlsx/.csv).
+* **Badges Visuais**: Identificação de liquidação e vínculo direto com pedidos de venda.
 
-### 4.2 Modal Unificado de Lançamento (`TransactionDialog`)
-Centralização de cadastro tanto para receitas quanto para despesas, eliminando duplicidade de formulários.
+---
+
+## 5. Modal Unificado de Lançamentos
+
+Centralização de cadastro tanto para receitas quanto para despesas (`TransactionDialog`), eliminando formulários duplicados.
 
 ![Modal de Novo Lançamento](./docs/prints/05_modal_novo_lancamento.png)
 
-* **Campos Obrigatórios Validados**: Descrição, Valor com máscara em Real (R$), Categoria, Data de Competência, Forma de Pagamento e Status.
-* **Vínculo com Pedidos de Venda**: Permite vincular uma receita a um pedido existente, preenchendo automaticamente cliente e valor.
-* **Separação de Status e Meio de Pagamento**: Permite registrar, por exemplo, que a forma escolhida foi "Boleto", mas o status permanece "Pendente" até a compensação.
+* **Validações Rígidas**: Descrição, Valor em Real (R$), Categoria, Data de Competência, Forma de Pagamento e Status.
+* **Vínculo com Pedidos de Venda**: Preenchimento automático de cliente e valor ao selecionar um pedido.
+* **Separação de Status e Meio**: Permite registrar a forma de pagamento (ex: Boleto) mantendo o status "Pendente" até a compensação.
 
-### 4.3 Contas a Receber
+---
+
+## 6. Gestão de Contas a Receber
+
 Controle rigoroso dos recebíveis com análise de inadimplência e projeção de entradas futuras.
 
 ![Contas a Receber](./docs/prints/06_contas_a_receber.png)
 
-* **Alternância de Visão**:
+* **Dupla Visualização**:
   * **Agrupada por Cliente**: Accordions colapsáveis exibindo o total devedor por cliente e a data do vencimento mais próximo.
   * **Tabela Plana**: Listagem individual direta com ordenação por urgência.
 * **Gráfico de Fluxo Futuro**: Projeção mês a mês dos valores a receber.
-* **Baixa Parcial com Desmembramento**: Se um cliente pagar apenas parte do débito, o sistema baixa o valor pago e gera automaticamente um novo lançamento com o saldo devedor restante.
+* **Baixa Parcial com Desmembramento**: Ao receber um pagamento parcial, o sistema baixa o valor recebido e gera automaticamente um novo lançamento com o saldo restante.
 
-### 4.4 Contas a Pagar
+---
+
+## 7. Gestão de Contas a Pagar
+
 Planejamento de desembolsos para fornecedores, impostos e despesas fixas.
 
 ![Contas a Pagar](./docs/prints/07_contas_a_pagar.png)
 
-* **Alertas de Vencimento**: Destaque visual em vermelho para contas em atraso e amarelo para contas vencendo no dia.
-* **Baixa Rápida de Duplicatas**: Quitação individual com possibilidade de registrar juros ou descontos negociados.
+* **Alertas Visuais**: Destaque em vermelho para contas atrasadas e amarelo para contas vencendo no dia.
+* **Baixa Rápida de Duplicatas**: Quitação individual com registro de descontos ou juros negociados.
+* **Gráfico de Previsão de Despesas**: Curva cronológica dos desembolsos futuros.
 
 ---
 
-## 5. Vendas, Atendimento & Frente de Caixa (PDV Touch)
+## 8. Modo Loja & Frente de Caixa Touch (PDV)
 
-O **Modo Loja** foi desenvolvido para atendimento balcão de alta velocidade, atendendo tanto comércios varejistas quanto empresas de serviços rápidos.
+Frente de caixa ágil projetada para atendimento balcão de alta velocidade em comércios e prestadores de serviços rápidos.
 
 ![Modo Loja PDV Touch](./docs/prints/08_modo_loja_pdv.png)
 
-### Funcionalidades do PDV:
-* **Catálogo Touchscreen**: Grid responsivo de produtos e serviços com fotos, valores e filtros rápidos em pílulas (Bebidas, Alimentos, Serviços, etc.).
-* **Cupom Digital de Atendimento**: Exibição lateral em tempo real dos itens inseridos, quantidades com botões `+` e `-`, subtotais, descontos e total destacado.
-* **Leitor de Código de Barras Híbrido**:
-  * Suporte nativo a leitores de código de barras físicos (USB/Bluetooth).
-  * Leitor com câmera embutida com mira laser visual e feedback sonoro/vibratório.
-  * Pareamento com celular remoto via QR Code em tempo real (Supabase Realtime).
-* **Teclas de Atalho**:
+* **Catálogo Touchscreen**: Grid responsivo com fotos, preços e pílulas de categorias (Bebidas, Alimentos, Serviços, etc.).
+* **Cupom Digital de Atendimento**: Exibição lateral em tempo real dos itens, quantidades com botões `+` e `-`, subtotais, descontos e total destacado.
+* **Leitor de Código de Barras Híbrido**: Suporte a leitor físico USB, câmera do computador ou celular pareado via Supabase Realtime QR Code.
+* **Teclas de Atalho de Alta Produtividade**:
   * `F2`: Finalizar Venda
   * `F4`: Abrir Leitor de Código de Barras
   * `F8`: Limpar Carrinho
   * `F10`: Alternar Modo Tela Cheia (Kiosk)
-* **Checkout Descomplicado**:
-  * Seleção de forma de pagamento: **Dinheiro** (com calculadora automática de troco), **Cartão de Crédito/Débito**, **PIX** e Formas Personalizadas.
-  * Modal de confirmação antes de concluir, exibindo resumo completo da venda para evitar finalizações por engano.
-  * Baixa imediata de estoque no Kardex e lançamento direto no Financeiro.
+* **Checkout Descomplicado**: Dinheiro (com calculadora de troco express), Cartões, PIX e Formas Personalizadas, com modal de confirmação antes de concluir para evitar erros.
 
 ---
 
-## 6. Ordens de Serviço e Pedidos de Venda
+## 9. Pedidos de Venda
 
-### 6.1 Pedidos de Venda
 Gestão comercial completa para vendas corporativas, orçamentos e encomendas.
 
 ![Pedidos de Venda](./docs/prints/09_pedidos_de_venda.png)
 
 * **Fluxo de Status**: Orçamento -> Aprovado -> Faturado -> Entregue -> Cancelado.
 * **Impressão Comercial**: Geração de Cupom Térmico (80mm) ou PDF Comercial formatado com dados da empresa, cliente, itens, totalizadores e assinaturas.
+* **Sincronização Total**: Baixa automática de estoque no Kardex e lançamento direto no Contas a Receber.
 
-### 6.2 Ordens de Serviço (O.S.)
+---
+
+## 10. Ordens de Serviço (O.S.)
+
 Especialmente desenvolvida para oficinas, assistências técnicas, consultorias e prestadores em geral.
 
 ![Ordens de Serviço](./docs/prints/10_ordens_de_servico.png)
 
 * **Composição Mista**: Lançamento conjunto de peças substituídas (com baixa automática de estoque) e serviços de mão de obra prestados.
-* **Controle de Equipamento e Diagnóstico**: Registro do item em reparo, defeito relatado, laudo técnico executado e garantia fornecida.
+* **Controle de Equipamento e Diagnóstico**: Registro do item em reparo, defeito relatado, laudo técnico executado e termo de garantia.
+* **Emissão de Laudo Técnico**: Impressão de comprovante em PDF e integração com faturamento.
 
 ---
 
-## 7. Cadastros & CRM (Clientes e Fornecedores)
+## 11. Gestão de Clientes (CRM)
 
-### 7.1 Gestão de Clientes (CRM)
 Base centralizada de clientes com histórico de relacionamento e inteligência comercial.
 
 ![Clientes](./docs/prints/11_clientes.png)
 
-* **Ficha Cadastral Completa**: Suporte a Pessoa Física (CPF) e Pessoa Jurídica (CNPJ), endereço, telefones e e-mail.
-* **Filtros Especiais**: Filtre clientes com débitos em aberto ou aniversariantes do mês para ações promocionais.
-* **Histórico Unificado**: Acesso direto a todas as compras, agendamentos e pendências financeiras daquele cliente.
+* **Ficha Cadastral Completa**: Pessoa Física (CPF) e Pessoa Jurídica (CNPJ), endereço, telefones e e-mail.
+* **Filtros Especiais**: Clientes com débitos em aberto ou aniversariantes do mês para ações promocionais.
+* **Histórico Unificado**: Acesso direto a todas as compras, agendamentos e pendências financeiras.
 
-### 7.2 Gestão de Fornecedores
+---
+
+## 12. Gestão de Fornecedores
+
 Controle de parceiros comerciais, distribuidores e prestadores terceirizados.
 
 ![Fornecedores](./docs/prints/12_fornecedores.png)
@@ -186,153 +191,174 @@ Controle de parceiros comerciais, distribuidores e prestadores terceirizados.
 
 ---
 
-## 8. Agenda de Serviços & Gestão de Escalas de Trabalho
+## 13. Agenda de Serviços & Grade Horária Diária
 
-O módulo de Agenda organiza o fluxo de atendimento da equipe, eliminando faltas e conflitos de horários.
-
-### 8.1 Grade Horária Diária (`ScheduleTimelineView`)
-Visualização em linha do tempo dinâmica com slots horários precisos.
+Linha do tempo dinâmica com slots horários precisos para atendimento ao cliente.
 
 ![Agenda de Serviços](./docs/prints/13_agenda_servicos.png)
 
 * **Slots Vagos Clicáveis**: Clique em qualquer horário livre para abrir o agendamento pré-preenchido.
 * **Detecção Ativa de Conflitos**: O sistema impede agendamentos sobrepostos para o mesmo profissional ou mesmo cliente.
 * **Status em Cores**: Identificação clara de agendamentos agendados, confirmados, em atendimento, concluídos ou faltas.
-* **Cadastro Rápido de Clientes**: Inclusão de novos clientes sem sair do formulário de agendamento.
+* **Cadastro Rápido Inline**: Inclusão de novos clientes sem sair do formulário de agendamento.
 
-### 8.2 Gestão de Escalas de Trabalho (`ScheduleShiftManager`)
-Controle dos dias de expediente e horários de trabalho dos colaboradores.
+---
+
+## 14. Gestão de Escalas de Trabalho (Agenda)
+
+Controle dos dias de expediente e jornadas de trabalho da equipe.
 
 ![Gestão de Escalas de Trabalho](./docs/prints/14_agenda_gestao_escalas.png)
 
 * **Múltiplos Turnos por Dia**: Suporte a jornadas fracionadas (ex: 08:00 às 12:00 e 14:00 às 18:00), criando automaticamente a pausa de almoço/intervalo.
-* **Escala Geral vs Individual**: Configure o horário padrão da empresa e especifique exceções para colaboradores que atuam em turnos alternativos.
+* **Escala Geral vs Individual**: Configure o horário padrão da empresa e especifique exceções por colaborador.
 * **Replicador de Dias Úteis**: Botão rápido para replicar os horários de Segunda a Sexta em um único clique.
-* **Reflexo Visual na Grade**: Os horários fora de expediente e intervalos de almoço são hachurados visualmente na grade da agenda.
+* **Reflexo Visual na Grade**: Horários fora de expediente e intervalos de almoço são hachurados visualmente na grade da agenda.
 
 ---
 
-## 9. Estoque, Hub de Perecíveis & Validades
+## 15. Estoque, Hub de Perecíveis & Validades
 
 Controle minucioso de cada item comercializado pela empresa, assegurando que nenhum produto seja perdido por vencimento ou ruptura de estoque.
 
 ![Estoque e Inventário](./docs/prints/15_estoque_inventario.png)
 
-### Principais Destaques do Estoque:
-1. **Hub Interativo de Perecíveis (No Topo da Tela)**:
-   * Painel de risco financeiro exibindo a quantidade de itens próximos do vencimento e o **capital total em risco**.
-   * Badges dinâmicos com contagem regressiva de dias restantes (ex: "Vence em 3 dias", "Vencido").
-   * Botão de **Baixa Rápida por Descarte/Vencimento**, atualizando o saldo imediatamente e gravando o motivo no histórico.
-2. **Cadastro Completo de Mercadoria**:
-   * Preço de custo, margem de lucro e preço de venda sugerido.
-   * Definição de **Estoque Mínimo** para disparo de alertas preventivos de reposição.
-   * Associação com código de barras (EAN-13, etc.) para leitura instantânea no PDV.
+* **Hub Interativo de Perecíveis (No Topo da Tela)**:
+  * Painel de risco financeiro exibindo a quantidade de itens próximos do vencimento e o **capital total em risco**.
+  * Badges dinâmicos com contagem regressiva de validade (ex: "Vence em 3 dias", "Vencido").
+  * Botão de **Baixa Rápida por Descarte/Vencimento**, atualizando o saldo imediatamente e gravando a justificativa no Kardex.
+* **Cadastro Completo de Mercadoria**: Preço de custo, margem de lucro, preço de venda e estoque mínimo com alertas preventivos.
 
 ---
 
-## 10. Relatórios Gerenciais, DRE e Kardex
+## 16. Relatórios Gerenciais (Suite Completa)
 
-Tomada de decisão estratégica através de relatórios e indicadores matemáticos transparentes.
+O Previna conta com uma suíte analítica com **8 relatórios especializados**, cobrindo todas as dimensões do negócio:
 
-### 10.1 Demonstração do Resultado do Exercício (DRE Simplificado)
-Relatório contábil gerencial estruturado para evidenciar se a operação gerou lucro ou prejuízo.
+### 16.1 DRE Simplificado
+Demonstração contábil do resultado do exercício para apuração de lucro líquido real e margem de contribuição.
 
 ![Relatório DRE Simplificado](./docs/prints/16_relatorios_dre.png)
 
-* **Estrutura Contábil Padrão**:
-  * (+) Receita Operacional Bruta
-  * (-) Deduções e Devoluções
-  * (=) Receita Líquida
-  * (-) Custos das Mercadorias/Serviços Vendidos (CMV/CPV)
-  * (=) Margem de Contribuição / Lucro Bruto
-  * (-) Despesas Operacionais e Administrativas
-  * (=) Resultado Líquido do Exercício
-* **Agrupamento por Subcategorias**: Expansão hierárquica detalhada para identificar em quais contas específicas o dinheiro foi investido.
-* **Exportação Completa**: Download em PDF corporativo e planilha editável.
+* Estrutura formal: Receita Bruta, Deduções, Receita Líquida, CMV/CPV, Lucro Bruto e Despesas Operacionais.
+* Abertura em subcategorias detalhadas para identificação precisa de custos e exportação em PDF/Excel.
 
-### 10.2 Relatório Avançado de Estoque & Kardex
-Inteligência logística para evitar compras em excesso ou falta de mercadoria.
+### 16.2 Comissões de Atendentes
+Apuração automática de comissões por colaborador sobre serviços prestados e produtos vendidos.
 
-![Relatório de Estoque e Kardex](./docs/prints/17_relatorios_inventario_kardex.png)
+![Relatório de Comissões](./docs/prints/17_relatorios_comissoes.png)
 
-* **Curva ABC (Gráfico de Pareto)**: Classificação dos produtos mais importantes (Classe A = 80% do faturamento) para foco estratégico.
-* **Giro de Estoque & Cobertura**: Cálculo do consumo médio diário e previsão de quantos dias o estoque atual irá durar.
-* **Sugestão Automatizada de Compras**: O sistema calcula automaticamente quantos itens precisam ser repostos para atingir o estoque de segurança com custo total previsto.
-* **Extrato Cronológico Kardex**: Rastreabilidade auditora de todas as entradas, saídas, vendas e descartes produto a produto.
+* Total faturado versus total de comissão devida no período selecionado.
+* Transparência total para fechamento de folha de pagamento e metas.
 
-### 10.3 Distribuição Financeira & Análise de Margens
-Gráficos de dispersão e análise percentual das receitas e custos por departamento e método de liquidação.
+### 16.3 Distribuição de Despesas
+Análise gráfica da dispersão de receitas e custos por centro de custos e categorias financeiras.
 
-![Distribuição Financeira](./docs/prints/18_relatorios_distribuicao.png)
+![Distribuição de Despesas](./docs/prints/18_relatorios_distribuicao.png)
+
+* Gráficos comparativos de pizza e dispersão para identificação dos maiores centros de consumo de caixa.
+
+### 16.4 Fluxo de Caixa Projetado
+Projeção preditiva do saldo bancário baseada nos recebíveis e pagáveis futuros.
+
+![Fluxo de Caixa Projetado](./docs/prints/19_relatorios_fluxo_projetado.png)
+
+* Simulação para horizontes de 30, 60 e 90 dias, prevenindo descasamento de liquidez.
+
+### 16.5 Ponto de Equilíbrio (Break-Even)
+Cálculo econômico da receita mínima necessária para cobrir todos os custos fixos operacionais.
+
+![Ponto de Equilíbrio](./docs/prints/20_relatorios_ponto_equilibrio.png)
+
+* Aponta o dia exato do mês em que a empresa ultrapassa os custos e passa a operar no lucro líquido.
+
+### 16.6 Contas Pagar / Receber (Provisões)
+Cruzamento comparativo de provisões financeiras com agrupamento diário ou mensal dinâmico.
+
+![Contas Pagar e Receber Provisões](./docs/prints/21_relatorios_contas_pagar_receber.png)
+
+* Gráfico de barras comparativas entre entradas e saídas previstas para o período.
+
+### 16.7 Análise de Margens
+Diagnóstico de rentabilidade e markup produto a produto e serviço a serviço.
+
+![Análise de Margens](./docs/prints/22_relatorios_analise_margem.png)
+
+* Identificação dos itens de maior contribuição marginal e produtos que operam abaixo da margem ideal.
+
+### 16.8 Estoque, Curva ABC e Kardex
+Suite analítica avançada de inventário com 5 visões em um único relatório.
+
+![Relatório de Estoque e Kardex](./docs/prints/23_relatorios_inventario_kardex.png)
+
+* **Curva ABC (Gráfico de Pareto)**: Identificação dos 20% dos produtos que representam 80% do faturamento.
+* **Giro de Estoque e Dias de Cobertura**: Cálculo do consumo médio diário para prever a duração do estoque.
+* **Sugestão Automatizada de Compras**: Quantidade ideal a comprar e custo estimado de reposição.
+* **Extrato Auditor Kardex**: Histórico cronológico completo de entradas, saídas, vendas e perdas.
 
 ---
 
-## 11. Central de Notificações & Alertas
+## 17. Central de Notificações & Alertas
 
 A plataforma monitora ativamente as operações e antecipa problemas através de um centro de alertas inteligente.
 
-![Central de Notificações](./docs/prints/19_central_notificacoes.png)
+![Central de Notificações](./docs/prints/24_central_notificacoes.png)
 
-* **Sino com Contador em Tempo Real**: Exibição permanente no cabeçalho com a contagem de avisos não lidos.
-* **Tipos de Alerta**:
-  * Contas a pagar vencendo hoje ou atrasadas.
-  * Cobranças a receber em aberto.
-  * Produtos atingindo o limite de estoque mínimo.
-  * Mercadorias com validade crítica ou expirada.
-* **Histórico de Notificações**: Opção de marcar como lidas individualmente ou limpar todas de uma só vez.
+* **Sino com Contador em Tempo Real**: Exibição permanente no cabeçalho.
+* **Tipos de Alerta**: Contas a pagar/receber vencendo hoje ou atrasadas, ruptura de estoque e validades críticas.
 
 ---
 
-## 12. Configurações, Formas de Pagamento & Planos
+## 18. Configurações da Empresa & Formas de Pagamento
 
-Personalização e governança do sistema.
+### 18.1 Dados da Empresa & Perfil
+Configuração cadastral dos dados da empresa, logotipo oficial e parâmetros operacionais do tenant.
 
-### 12.1 Dados da Empresa & Perfil
-Configuração cadastral dos dados da empresa, logotipo e parâmetros do tenant.
+![Configurações da Empresa](./docs/prints/25_configuracoes_empresa.png)
 
-![Configurações da Empresa](./docs/prints/20_configuracoes_empresa.png)
-
-### 12.2 Formas de Pagamento Personalizadas
+### 18.2 Formas de Pagamento Personalizadas
 Criação e manutenção de métodos de recebimento personalizados além dos padrões de mercado.
 
-![Formas de Pagamento Personalizadas](./docs/prints/21_configuracoes_formas_pagamento.png)
+![Formas de Pagamento Personalizadas](./docs/prints/26_configuracoes_formas_pagamento.png)
 
-* **Cadastro Livre**: Adicione formas como "Crediário Próprio", "Boleto 30 Dias", "Vale Alimentação", "Transferência Bancária", etc.
-* **Reflexo Imediato**: As opções criadas aparecem instantaneamente nos formulários de transação, filtros e frente de caixa.
+* **Cadastro Livre**: Adicione formas como "Crediário Próprio", "Boleto 30 Dias", "Vale Alimentação", etc.
+* **Reflexo Imediato**: Disponibilidade automática no PDV Touch, Pedidos e Lançamentos Financeiros.
 
-### 12.3 Faturamento, Assinatura & Quotas de NFS-e
+---
+
+## 19. Faturamento, Planos & Quotas de NFS-e
+
 Gestão da assinatura SaaS da empresa na plataforma Previna.
 
-![Painel de Faturamento e Assinatura](./docs/prints/22_configuracoes_assinatura.png)
+![Painel de Faturamento e Assinatura](./docs/prints/27_configuracoes_assinatura.png)
 
-* **Status da Conta e Período de Cobrança**: Detalhes do plano ativo, data de renovação e valor da mensalidade.
-* **Quotas de Emissão de Notas Fiscais (NFS-e Asaas)**: Barra de progresso visual exibindo as notas emitidas no ciclo versus a franquia contratada.
-* **Troca de Plano e Liquidação**: Pagamento seguro via Cartão de Crédito com tokenização PCI ou PIX Dinâmico.
+* **Status da Conta e Renovação**: Plano ativo, data de renovação e valor da mensalidade com pagamento via Cartão ou PIX.
+* **Quotas de Emissão de Notas Fiscais (NFS-e Asaas)**: Barra de progresso visual exibindo as notas emitidas versus a franquia contratada.
 
 ---
 
-## 13. Experiência Mobile e Responsividade Touch
+## 20. Experiência Mobile & Responsividade Touch
 
-A plataforma foi projetada desde a sua base para oferecer a mesma produtividade e poder de gestão na tela de um smartphone.
+Projetada desde a base para oferecer a mesma velocidade e poder de gestão na tela de um smartphone.
 
-### 13.1 Frente de Caixa & PDV Touch no Celular
+### 20.1 Frente de Caixa & PDV Touch no Celular
 Interface compacta otimizada para toque com botões amplos e cupom flutuante.
 
-![PDV Mobile Responsivo](./docs/prints/23_mobile_pdv_responsivo.png)
+![PDV Mobile Responsivo](./docs/prints/28_mobile_pdv_responsivo.png)
 
-* **Cupom Flutuante de Checkout**: O operador de caixa pode navegar pelo catálogo em tela cheia e expandir a gaveta do carrinho apenas no momento do fechamento.
-* **Botão Flutuante de Suporte Elevado**: O widget de suporte e atendimento fica elevado estrategicamente para nunca cobrir os menus de navegação do celular.
+* **Cupom Flutuante de Checkout**: O operador navega pelo catálogo em tela cheia e expande o carrinho na hora do pagamento.
+* **Botão de Suporte Elevado**: O widget flutuante de atendimento fica elevado estrategicamente para não cobrir a barra de navegação do celular.
 
-### 13.2 Barra Inferior Fixa & Gaveta Geral de Módulos (Menu Sheet)
+### 20.2 Barra Inferior Fixa & Gaveta Geral de Módulos (Menu Sheet)
 Navegação ergonômica com uma única mão.
 
-![Menu de Navegação Mobile](./docs/prints/24_mobile_menu_navegacao.png)
+![Menu de Navegação Mobile](./docs/prints/29_mobile_menu_navegacao.png)
 
-* **Navegação Rápida**: Acesso imediato aos módulos mais usados (Início, Finanças, PDV e Vendas).
-* **Gaveta de Módulos (Sheet)**: Ao tocar em "Menu", uma gaveta fluida se abre com todos os grupos do sistema organizados por categoria (Financeiro, Vendas, Cadastros e Análise).
+* **Navegação Rápida**: Acesso instantâneo a Início, Finanças, PDV e Vendas.
+* **Gaveta de Módulos (Sheet)**: Acesso rápido a todos os grupos (Financeiro, Vendas, Cadastros e Análise).
 
 ---
 
-## 📌 Considerações Finais & Suporte
+## 📌 Conclusão
 
-A plataforma **Previna** entrega um fluxo financeiro e operacional transparente, moderno e à prova de falhas. Qualquer dúvida, sugestão ou necessidade de suporte técnico pode ser acionada diretamente pelo ícone de atendimento no canto inferior direito da tela.
+A plataforma **Previna** oferece uma solução integrada, robusta e intuitiva para o gerenciamento de empresas de qualquer porte. Todos os arquivos de documentação, PDF e capturas de tela estão disponíveis no repositório.

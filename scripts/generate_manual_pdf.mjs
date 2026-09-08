@@ -12,7 +12,6 @@ console.log('Using browser at:', executablePath);
 
 const printsDir = path.resolve('docs/prints');
 
-// Helper to convert image to base64 so HTML and PDF are 100% self-contained
 function getImageBase64(filename) {
   const filePath = path.join(printsDir, filename);
   if (!fs.existsSync(filePath)) {
@@ -188,9 +187,64 @@ const sections = [
     ]
   },
   {
-    title: "17. Relatório de Estoque & Kardex",
+    title: "17. Relatório de Comissões de Atendentes",
+    desc: "Cálculo automatizado de bonificações e comissões por colaborador sobre serviços e vendas.",
+    image: "17_relatorios_comissoes.png",
+    points: [
+      "Percentuais configuráveis individualmente por tipo de atendimento ou produto.",
+      "Apuração transparente por período de competência para fechamento de folha.",
+      "Resumo por profissional com total faturado versus total de comissão gerada."
+    ]
+  },
+  {
+    title: "18. Relatório de Distribuição de Despesas",
+    desc: "Análise gráfica da repartição de despesas e receitas por centro de custos e categorias.",
+    image: "18_relatorios_distribuicao.png",
+    points: [
+      "Visualização em gráficos de dispersão, pizza e composição percentual.",
+      "Identificação dos maiores pontos de consumo de capital da organização."
+    ]
+  },
+  {
+    title: "19. Relatório de Fluxo de Caixa Projetado",
+    desc: "Projeção matemática futura do saldo bancário baseada em contas a pagar e receber previstas.",
+    image: "19_relatorios_fluxo_projetado.png",
+    points: [
+      "Simulação de liquidez para horizontes de 30, 60 e 90 dias.",
+      "Curva de saldo acumulado prevenindo surpresas de descasamento financeiro."
+    ]
+  },
+  {
+    title: "20. Relatório de Ponto de Equilíbrio (Break-Even)",
+    desc: "Indicador econômico que aponta o volume exato de faturamento necessário para cobrir todos os custos fixos.",
+    image: "20_relatorios_ponto_equilibrio.png",
+    points: [
+      "Cálculo automático baseado na margem de contribuição média e despesas fixas mensais.",
+      "Termômetro de metas indicando em qual dia do mês a empresa atinge o ponto de equilíbrio."
+    ]
+  },
+  {
+    title: "21. Relatório de Contas Pagar / Receber (Provisões)",
+    desc: "Cruzamento analítico e comparativo entre receitas previstas e compromissos a liquidar.",
+    image: "21_relatorios_contas_pagar_receber.png",
+    points: [
+      "Gráfico dinâmico comparativo diário ou mensal conforme o período selecionado.",
+      "Visão detalhada do fluxo líquido previsto para o período."
+    ]
+  },
+  {
+    title: "22. Relatório de Análise de Margens",
+    desc: "Diagnóstico da rentabilidade de cada produto e serviço comercializado pela empresa.",
+    image: "22_relatorios_analise_margem.png",
+    points: [
+      "Markup praticado versus margem de contribuição percentual real.",
+      "Identificação de produtos líderes de margem e itens com rentabilidade reduzida."
+    ]
+  },
+  {
+    title: "23. Relatório de Estoque & Inventário (Kardex / Curva ABC)",
     desc: "Análise analítica de inventário, giro de mercadoria e histórico cronológico.",
-    image: "17_relatorios_inventario_kardex.png",
+    image: "23_relatorios_inventario_kardex.png",
     points: [
       "Curva ABC com Gráfico de Pareto de dupla escala (identificação dos 20% que geram 80% do faturamento).",
       "Giro de estoque com cálculo de consumo médio diário e dias de cobertura restante.",
@@ -199,18 +253,9 @@ const sections = [
     ]
   },
   {
-    title: "18. Relatório de Distribuição Financeira",
-    desc: "Análise gráfica da repartição de despesas e receitas por centro de custos.",
-    image: "18_relatorios_distribuicao.png",
-    points: [
-      "Visualização em gráficos de dispersão e composição percentual.",
-      "Identificação dos maiores pontos de consumo de capital da organização."
-    ]
-  },
-  {
-    title: "19. Central de Notificações & Alertas",
+    title: "24. Central de Notificações & Alertas",
     desc: "Monitoramento contínuo das rotinas críticas do estabelecimento em um hub dedicado.",
-    image: "19_central_notificacoes.png",
+    image: "24_central_notificacoes.png",
     points: [
       "Avisos automáticos de contas a pagar/receber vencendo hoje ou já vencidas.",
       "Alertas de ruptura de estoque e produtos em faixa crítica de validade.",
@@ -218,36 +263,36 @@ const sections = [
     ]
   },
   {
-    title: "20. Configurações da Empresa",
+    title: "25. Configurações da Empresa",
     desc: "Parametrização cadastral do tenant, informações fiscais e personalização da marca.",
-    image: "20_configuracoes_empresa.png",
+    image: "25_configuracoes_empresa.png",
     points: [
       "Cadastro de Razão Social, Nome Fantasia, CNPJ e contatos oficiais.",
       "Upload de logotipo institucional aplicado aos relatórios e cupons fiscais."
     ]
   },
   {
-    title: "21. Formas de Pagamento Personalizadas",
+    title: "26. Formas de Pagamento Personalizadas",
     desc: "Flexibilidade total para cadastrar meios de recebimento adaptados à realidade do comércio.",
-    image: "21_configuracoes_formas_pagamento.png",
+    image: "26_configuracoes_formas_pagamento.png",
     points: [
       "Criação livre de métodos como 'Crediário Loja', 'Boleto 30 Dias', 'Vales', etc.",
       "Disponibilidade instantânea no PDV Touch, Pedidos e Lançamentos Financeiros."
     ]
   },
   {
-    title: "22. Faturamento, Planos & Quotas de NFS-e",
+    title: "27. Faturamento, Planos & Quotas de NFS-e",
     desc: "Gestão da assinatura SaaS da empresa na plataforma e consumo de emissão de notas fiscais.",
-    image: "22_configuracoes_assinatura.png",
+    image: "27_configuracoes_assinatura.png",
     points: [
       "Controle do plano ativo, renovação automática e pagamento via Cartão ou PIX Dinâmico.",
       "Barra de progresso de notas fiscais emitidas no ciclo versus franquia contratada (Asaas NFS-e)."
     ]
   },
   {
-    title: "23. PDV Touch no Celular (Mobile Responsivo)",
+    title: "28. PDV Touch no Celular (Mobile Responsivo)",
     desc: "Operação completa de frente de caixa otimizada para a tela de smartphones.",
-    image: "23_mobile_pdv_responsivo.png",
+    image: "28_mobile_pdv_responsivo.png",
     points: [
       "Cupom flutuante retrátil que não obstrui o catálogo de produtos no celular.",
       "Botão flutuante de suporte técnico estrategicamente elevado para não cobrir a barra de navegação.",
@@ -255,9 +300,9 @@ const sections = [
     ]
   },
   {
-    title: "24. Navegação Mobile com Menu Sheet",
+    title: "29. Navegação Mobile com Menu Sheet",
     desc: "Ergonomia projetada para controle confortável do sistema com uma única mão.",
-    image: "24_mobile_menu_navegacao.png",
+    image: "29_mobile_menu_navegacao.png",
     points: [
       "Barra inferior fixa com os atalhos essenciais do dia a dia (Início, Finanças, PDV e Vendas).",
       "Menu gaveta (Sheet) expansível agrupando todos os módulos do sistema de forma limpa."
@@ -275,7 +320,7 @@ const htmlContent = `<!DOCTYPE html>
 
     @page {
       size: A4;
-      margin: 15mm 15mm 15mm 15mm;
+      margin: 12mm 12mm 12mm 12mm;
     }
 
     * {
@@ -288,8 +333,8 @@ const htmlContent = `<!DOCTYPE html>
       font-family: 'Inter', sans-serif;
       color: #1e293b;
       background-color: #ffffff;
-      line-height: 1.5;
-      font-size: 13px;
+      line-height: 1.4;
+      font-size: 12px;
     }
 
     .cover {
@@ -321,7 +366,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .cover h1 {
-      font-size: 38px;
+      font-size: 40px;
       font-weight: 800;
       margin-bottom: 12px;
       line-height: 1.2;
@@ -348,7 +393,7 @@ const htmlContent = `<!DOCTYPE html>
     .section-page {
       page-break-inside: avoid;
       page-break-after: always;
-      padding-top: 10px;
+      padding-top: 6px;
     }
 
     .header-bar {
@@ -356,30 +401,30 @@ const htmlContent = `<!DOCTYPE html>
       justify-content: space-between;
       align-items: center;
       border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 8px;
-      margin-bottom: 16px;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
     }
 
     .header-title {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       color: #0f172a;
     }
 
     .header-tag {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: #2563eb;
       background-color: #eff6ff;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 6px;
     }
 
     .description {
-      font-size: 13px;
+      font-size: 12px;
       color: #475569;
-      margin-bottom: 14px;
-      line-height: 1.6;
+      margin-bottom: 10px;
+      line-height: 1.5;
     }
 
     .image-container {
@@ -387,8 +432,8 @@ const htmlContent = `<!DOCTYPE html>
       border-radius: 8px;
       overflow: hidden;
       border: 1px solid #cbd5e1;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      margin-bottom: 14px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+      margin-bottom: 10px;
       background: #f8fafc;
     }
 
@@ -402,16 +447,16 @@ const htmlContent = `<!DOCTYPE html>
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 12px 16px;
+      padding: 10px 14px;
     }
 
     .features-card h4 {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #334155;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .features-card ul {
@@ -420,10 +465,10 @@ const htmlContent = `<!DOCTYPE html>
 
     .features-card li {
       position: relative;
-      padding-left: 18px;
-      font-size: 12px;
+      padding-left: 16px;
+      font-size: 11px;
       color: #475569;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       line-height: 1.4;
     }
 
@@ -436,8 +481,8 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .footer {
-      margin-top: 10px;
-      font-size: 10px;
+      margin-top: 8px;
+      font-size: 9px;
       color: #94a3b8;
       display: flex;
       justify-content: space-between;
@@ -452,8 +497,8 @@ const htmlContent = `<!DOCTYPE html>
     <h1>Previna SaaS</h1>
     <p class="subtitle">Manual Visual Completo de Operação, Telas e Funcionalidades do Sistema</p>
     <div class="cover-meta">
-      <p>Ecossistema de Gestão Financeira, Comercial, Estoque e Agendamento</p>
-      <p style="margin-top: 4px;">Atualizado em 2026 • 24 Telas Documentadas com Capturas Reais</p>
+      <p>Ecossistema de Gestão Financeira, Frente de Caixa PDV, Estoque, Vendas e Relatórios</p>
+      <p style="margin-top: 4px;">Atualizado em 2026 • 29 Telas Documentadas com Capturas Reais de Alta Resolução</p>
     </div>
   </div>
 
@@ -516,10 +561,10 @@ async function main() {
     format: 'A4',
     printBackground: true,
     margin: {
-      top: '10mm',
-      bottom: '10mm',
-      left: '10mm',
-      right: '10mm'
+      top: '8mm',
+      bottom: '8mm',
+      left: '8mm',
+      right: '8mm'
     }
   });
 

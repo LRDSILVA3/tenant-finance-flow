@@ -43,6 +43,13 @@ const Index: React.FC = () => {
   const [isTourOpen, setIsTourOpen] = useState(false);
 
   useEffect(() => {
+    (window as any).__setView = (view: View, reportTab?: string) => {
+      setCurrentView(view);
+      if (reportTab) setActiveReportTab(reportTab);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && !loadingClients) {
       if (!isAuthenticated) {
         navigate('/auth', { replace: true });
