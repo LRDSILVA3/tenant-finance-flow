@@ -1,6 +1,7 @@
 # Project Task Board
 
 ## ✅ Done
+- [x] **Melhoria Estrutural da Agenda de Serviços**: Modularização completa com novo diálogo oficial `AppointmentDialog`, detecção e alerta em tempo real de choque/conflito de horários de colaboradores e clientes (com suporte a encaixes), integração inline com `CustomerDialog` para cadastro rápido de clientes no agendamento, e adição de múltiplos modos de visualização dinâmica: Grade Horária Diária (`ScheduleTimelineView` com slots vagos clicáveis), Visão Semanal (`ScheduleWeekView` com navegação Seg-Dom e faturamento estimado por dia) e Visão por Colaboradores (`ScheduleCollaboratorsView` com colunas lado a lado por profissional). Testes automatizados cobrindo todos os fluxos.
 - [x] Corrigir cálculo de expiração da assinatura (7 meses para 1 mês) e restaurar acesso durante trial de Pix (status pending) no frontend e Edge Function.
 - [x] Create public Landing Page for ad conversion and routing adjustments (Refactored to premium version with Pricing, Testimonials, and FAQ).
 - [x] Update platform branding to use "Previna" name and logo.
