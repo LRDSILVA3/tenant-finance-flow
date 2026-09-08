@@ -54,6 +54,7 @@ import {
   Layers,
   Store,
   Volume2,
+  ArrowRight,
 } from 'lucide-react';
 
 // Web Audio API para Bipe Sonoro
@@ -654,13 +655,13 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         </div>
 
         {/* Botões de Ação Rápida */}
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
           {onBackToOrders && (
             <Button
               variant="outline"
               size="sm"
               onClick={onBackToOrders}
-              className="text-xs h-7 gap-1 text-muted-foreground"
+              className="text-xs h-7 gap-1 text-muted-foreground flex-1 sm:flex-initial"
             >
               Voltar aos Pedidos
             </Button>
@@ -670,20 +671,20 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             variant="outline"
             size="sm"
             onClick={toggleFullscreen}
-            className="text-xs h-7 gap-1 text-primary border-primary/30"
+            className="text-xs h-7 gap-1 text-primary border-primary/30 flex-1 sm:flex-initial"
           >
             {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-            {isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia (Kiosk)'}
+            {isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia'}
           </Button>
         </div>
       </div>
 
       {/* Grid Principal: Esquerda (Catálogo Touch) vs Direita (Cupom de Venda) */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0">
         {/* ==================================================================== */}
         {/* LADO ESQUERDO: CATÁLOGO TOUCH COM BOTÕES GRANDES (7 Colunas) */}
         {/* ==================================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0 h-full space-y-2">
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0 h-auto lg:h-full space-y-2">
           {/* Barra de Pesquisa e Filtros Rápidos */}
           <div className="shrink-0 bg-card border rounded-xl p-2.5 space-y-2 shadow-xs">
             <div className="flex flex-col sm:flex-row gap-2">
@@ -907,7 +908,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         {/* ==================================================================== */}
         {/* LADO DIREITO: CUPOM / COMANDA DE ATENDIMENTO (5 Colunas) */}
         {/* ==================================================================== */}
-        <div className="lg:col-span-5 xl:col-span-4 bg-card border rounded-xl shadow-md p-3 flex flex-col min-h-0 h-full">
+        <div id="store-pos-cupom" className="lg:col-span-5 xl:col-span-4 bg-card border rounded-xl shadow-md p-3 flex flex-col min-h-0 h-auto lg:h-full">
           {/* Topo: Identificação e Cabeçalho */}
           <div className="shrink-0 space-y-1.5 pb-2 border-b">
             {/* Cabeçalho do Cupom */}
@@ -1226,6 +1227,35 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           </div>
         </div>
       </div>
+
+      {/* Mobile Floating Cupom / Checkout Button */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-16 sm:bottom-20 left-3 right-3 z-30 lg:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById('store-pos-cupom')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-xl flex items-center justify-between border border-emerald-400/30 active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-white/20 rounded-lg">
+                <ShoppingCart className="h-4 w-4 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-bold leading-tight">
+                  {cart.length} {cart.length === 1 ? 'item no cupom' : 'itens no cupom'}
+                </p>
+                <p className="text-[10px] text-white/80 leading-tight">Toque para pagar / finalizar</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-extrabold font-mono">{formatCurrency(grandTotal)}</span>
+              <ArrowRight className="h-4 w-4" />
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* MODAL DE CONFIRMAÇÃO DE VENDA */}
       <Dialog open={isConfirmModalOpen} onOpenChange={setIsConfirmModalOpen}>

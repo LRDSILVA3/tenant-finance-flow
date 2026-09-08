@@ -897,59 +897,57 @@ export const Payables: React.FC = () => {
 
                   {isExpanded && (
                     <div className="border-t bg-muted/10 p-4 space-y-3">
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse text-left text-sm">
-                          <thead>
-                            <tr className="border-b text-muted-foreground font-medium text-xs">
-                              <th className="py-2 px-1">Descrição</th>
-                              <th className="py-2 px-1">Categoria</th>
-                              <th className="py-2 px-1">Vencimento</th>
-                              <th className="py-2 px-1">Forma</th>
-                              <th className="py-2 px-1">Referência</th>
-                              <th className="py-2 px-1 text-right">Valor</th>
-                              <th className="py-2 px-1 text-right">Ação</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {group.transactions.map((tx) => {
-                              const cat = getCategoryById(tx.categoryId);
-                              return (
-                                <tr key={tx.id} className="hover:bg-muted/20">
-                                  <td className="py-2 px-1 font-medium">{tx.description}</td>
-                                  <td className="py-2 px-1 text-muted-foreground">{cat?.name || '—'}</td>
-                                  <td className="py-2 px-1 font-medium text-muted-foreground">
-                                    {formatDate(tx.date)}
-                                  </td>
-                                  <td className="py-2 px-1">
-                                    {tx.paymentMethod ? (
-                                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <div className="space-y-3">
+                        {group.transactions.map((tx) => {
+                          const cat = getCategoryById(tx.categoryId);
+                          return (
+                            <div
+                              key={tx.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-card gap-3 hover:bg-muted/20 transition-colors"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold text-sm text-foreground">{tx.description}</span>
+                                  {tx.reference && (
+                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                                      Ref: {tx.reference}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Vencimento: <strong className="text-foreground">{formatDate(tx.date)}</strong>
+                                  </span>
+                                  <span>•</span>
+                                  <span>Cat: {cat?.name || '—'}</span>
+                                  {tx.paymentMethod && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-1">
                                         {getPaymentMethodIcon(tx.paymentMethod)}
                                         {getPaymentMethodLabel(tx.paymentMethod, t)}
                                       </span>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-1 text-muted-foreground font-mono text-xs">{tx.reference || '—'}</td>
-                                  <td className="py-2 px-1 text-right font-bold text-rose-600 money-font">
-                                    {formatCurrency(tx.amount)}
-                                  </td>
-                                  <td className="py-2 px-1 text-right">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleOpenPaymentDialog(tx)}
-                                      className="h-8 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                    >
-                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                      Dar Baixa
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
+                                <span className="font-bold text-rose-600 money-font text-sm">{formatCurrency(tx.amount)}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenPaymentDialog(tx)}
+                                  className="h-8 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Dar Baixa
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -968,86 +966,149 @@ export const Payables: React.FC = () => {
                 <p className="font-medium">Nenhum lançamento encontrado com os filtros selecionados.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="w-[140px]">Vencimento</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Fornecedor</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Forma Pagamento</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead className="text-right w-[120px]">Ação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {flatPayables.map((tx) => {
-                      const sup = tx.supplierId ? getSupplierById(tx.supplierId) : null;
-                      const cat = getCategoryById(tx.categoryId);
-                      const badgeInfo = getDueBadgeInfo(tx.date);
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="w-[140px]">Vencimento</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Fornecedor</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Forma Pagamento</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right w-[120px]">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {flatPayables.map((tx) => {
+                        const sup = tx.supplierId ? getSupplierById(tx.supplierId) : null;
+                        const cat = getCategoryById(tx.categoryId);
+                        const badgeInfo = getDueBadgeInfo(tx.date);
 
-                      return (
-                        <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-red-50/10")}>
-                          <TableCell className="whitespace-nowrap">
-                            <div className="space-y-0.5">
-                              <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
-                              <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
-                                {badgeInfo.label}
+                        return (
+                          <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-red-50/10")}>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="space-y-0.5">
+                                <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
+                                <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
+                                  {badgeInfo.label}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
+                                {tx.reference && (
+                                  <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                                )}
+                                {tx.notes && (
+                                  <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm font-medium text-foreground">
+                                {sup?.name || <span className="text-muted-foreground italic">Sem Fornecedor</span>}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {cat?.name || '—'}
                               </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
-                              {tx.reference && (
-                                <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                            </TableCell>
+                            <TableCell>
+                              {tx.paymentMethod ? (
+                                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  {getPaymentMethodIcon(tx.paymentMethod)}
+                                  {getPaymentMethodLabel(tx.paymentMethod)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
-                              {tx.notes && (
-                                <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm font-medium text-foreground">
-                              {sup?.name || <span className="text-muted-foreground italic">Sem Fornecedor</span>}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-bold text-sm text-rose-600">
+                              {formatCurrency(tx.amount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenPaymentDialog(tx)}
+                                className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Pagar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Cards View */}
+                <div className="block md:hidden divide-y divide-border">
+                  {flatPayables.map((tx) => {
+                    const sup = tx.supplierId ? getSupplierById(tx.supplierId) : null;
+                    const cat = getCategoryById(tx.categoryId);
+                    const badgeInfo = getDueBadgeInfo(tx.date);
+
+                    return (
+                      <div key={tx.id} className={cn("p-4 space-y-2.5", badgeInfo.isOverdue && "bg-red-50/10")}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-sm text-foreground block truncate">{tx.description}</span>
+                            <span className="text-xs text-muted-foreground block truncate">
+                              {sup?.name || 'Sem Fornecedor'}
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs font-normal">
-                              {cat?.name || '—'}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-mono font-bold text-sm text-rose-600 block">{formatCurrency(tx.amount)}</span>
+                            <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium mt-0.5", badgeInfo.className)}>
+                              {badgeInfo.label}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {tx.paymentMethod ? (
-                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-mono text-[11px]">{formatDate(tx.date)}</span>
+                          <span>•</span>
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal">
+                            {cat?.name || '—'}
+                          </Badge>
+                          {tx.paymentMethod && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 text-[11px]">
                                 {getPaymentMethodIcon(tx.paymentMethod)}
                                 {getPaymentMethodLabel(tx.paymentMethod)}
                               </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-sm text-rose-600">
-                            {formatCurrency(tx.amount)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenPaymentDialog(tx)}
-                              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Pagar
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                            </>
+                          )}
+                          {tx.reference && (
+                            <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">Ref: {tx.reference}</span>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenPaymentDialog(tx)}
+                            className="w-full sm:w-auto h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1.5 justify-center"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Pagar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

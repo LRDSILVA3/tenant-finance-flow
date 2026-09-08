@@ -139,7 +139,6 @@ Focado no controle e segmentação de clientes para prestadores de serviço e co
   >
   > 🚀 Conecte-se com seu público e tome decisões de marketing mais inteligentes!
   >
-  > *#CRM #Clientes #Fidelizacao #GestaoDeClientes #PrevinaSaaS*
 <!-- slide -->
 ### 💻 Conceito 6: Multi-Dispositivo (Seu Negócio de Qualquer Lugar)
 Demonstra a adaptabilidade responsiva do Previna em laptops, tablets e smartphones. Ideal para gestores que viajam ou trabalham na rua.
@@ -156,6 +155,25 @@ Demonstra a adaptabilidade responsiva do Previna em laptops, tablets e smartphon
   > 🔗 Faça seu cadastro em 1 minuto e mude o nível da gestão do seu negócio!
   >
   > *#Multiplataforma #SaaS #Mobilidade #ControleFinanceiro #Previna*
+<!-- slide -->
+### 📲 Conceito 7: Boas-vindas para Novos Seguidores do Instagram (Captação de Leads)
+Criado especificamente para envio via Direct Message (DM) ou Stories de boas-vindas para novos seguidores do Instagram, transformando seguidores em usuários cadastrados.
+
+![Banner Boas-Vindas Instagram](./marketing-assets/previna_banner_instagram_welcome.jpg)
+
+* **Mensagem para Direct Message (DM de Boas-Vindas)**:
+  > Olá! Muito obrigado por nos seguir aqui no Instagram! 🚀
+  >
+  > O **Previna** é uma plataforma simples e completa criada para tirar o estresse financeiro e de estoque do seu negócio:
+  >
+  > 🔹 **Fluxo de Caixa & DRE** sem precisar de planilhas complexas
+  > 🔹 **Controle de Estoque** inteligente com leitor no próprio celular
+  > 🔹 **Frente de Caixa & Pedidos de Venda** rápidos para balcão
+  > 🔹 Acesse pelo computador ou direto no smartphone!
+  >
+  > 🎁 **Preparamos um teste gratuito especial para você.** Basta acessar nosso site pelo link da bio e criar sua conta em menos de 1 minuto!
+  >
+  > Se tiver qualquer dúvida sobre como aplicar na sua empresa, é só me chamar por aqui. Sucesso nas vendas! 💪
 ````
 
 ### 🎨 Banners Premium Gerados por IA

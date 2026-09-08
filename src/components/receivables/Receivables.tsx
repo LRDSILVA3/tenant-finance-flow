@@ -991,125 +991,225 @@ export const Receivables: React.FC = () => {
                 <p className="font-medium">Nenhum lançamento encontrado com os filtros selecionados.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="w-[140px]">Vencimento</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Forma Pagamento</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead className="text-right w-[120px]">Ação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {flatReceivables.map((tx) => {
-                      const cust = tx.customerId ? getCustomerById(tx.customerId) : null;
-                      const cat = getCategoryById(tx.categoryId);
-                      const badgeInfo = getDueBadgeInfo(tx.date);
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="w-[140px]">Vencimento</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Forma Pagamento</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right w-[120px]">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {flatReceivables.map((tx) => {
+                        const cust = tx.customerId ? getCustomerById(tx.customerId) : null;
+                        const cat = getCategoryById(tx.categoryId);
+                        const badgeInfo = getDueBadgeInfo(tx.date);
 
-                      return (
-                        <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-amber-50/20")}>
-                          <TableCell className="whitespace-nowrap">
-                            <div className="space-y-0.5">
-                              <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
-                              <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
-                                {badgeInfo.label}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                {tx.reference && (
-                                  <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
-                                )}
-                                {tx.orderId && (
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
-                                        if (order) setSelectedOrderForView(order);
-                                      }}
-                                      className="text-[10px] bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
-                                      title="Clique para visualizar o recibo do pedido"
-                                    >
-                                      <ShoppingBag className="h-3 w-3 text-primary" />
-                                      <span>Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}</span>
-                                      <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
-                                        if (order) {
-                                          generateOrderPdf(order, currentClient?.name);
-                                          toast({
-                                            title: "PDF Gerado",
-                                            description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
-                                          });
-                                        }
-                                      }}
-                                      className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
-                                      title="Baixar PDF do Pedido"
-                                    >
-                                      <Download className="h-3 w-3" />
-                                    </button>
-                                  </div>
+                        return (
+                          <TableRow key={tx.id} className={cn("hover:bg-muted/30", badgeInfo.isOverdue && "bg-amber-50/20")}>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="space-y-0.5">
+                                <span className="font-mono text-xs font-semibold block">{formatDate(tx.date)}</span>
+                                <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium", badgeInfo.className)}>
+                                  {badgeInfo.label}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <span className="font-semibold text-sm text-foreground block">{tx.description}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  {tx.reference && (
+                                    <span className="text-[11px] font-mono text-muted-foreground">Ref: {tx.reference}</span>
+                                  )}
+                                  {tx.orderId && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                          if (order) setSelectedOrderForView(order);
+                                        }}
+                                        className="text-[10px] bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
+                                        title="Clique para visualizar o recibo do pedido"
+                                      >
+                                        <ShoppingBag className="h-3 w-3 text-primary" />
+                                        <span>Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}</span>
+                                        <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                          if (order) {
+                                            generateOrderPdf(order, currentClient?.name);
+                                            toast({
+                                              title: "PDF Gerado",
+                                              description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                            });
+                                          }
+                                        }}
+                                        className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
+                                        title="Baixar PDF do Pedido"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {tx.notes && (
+                                  <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
                                 )}
                               </div>
-                              {tx.notes && (
-                                <p className="text-[11px] text-muted-foreground italic truncate max-w-xs">{tx.notes}</p>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <span className="text-sm font-medium text-foreground block">{cust?.name || (tx.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado')}</span>
+                                {cust?.phone && <span className="text-[11px] text-muted-foreground">{cust.phone}</span>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {cat?.name || 'Geral'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {tx.paymentMethod ? (
+                                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  {getPaymentMethodIcon(tx.paymentMethod)}
+                                  {getPaymentMethodLabel(tx.paymentMethod, t)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <span className="text-sm font-medium text-foreground block">{cust?.name || (tx.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado')}</span>
-                              {cust?.phone && <span className="text-[11px] text-muted-foreground">{cust.phone}</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs font-normal">
-                              {cat?.name || 'Geral'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-bold text-sm text-amber-600">
+                              {formatCurrency(tx.amount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenPaymentDialog(tx)}
+                                className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Receber
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Cards View */}
+                <div className="block md:hidden divide-y divide-border">
+                  {flatReceivables.map((tx) => {
+                    const cust = tx.customerId ? getCustomerById(tx.customerId) : null;
+                    const cat = getCategoryById(tx.categoryId);
+                    const badgeInfo = getDueBadgeInfo(tx.date);
+
+                    return (
+                      <div key={tx.id} className={cn("p-4 space-y-2.5", badgeInfo.isOverdue && "bg-amber-50/20")}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-sm text-foreground block truncate">{tx.description}</span>
+                            <span className="text-xs text-muted-foreground block truncate">
+                              {cust?.name || (tx.customerId ? 'Cliente Desconhecido' : 'Sem Cliente Vinculado')}
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-mono font-bold text-sm text-amber-600 block">{formatCurrency(tx.amount)}</span>
+                            <Badge variant="outline" className={cn("text-[10px] py-0 px-1.5 font-medium mt-0.5", badgeInfo.className)}>
+                              {badgeInfo.label}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {tx.paymentMethod ? (
-                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-mono text-[11px]">{formatDate(tx.date)}</span>
+                          <span>•</span>
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal">
+                            {cat?.name || 'Geral'}
+                          </Badge>
+                          {tx.paymentMethod && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 text-[11px]">
                                 {getPaymentMethodIcon(tx.paymentMethod)}
                                 {getPaymentMethodLabel(tx.paymentMethod, t)}
                               </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-sm text-amber-600">
-                            {formatCurrency(tx.amount)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenPaymentDialog(tx)}
-                              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                            </>
+                          )}
+                          {tx.reference && (
+                            <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">Ref: {tx.reference}</span>
+                          )}
+                        </div>
+
+                        {tx.orderId && (
+                          <div className="flex items-center gap-1 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                if (order) setSelectedOrderForView(order);
+                              }}
+                              className="text-[10px] bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
+                              title="Clique para visualizar o recibo do pedido"
                             >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Receber
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                              <ShoppingBag className="h-3 w-3 text-primary" />
+                              <span>Pedido: #{getOrderById ? getOrderById(tx.orderId)?.orderNumber || tx.orderId.slice(0, 8) : tx.orderId.slice(0, 8)}</span>
+                              <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const order = getOrderById ? getOrderById(tx.orderId!) : orders.find((o: any) => o.id === tx.orderId);
+                                if (order) {
+                                  generateOrderPdf(order, currentClient?.name);
+                                  toast({
+                                    title: "PDF Gerado",
+                                    description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                  });
+                                }
+                              }}
+                              className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-1 rounded transition-colors"
+                              title="Baixar PDF do Pedido"
+                            >
+                              <Download className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenPaymentDialog(tx)}
+                            className="w-full sm:w-auto h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1.5 justify-center"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Receber
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

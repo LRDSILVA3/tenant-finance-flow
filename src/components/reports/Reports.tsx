@@ -1445,38 +1445,38 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
         </Card>
       ) : (
         <Tabs defaultValue="dre" className="w-full print:space-y-4" value={activeReportTab} onValueChange={setActiveReportTab}>
-          <TabsList className="mb-4 flex-wrap print:hidden h-auto gap-1 bg-transparent border-b rounded-none p-0">
-            <TabsTrigger value="dre" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+          <TabsList className="mb-4 flex flex-nowrap overflow-x-auto no-scrollbar justify-start print:hidden h-auto gap-1 bg-transparent border-b rounded-none p-0 pb-1 w-full">
+            <TabsTrigger value="dre" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-4 w-4" />
               DRE Simplificado
             </TabsTrigger>
             {userSettings.enableCommission && (
-              <TabsTrigger value="commissions" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+              <TabsTrigger value="commissions" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
                 <Users className="h-4 w-4" />
                 Comissões
               </TabsTrigger>
             )}
-            <TabsTrigger value="distribution" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="distribution" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <PieIcon className="h-4 w-4" />
               Distribuição
             </TabsTrigger>
-            <TabsTrigger value="projection" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="projection" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <LineChartIcon className="h-4 w-4" />
               Fluxo Projetado
             </TabsTrigger>
-            <TabsTrigger value="breakeven" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="breakeven" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <Calculator className="h-4 w-4" />
               Ponto de Equilíbrio
             </TabsTrigger>
-            <TabsTrigger value="payables" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="payables" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <Layers className="h-4 w-4" />
               Contas Pagar/Receber
             </TabsTrigger>
-            <TabsTrigger value="margins" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="margins" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <Percent className="h-4 w-4" />
               Análise de Margem
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">
+            <TabsTrigger value="inventory" className="flex items-center gap-2 shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-4 py-2 text-xs sm:text-sm">
               <Package className="h-4 w-4" />
               Estoque e Inventário
             </TabsTrigger>
@@ -1495,8 +1495,8 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table className="min-w-[550px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead className="font-semibold text-foreground">Conta Contábil / Descrição</TableHead>
@@ -1643,8 +1643,8 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-hidden border rounded-lg">
-                    <Table>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <Table className="min-w-[650px]">
                       <TableHeader className="bg-muted/50">
                         <TableRow>
                           <TableHead className="font-semibold text-foreground">Colaborador</TableHead>
@@ -1831,8 +1831,8 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                   </ResponsiveContainer>
                 </div>
 
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table className="min-w-[600px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead>Mês Projetado</TableHead>
@@ -2008,8 +2008,8 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                   </div>
                 )}
 
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table className="min-w-[650px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead>Fluxo de Caixa</TableHead>
@@ -2051,8 +2051,8 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table className="min-w-[650px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead>Categoria de Receita</TableHead>

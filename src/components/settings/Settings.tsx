@@ -124,32 +124,31 @@ export const Settings: React.FC = () => {
         <p className="page-subtitle">{t.settingsSubtitle}</p>
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="general" className="flex items-center gap-2">
+        <TabsList className="mb-4 flex flex-nowrap overflow-x-auto no-scrollbar justify-start p-1 w-full gap-1 h-auto bg-muted/50 border rounded-lg">
+          <TabsTrigger value="general" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <SettingsIcon className="h-4 w-4" />
             Geral
           </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex items-center gap-2">
+          <TabsTrigger value="subscription" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <CreditCard className="h-4 w-4" />
             {t.subscription}
           </TabsTrigger>
-          <TabsTrigger value="chart-of-accounts" className="flex items-center gap-2">
+          <TabsTrigger value="chart-of-accounts" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <List className="h-4 w-4" />
             {t.chartOfAccounts}
           </TabsTrigger>
-          <TabsTrigger value="pdf-customization" className="flex items-center gap-2">
+          <TabsTrigger value="pdf-customization" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <Palette className="h-4 w-4" />
             Documentos & PDFs
           </TabsTrigger>
           {isOwner && (
-            <TabsTrigger value="team" className="flex items-center gap-2">
+            <TabsTrigger value="team" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
               <UserPlus className="h-4 w-4" />
               Equipe
             </TabsTrigger>
           )}
           {userSettings.enableCommission && (
-            <TabsTrigger value="collaborators" className="flex items-center gap-2">
+            <TabsTrigger value="collaborators" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
               <Users className="h-4 w-4" />
               Colaboradores
             </TabsTrigger>

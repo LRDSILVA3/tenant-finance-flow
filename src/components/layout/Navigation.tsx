@@ -1,5 +1,5 @@
 // Navigation Component
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,8 @@ import {
   PlusCircle,
   ShoppingCart,
   ClipboardList,
-  Store
+  Store,
+  Menu
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'store_pos' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'admin' | 'notifications';
 
@@ -60,6 +68,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const isAdminView = location.pathname === '/admin';
   const activeId = isAdminView ? 'admin' : currentView;
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Helpers de estado ativo para grupos do menu suspenso
   const isFinanceActive = activeId === 'transactions' || activeId === 'receivables' || activeId === 'payables';
@@ -146,7 +155,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           </Button>
         </div>
       )}
-      <nav className="border-b border-border bg-card">
+      <nav className="hidden md:block border-b border-border bg-card">
         <div className="container px-4 sm:px-6">
           <div className="flex gap-1 overflow-x-auto">
             {/* Dashboard */}
@@ -492,6 +501,269 @@ export const Navigation: React.FC<NavigationProps> = ({
           </div>
         </div>
       </nav>
+
+      {/* Mobile Bottom Navigation Bar (Fixed at bottom for < md) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border shadow-lg px-2 py-1 flex items-center justify-around">
+        {/* Início */}
+        <button
+          onClick={() => handleNavClick('dashboard')}
+          className={cn(
+            "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+            activeId === 'dashboard' ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <LayoutDashboard className="h-4 w-4 mb-0.5" />
+          <span>Início</span>
+        </button>
+
+        {/* Financeiro */}
+        <button
+          onClick={() => handleNavClick('transactions')}
+          className={cn(
+            "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+            isFinanceActive ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <ArrowRightLeft className="h-4 w-4 mb-0.5" />
+          <span>Finanças</span>
+        </button>
+
+        {/* Modo Loja (PDV Touch) */}
+        <button
+          onClick={() => handleNavClick('store_pos')}
+          className={cn(
+            "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+            activeId === 'store_pos' ? "text-emerald-600 font-bold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <div className={cn(
+            "p-1 rounded-full -mt-3.5 shadow-md transition-transform",
+            activeId === 'store_pos' ? "bg-emerald-600 text-white scale-110" : "bg-emerald-600 text-white"
+          )}>
+            <Store className="h-4 w-4" />
+          </div>
+          <span className="mt-0.5">PDV</span>
+        </button>
+
+        {/* Vendas */}
+        <button
+          onClick={() => handleNavClick('orders')}
+          className={cn(
+            "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+            activeId === 'orders' ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <ShoppingCart className="h-4 w-4 mb-0.5" />
+          <span>Vendas</span>
+        </button>
+
+        {/* Menu Completo (Sheet) */}
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <SheetTrigger asChild>
+            <button
+              className={cn(
+                "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+                isMobileMenuOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Menu className="h-4 w-4 mb-0.5" />
+              <span>Menu</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl px-4 py-5 overflow-y-auto">
+            <SheetHeader className="pb-3 border-b text-left">
+              <SheetTitle className="text-base font-bold flex items-center gap-2">
+                <Store className="h-5 w-5 text-primary" />
+                Módulos do Sistema
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="py-4 space-y-5">
+              {/* Grupo Financeiro */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                  Financeiro
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => { handleNavClick('transactions'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'transactions' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <ArrowRightLeft className="h-5 w-5 text-primary" />
+                    <span className="text-xs">Lançamentos</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('receivables'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'receivables' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <HandCoins className="h-5 w-5 text-emerald-600" />
+                    <span className="text-xs">A Receber</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('payables'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'payables' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Wallet className="h-5 w-5 text-rose-600" />
+                    <span className="text-xs">A Pagar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grupo Vendas & Atendimento */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                  Vendas & Atendimento
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => { handleNavClick('store_pos'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'store_pos' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Store className="h-5 w-5 text-emerald-600" />
+                    <span className="text-xs">Modo Loja</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('orders'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'orders' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <ShoppingCart className="h-5 w-5 text-primary" />
+                    <span className="text-xs">Pedidos</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('service_orders'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'service_orders' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <ClipboardList className="h-5 w-5 text-indigo-600" />
+                    <span className="text-xs">Ordens Serv.</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grupo Cadastros */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                  Cadastros & Operação
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    onClick={() => { handleNavClick('customers'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'customers' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Users className="h-5 w-5 text-blue-600" />
+                    <span className="text-[11px]">Clientes</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('suppliers'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'suppliers' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Truck className="h-5 w-5 text-amber-600" />
+                    <span className="text-[11px]">Fornec.</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('schedule'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'schedule' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <CalendarDays className="h-5 w-5 text-teal-600" />
+                    <span className="text-[11px]">Agenda</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('inventory'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'inventory' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Package className="h-5 w-5 text-purple-600" />
+                    <span className="text-[11px]">Estoque</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grupo Relatórios & Configurações */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                  Gerenciamento & Análise
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => { handleNavClick('reports'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'reports' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <BarChart3 className="h-5 w-5 text-cyan-600" />
+                    <span className="text-xs">Relatórios</span>
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('notifications'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors relative",
+                      activeId === 'notifications' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Bell className="h-5 w-5 text-amber-600" />
+                    <span className="text-xs">Alertas</span>
+                    {unreadNotificationsCount > 0 && (
+                      <span className="absolute top-2 right-4 h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => { handleNavClick('settings'); setIsMobileMenuOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                      activeId === 'settings' && "border-primary bg-primary/5 text-primary font-bold"
+                    )}
+                  >
+                    <Settings className="h-5 w-5 text-slate-600" />
+                    <span className="text-xs">Ajustes</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Link Admin se aplicável */}
+              {userProfile?.isAdmin && (
+                <div className="pt-1">
+                  <button
+                    onClick={() => { handleNavClick('admin'); setIsMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-indigo-200 bg-indigo-50/20 text-indigo-700 font-semibold text-xs"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Painel Administrador SaaS
+                  </button>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 };

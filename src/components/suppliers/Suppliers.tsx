@@ -335,7 +335,7 @@ export const Suppliers: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[550px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[300px]">Fornecedor</TableHead>

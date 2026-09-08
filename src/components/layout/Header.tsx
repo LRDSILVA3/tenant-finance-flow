@@ -196,16 +196,16 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-24 items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-20 w-auto min-w-[80px] items-center justify-center rounded-lg overflow-hidden">
+      <div className="container flex h-16 sm:h-20 items-center justify-between px-3 sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex h-10 sm:h-14 w-auto min-w-[50px] sm:min-w-[80px] items-center justify-center rounded-lg overflow-hidden">
             <img src="/logo.png" alt="Previna Logo" className="h-full w-auto object-contain" />
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Client Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Select
               value={currentClient?.id || ''}
               onValueChange={(id) => {
@@ -214,13 +214,13 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
               }}
               disabled={loadingClients}
             >
-              <SelectTrigger data-tour="client-select" className="w-[160px] sm:w-[200px] bg-background">
+              <SelectTrigger data-tour="client-select" className="w-[125px] sm:w-[190px] h-8 sm:h-9 text-xs sm:text-sm bg-background px-2 sm:px-3">
                 {loadingClients ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin shrink-0" />
                 ) : (
-                  <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <Building2 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 )}
-                <SelectValue placeholder={t.selectClient} />
+                <SelectValue placeholder={t.selectClient} className="truncate" />
               </SelectTrigger>
               <SelectContent>
                 {clients.map((client) => (
@@ -238,10 +238,11 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
               onClick={() => setIsAddClientOpen(true)}
               title={t.addCategory}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
 
             {/* Sino de Notificações */}
@@ -251,12 +252,12 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
                   variant="ghost" 
                   size="icon" 
                   data-tour="notifications-bell"
-                  className="relative hover:bg-muted/60 transition-all rounded-full duration-300 h-9 w-9"
+                  className="relative hover:bg-muted/60 transition-all rounded-full duration-300 h-8 w-8 sm:h-9 sm:w-9 shrink-0"
                   title="Notificações"
                 >
-                  <Bell className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors duration-200" />
+                  <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground hover:text-foreground transition-colors duration-200" />
                   {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm animate-pulse">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm animate-pulse">
                       {unreadNotificationsCount}
                     </span>
                   )}
@@ -375,61 +376,63 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
             </Popover>
           </div>
 
-          {/* Tour do Sistema */}
+          {/* Tour do Sistema (Desktop) */}
           {onStartTour && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onStartTour}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted mr-1 animate-fade-in"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted animate-fade-in"
               title="Iniciar tutorial do sistema"
             >
               <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-              <span className="hidden sm:inline">Tutorial</span>
+              <span>Tutorial</span>
             </Button>
           )}
 
-          {/* Dark Mode Toggle */}
+          {/* Dark Mode Toggle (Desktop) */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}
             title={currentTheme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
-            className="h-9 w-9 text-muted-foreground hover:text-foreground mr-1"
+            className="hidden sm:inline-flex h-9 w-9 text-muted-foreground hover:text-foreground"
           >
             {currentTheme === 'dark' ? (
-              <Sun className="h-5 w-5 text-amber-400" />
+              <Sun className="h-4 w-4 text-amber-400" />
             ) : (
-              <Moon className="h-5 w-5 text-slate-600" />
+              <Moon className="h-4 w-4 text-slate-600" />
             )}
           </Button>
 
-          {/* Language Selector */}
-          <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
-            <SelectTrigger className="w-[120px] bg-background">
-              <Globe className="mr-2 h-4 w-4 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(languageLabels) as Language[]).map((lang) => (
-                <SelectItem key={lang} value={lang}>
-                  <span className="flex items-center gap-2">
-                    <span>{languageFlags[lang]}</span>
-                    <span>{languageLabels[lang]}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Language Selector (Desktop) */}
+          <div className="hidden sm:block">
+            <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
+              <SelectTrigger className="w-[120px] h-9 bg-background text-xs">
+                <Globe className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(languageLabels) as Language[]).map((lang) => (
+                  <SelectItem key={lang} value={lang}>
+                    <span className="flex items-center gap-2">
+                      <span>{languageFlags[lang]}</span>
+                      <span>{languageLabels[lang]}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <User className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full">
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onClick={() => {
                 setWhatsappNumber(userProfile?.whatsappNumber || '');
                 setNewPassword('');
@@ -439,6 +442,30 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
                 <User className="mr-2 h-4 w-4" />
                 Meu Perfil
               </DropdownMenuItem>
+
+              {/* Mobile-only menu items */}
+              <div className="sm:hidden border-t my-1 pt-1">
+                <DropdownMenuItem onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}>
+                  {currentTheme === 'dark' ? (
+                    <>
+                      <Sun className="mr-2 h-4 w-4 text-amber-400" />
+                      Modo Claro
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="mr-2 h-4 w-4 text-slate-600" />
+                      Modo Escuro
+                    </>
+                  )}
+                </DropdownMenuItem>
+                {onStartTour && (
+                  <DropdownMenuItem onClick={onStartTour}>
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    Tutorial do Sistema
+                  </DropdownMenuItem>
+                )}
+              </div>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

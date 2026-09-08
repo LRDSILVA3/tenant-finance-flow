@@ -218,17 +218,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header with Toggle */}
-      <div className="page-header flex items-start justify-between">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="page-title">{t.financialOverview}</h2>
-          <p className="page-subtitle">
+          <h2 className="page-title text-xl sm:text-2xl">{t.financialOverview}</h2>
+          <p className="page-subtitle text-xs sm:text-sm">
             {isDailyView ? t.dailyOverview : t.monthlyOverview}
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-2">
+        <div className="flex items-center gap-2 sm:gap-3 bg-muted/50 rounded-lg px-3 py-1.5 self-start sm:self-auto">
           <Label 
             htmlFor="view-toggle" 
-            className={`text-sm font-medium cursor-pointer transition-colors ${
+            className={`text-xs sm:text-sm font-medium cursor-pointer transition-colors ${
               !isDailyView ? 'text-foreground' : 'text-muted-foreground'
             }`}
           >
@@ -241,7 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
           />
           <Label 
             htmlFor="view-toggle" 
-            className={`text-sm font-medium cursor-pointer transition-colors ${
+            className={`text-xs sm:text-sm font-medium cursor-pointer transition-colors ${
               isDailyView ? 'text-foreground' : 'text-muted-foreground'
             }`}
           >
@@ -312,7 +312,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
               <div className="flex items-center gap-2 border-b pb-1">
                 <span className="text-xs font-bold text-income uppercase tracking-wider">Entradas</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 {(Object.keys(paymentMethodBreakdown.income) as string[]).map((method) => {
                   const config = paymentMethodConfig[method] || {
                     icon: <Wallet className="h-4 w-4" />,
@@ -356,7 +356,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
               <div className="flex items-center gap-2 border-b pb-1">
                 <span className="text-xs font-bold text-expense uppercase tracking-wider">Saídas</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 {(Object.keys(paymentMethodBreakdown.expense) as string[]).map((method) => {
                   const config = paymentMethodConfig[method] || {
                     icon: <Wallet className="h-4 w-4" />,

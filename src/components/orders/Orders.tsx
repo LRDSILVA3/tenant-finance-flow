@@ -790,12 +790,12 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {onNavigateToStorePos && (
               <Button
                 size="sm"
                 onClick={onNavigateToStorePos}
-                className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm"
+                className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex-1 sm:flex-initial"
               >
                 <Store className="h-4 w-4" />
                 <span className="hidden sm:inline">Modo Loja (PDV Touch)</span>
@@ -807,7 +807,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
               variant="outline"
               size="sm"
               onClick={() => setIsScanModalOpen(true)}
-              className="h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10 font-medium text-xs shadow-sm"
+              className="h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10 font-medium text-xs shadow-sm flex-1 sm:flex-initial"
             >
               <Barcode className="h-4 w-4 text-emerald-600" />
               <span className="hidden sm:inline">Leitor de Código / Celular</span>
@@ -820,7 +820,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
               )}
             </Button>
 
-            <TabsList className="grid grid-cols-2 w-60">
+            <TabsList className="grid grid-cols-2 w-full sm:w-60">
               <TabsTrigger
                 value="pos"
                 onClick={() => setActiveTab('pos')}
@@ -975,7 +975,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
 
           {/* LADO DIREITO: CARRINHO E CHECKOUT (STICKY PANEL) */}
           <div className="lg:col-span-5 xl:col-span-4 space-y-4 sticky top-4">
-            <Card className="border-border shadow-lg">
+            <Card id="pos-cart-panel" className="border-border shadow-lg">
               <CardHeader className="p-4 pb-3 border-b bg-muted/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1310,6 +1310,35 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
         </div>
       </TabsContent>
 
+      {/* Mobile Quick Cart Bar */}
+      {activeTab === 'pos' && cartItems.length > 0 && (
+        <div className="fixed bottom-16 sm:bottom-20 left-3 right-3 z-30 lg:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById('pos-cart-panel')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="w-full bg-primary text-primary-foreground p-3.5 rounded-xl shadow-xl flex items-center justify-between border border-primary-foreground/20 active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-white/20 rounded-lg">
+                <ShoppingCart className="h-4 w-4" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-semibold leading-tight">
+                  {cartItems.reduce((a, b) => a + b.quantity, 0)} {cartItems.length === 1 ? 'item no pedido' : 'itens no pedido'}
+                </p>
+                <p className="text-[11px] opacity-80 leading-tight">Toque para finalizar</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold font-mono">{formatCurrency(cartTotal)}</span>
+              <ArrowRight className="h-4 w-4" />
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* ABA 2: HISTÓRICO DE PEDIDOS */}
       <TabsContent value="history" className="mt-0">
         <div className="space-y-4">
@@ -1375,7 +1404,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
 
               <div className="flex gap-2 w-full sm:w-auto">
                 <Select value={historyStatusFilter} onValueChange={setHistoryStatusFilter}>
-                  <SelectTrigger className="h-9 text-xs w-44">
+                  <SelectTrigger className="h-9 text-xs w-full sm:w-44">
                     <SelectValue placeholder="Filtrar por status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1391,98 +1420,100 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
           </Card>
 
           {/* Tabela de Pedidos */}
-          <Card className="border-border">
+          <Card className="border-border overflow-hidden">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-28">Número</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Itens</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor Total</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
+              <div className="overflow-x-auto">
+                <Table className="w-full min-w-[700px]">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-xs">
-                        Nenhum pedido encontrado.
-                      </TableCell>
+                      <TableHead className="w-28">Número</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Itens</TableHead>
+                      <TableHead>Pagamento</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Valor Total</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id} className="hover:bg-muted/30">
-                        <TableCell className="font-bold text-xs text-primary">
-                          #{order.orderNumber}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {formatDate(new Date(order.createdAt))}
-                        </TableCell>
-                        <TableCell className="text-xs font-medium">
-                          {order.customer?.name || 'Cliente Balcão'}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {order.items?.length || 0} itens
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          <span className="capitalize">{order.paymentMethod || 'Dinheiro'}</span>
-                          <span className="text-[10px] text-muted-foreground block">
-                            {order.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              order.status === 'completed' ? 'default' :
-                              order.status === 'pending' ? 'secondary' :
-                              order.status === 'draft' ? 'outline' : 'destructive'
-                            }
-                            className="text-[10px]"
-                          >
-                            {order.status === 'completed' && 'Concluído'}
-                            {order.status === 'pending' && 'Pendente'}
-                            {order.status === 'draft' && 'Orçamento'}
-                            {order.status === 'cancelled' && 'Cancelado'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-xs text-foreground">
-                          {formatCurrency(order.totalAmount)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10"
-                              onClick={() => generateOrderPdf(order, currentClient?.name || 'Previna Gestão')}
-                              title="Baixar PDF Estilizado do Pedido"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              PDF
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs gap-1"
-                              onClick={() => {
-                                setSelectedOrderForReceipt(order);
-                                setIsReceiptOpen(true);
-                              }}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Comprovante
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOrders.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-xs">
+                          Nenhum pedido encontrado.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredOrders.map((order) => (
+                        <TableRow key={order.id} className="hover:bg-muted/30">
+                          <TableCell className="font-bold text-xs text-primary">
+                            #{order.orderNumber}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatDate(new Date(order.createdAt))}
+                          </TableCell>
+                          <TableCell className="text-xs font-medium">
+                            {order.customer?.name || 'Cliente Balcão'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {order.items?.length || 0} itens
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className="capitalize">{order.paymentMethod || 'Dinheiro'}</span>
+                            <span className="text-[10px] text-muted-foreground block">
+                              {order.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                order.status === 'completed' ? 'default' :
+                                order.status === 'pending' ? 'secondary' :
+                                order.status === 'draft' ? 'outline' : 'destructive'
+                              }
+                              className="text-[10px]"
+                            >
+                              {order.status === 'completed' && 'Concluído'}
+                              {order.status === 'pending' && 'Pendente'}
+                              {order.status === 'draft' && 'Orçamento'}
+                              {order.status === 'cancelled' && 'Cancelado'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-xs text-foreground">
+                            {formatCurrency(order.totalAmount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                                onClick={() => generateOrderPdf(order, currentClient?.name || 'Previna Gestão')}
+                                title="Baixar PDF Estilizado do Pedido"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                PDF
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => {
+                                  setSelectedOrderForReceipt(order);
+                                  setIsReceiptOpen(true);
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Comprovante
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

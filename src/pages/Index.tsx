@@ -145,10 +145,10 @@ const Index: React.FC = () => {
         onReportTabChange={setActiveReportTab}
       />
       <main className={cn(
-        "flex-1 container px-4 sm:px-6",
+        "flex-1 container px-3 sm:px-6",
         currentView === 'store_pos'
-          ? "py-2 overflow-hidden flex flex-col min-h-0"
-          : "py-6 overflow-y-auto"
+          ? "py-2 pb-16 md:pb-2 overflow-hidden flex flex-col min-h-0"
+          : "py-4 sm:py-6 pb-20 md:pb-6 overflow-y-auto"
       )}>
         {renderView()}
       </main>

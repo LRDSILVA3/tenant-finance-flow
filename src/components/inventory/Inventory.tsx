@@ -1195,12 +1195,13 @@ export const Inventory: React.FC = () => {
           </h2>
           <p className="page-subtitle">Controle o inventário e custos de aquisição de produtos.</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={openScanModal} variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 font-medium">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button onClick={openScanModal} variant="outline" className="flex-1 sm:flex-initial gap-2 border-primary text-primary hover:bg-primary/10 font-medium text-xs">
             <Barcode className="h-4 w-4 text-emerald-600" />
-            Leitor de Código / Celular / USB
+            <span className="hidden sm:inline">Leitor de Código / Celular / USB</span>
+            <span className="sm:hidden">Scanner / Código</span>
           </Button>
-          <Button onClick={openCreateProduct} className="gap-2">
+          <Button onClick={openCreateProduct} className="flex-1 sm:flex-initial gap-2 text-xs">
             <Plus className="h-4 w-4" />
             Novo Produto
           </Button>
@@ -1457,8 +1458,8 @@ export const Inventory: React.FC = () => {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-hidden border rounded-lg">
-                <Table>
+              <div className="overflow-x-auto border rounded-lg">
+                <Table className="min-w-[750px]">
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead>Produto</TableHead>
@@ -2313,8 +2314,8 @@ export const Inventory: React.FC = () => {
                 Nenhuma movimentação registrada para este produto.
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
+              <div className="border rounded-lg overflow-x-auto">
+                <Table className="min-w-[650px]">
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead>Data</TableHead>

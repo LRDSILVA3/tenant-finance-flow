@@ -635,22 +635,22 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
           </h2>
           <p className="page-subtitle">Gerencie os atendimentos e visualize a agenda por dia.</p>
         </div>
-        <Button onClick={openCreateAppt} className="gap-2 shrink-0">
+        <Button onClick={openCreateAppt} className="w-full sm:w-auto gap-2 shrink-0">
           <Plus className="h-4 w-4" />
           Novo Agendamento
         </Button>
       </div>
 
       <Tabs defaultValue="agenda">
-        <TabsList className="mb-4">
-          <TabsTrigger value="agenda" className="gap-2">
-            <CalendarDays className="h-4 w-4" /> Agenda
+        <TabsList className="mb-4 grid grid-cols-3 w-full sm:w-auto sm:inline-flex">
+          <TabsTrigger value="agenda" className="gap-2 text-xs sm:text-sm">
+            <CalendarDays className="h-4 w-4" /> <span className="hidden sm:inline">Agenda</span><span className="sm:hidden">Dia</span>
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
+          <TabsTrigger value="history" className="gap-2 text-xs sm:text-sm">
             <Clock className="h-4 w-4" /> Histórico
           </TabsTrigger>
-          <TabsTrigger value="service-types" className="gap-2">
-            <Settings2 className="h-4 w-4" /> Tipos de Serviço
+          <TabsTrigger value="service-types" className="gap-2 text-xs sm:text-sm">
+            <Settings2 className="h-4 w-4" /> <span className="hidden sm:inline">Tipos de Serviço</span><span className="sm:hidden">Serviços</span>
           </TabsTrigger>
         </TabsList>
 
@@ -841,8 +841,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
               {historyAppts.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">Nenhum agendamento encontrado.</div>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table className="min-w-[620px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead>Data / Hora</TableHead>
@@ -911,8 +911,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ initialCustomerId }) => {
               {serviceTypes.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">Nenhum tipo cadastrado. Crie um para agilizar os agendamentos.</div>
               ) : (
-                <div className="overflow-hidden border rounded-lg">
-                  <Table>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table className="min-w-[500px]">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead>Nome</TableHead>

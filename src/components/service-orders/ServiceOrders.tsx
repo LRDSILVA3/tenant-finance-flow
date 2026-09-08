@@ -279,7 +279,7 @@ export const ServiceOrders: React.FC = () => {
             setSelectedOS(null);
             setIsDialogOpen(true);
           }}
-          className="gap-1.5 shadow-sm text-xs font-semibold"
+          className="w-full sm:w-auto gap-1.5 shadow-sm text-xs font-semibold"
         >
           <Plus className="h-4 w-4" />
           Nova Ordem de Serviço
@@ -350,9 +350,9 @@ export const ServiceOrders: React.FC = () => {
             />
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 text-xs w-40">
+              <SelectTrigger className="h-9 text-xs w-full sm:w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -368,7 +368,7 @@ export const ServiceOrders: React.FC = () => {
             </Select>
 
             <Select value={collaboratorFilter} onValueChange={setCollaboratorFilter}>
-              <SelectTrigger className="h-9 text-xs w-44">
+              <SelectTrigger className="h-9 text-xs w-full sm:w-44">
                 <SelectValue placeholder="Técnico" />
               </SelectTrigger>
               <SelectContent>
@@ -385,9 +385,10 @@ export const ServiceOrders: React.FC = () => {
       </Card>
 
       {/* Tabela de Ordens de Serviço */}
-      <Card className="border-border">
+      <Card className="border-border overflow-hidden">
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
+            <Table className="w-full min-w-[850px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-24">OS</TableHead>
@@ -532,6 +533,7 @@ export const ServiceOrders: React.FC = () => {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
