@@ -51,6 +51,7 @@ import {
   RefreshCw,
   Printer,
   ChevronRight,
+  ChevronLeft,
   Layers,
   Store,
   Volume2,
@@ -131,6 +132,9 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
   // Modo Tela Cheia
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Aba Ativa no Mobile (Catálogo vs Cupom)
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cupom'>('catalog');
 
   // Calculadora de Troco Dinheiro
   const [cashGiven, setCashGiven] = useState<number>(0);
@@ -636,32 +640,32 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   return (
     <div className="h-full flex flex-col min-h-0 space-y-2 animate-fade-in">
       {/* Barra de Controle Superior do Modo Loja */}
-      <div className="shrink-0 bg-card border rounded-xl p-2.5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+      <div className="shrink-0 bg-card border rounded-xl p-2 sm:p-2.5 shadow-sm flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-emerald-600/10 text-emerald-600 rounded-lg shrink-0">
-            <Store className="h-5 w-5" />
+            <Store className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-bold text-foreground leading-tight">Modo Loja & Frente de Caixa Touch</h2>
-              <Badge className="bg-emerald-600 text-white text-[9px] uppercase font-bold tracking-wider px-1.5 py-0">
+              <h2 className="text-xs sm:text-sm font-bold text-foreground truncate">Modo Loja & Frente de Caixa Touch</h2>
+              <Badge className="bg-emerald-600 text-white text-[9px] uppercase font-bold tracking-wider px-1.5 py-0 shrink-0">
                 PDV Balcão
               </Badge>
             </div>
-            <p className="text-[10.5px] text-muted-foreground leading-tight">
+            <p className="hidden sm:block text-[10.5px] text-muted-foreground leading-tight truncate">
               Toque nos cards para incluir produtos e serviços com velocidade máxima.
             </p>
           </div>
         </div>
 
         {/* Botões de Ação Rápida */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-1.5 shrink-0">
           {onBackToOrders && (
             <Button
               variant="outline"
               size="sm"
               onClick={onBackToOrders}
-              className="text-xs h-7 gap-1 text-muted-foreground flex-1 sm:flex-initial"
+              className="text-[11px] sm:text-xs h-7 gap-1 text-muted-foreground px-2"
             >
               Voltar aos Pedidos
             </Button>
@@ -671,20 +675,69 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             variant="outline"
             size="sm"
             onClick={toggleFullscreen}
-            className="text-xs h-7 gap-1 text-primary border-primary/30 flex-1 sm:flex-initial"
+            className="text-[11px] sm:text-xs h-7 gap-1 text-primary border-primary/30 px-2"
           >
             {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-            {isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia'}
+            <span className="hidden sm:inline">{isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia'}</span>
           </Button>
         </div>
       </div>
 
+      {/* Seletor Mobile: Catálogo vs Cupom (Visível apenas em telas menores que lg) */}
+      <div className="lg:hidden shrink-0 grid grid-cols-2 gap-1 p-1 bg-muted/60 border rounded-xl shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setMobileTab('catalog')}
+          className={cn(
+            'py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5',
+            mobileTab === 'catalog'
+              ? 'bg-card text-foreground shadow-xs border border-border/60'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Store className="h-3.5 w-3.5" />
+          <span>Catálogo</span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 ml-1 font-semibold">
+            {catalogItems.length}
+          </Badge>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('cupom')}
+          className={cn(
+            'py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 relative',
+            mobileTab === 'cupom'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          <span>Cupom</span>
+          {cart.length > 0 && (
+            <span
+              className={cn(
+                'text-[10px] font-extrabold px-1.5 py-0 rounded-full',
+                mobileTab === 'cupom' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'
+              )}
+            >
+              {cart.reduce((sum, item) => sum + item.quantity, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Grid Principal: Esquerda (Catálogo Touch) vs Direita (Cupom de Venda) */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0">
+      <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-12 lg:gap-3 lg:overflow-hidden relative">
         {/* ==================================================================== */}
         {/* LADO ESQUERDO: CATÁLOGO TOUCH COM BOTÕES GRANDES (7 Colunas) */}
         {/* ==================================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0 h-auto lg:h-full space-y-2">
+        <div
+          className={cn(
+            'lg:col-span-7 xl:col-span-8 flex-col min-h-0 h-full space-y-2',
+            mobileTab === 'catalog' ? 'flex flex-1' : 'hidden lg:flex'
+          )}
+        >
           {/* Barra de Pesquisa e Filtros Rápidos */}
           <div className="shrink-0 bg-card border rounded-xl p-2.5 space-y-2 shadow-xs">
             <div className="flex flex-col sm:flex-row gap-2">
@@ -793,7 +846,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           </div>
 
           {/* Grid de Cards Touch (Botões Grandes) com Rolagem Dinâmica */}
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 scrollbar-thin">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 scrollbar-thin pb-24 lg:pb-0">
             {catalogItems.length === 0 ? (
               <div className="col-span-full py-12 text-center bg-card border border-dashed rounded-xl p-6 space-y-3">
                 <Package className="h-10 w-10 text-muted-foreground mx-auto opacity-40" />
@@ -908,7 +961,30 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         {/* ==================================================================== */}
         {/* LADO DIREITO: CUPOM / COMANDA DE ATENDIMENTO (5 Colunas) */}
         {/* ==================================================================== */}
-        <div id="store-pos-cupom" className="lg:col-span-5 xl:col-span-4 bg-card border rounded-xl shadow-md p-3 flex flex-col min-h-0 h-auto lg:h-full">
+        <div
+          id="store-pos-cupom"
+          className={cn(
+            'lg:col-span-5 xl:col-span-4 bg-card border rounded-xl shadow-md p-2.5 sm:p-3 flex-col min-h-0 h-full',
+            mobileTab === 'cupom' ? 'flex flex-1' : 'hidden lg:flex'
+          )}
+        >
+          {/* Botão Superior Mobile para Voltar ao Catálogo */}
+          <div className="lg:hidden flex items-center justify-between pb-1.5 border-b mb-1 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMobileTab('catalog')}
+              className="h-7 text-xs text-primary gap-1 px-1.5 -ml-1 font-semibold hover:bg-primary/10"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              + Adicionar Mais Itens
+            </Button>
+            <span className="text-xs font-bold text-muted-foreground">
+              Total: {formatCurrency(grandTotal)}
+            </span>
+          </div>
+
           {/* Topo: Identificação e Cabeçalho */}
           <div className="shrink-0 space-y-1.5 pb-2 border-b">
             {/* Cabeçalho do Cupom */}
@@ -1229,13 +1305,11 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       </div>
 
       {/* Mobile Floating Cupom / Checkout Button */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-16 sm:bottom-20 left-3 right-3 z-30 lg:hidden">
+      {cart.length > 0 && mobileTab === 'catalog' && (
+        <div className="fixed bottom-16 sm:bottom-20 left-2 right-2 z-30 lg:hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
           <button
             type="button"
-            onClick={() => {
-              document.getElementById('store-pos-cupom')?.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={() => setMobileTab('cupom')}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-xl flex items-center justify-between border border-emerald-400/30 active:scale-[0.98] transition-transform"
           >
             <div className="flex items-center gap-2">
@@ -1244,9 +1318,12 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
               </div>
               <div className="text-left">
                 <p className="text-xs font-bold leading-tight">
-                  {cart.length} {cart.length === 1 ? 'item no cupom' : 'itens no cupom'}
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)}{' '}
+                  {cart.reduce((sum, item) => sum + item.quantity, 0) === 1
+                    ? 'item no cupom'
+                    : 'itens no cupom'}
                 </p>
-                <p className="text-[10px] text-white/80 leading-tight">Toque para pagar / finalizar</p>
+                <p className="text-[10px] text-white/80 leading-tight">Toque para revisar cupom e pagar</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5">

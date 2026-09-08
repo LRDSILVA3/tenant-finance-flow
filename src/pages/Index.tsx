@@ -147,7 +147,7 @@ const Index: React.FC = () => {
       <main className={cn(
         "flex-1 container px-3 sm:px-6",
         currentView === 'store_pos'
-          ? "py-2 pb-16 md:pb-2 overflow-hidden flex flex-col min-h-0"
+          ? "py-1.5 px-2 sm:px-6 pb-16 md:pb-2 overflow-hidden flex flex-col min-h-0 h-full max-w-full"
           : "py-4 sm:py-6 pb-20 md:pb-6 overflow-y-auto"
       )}>
         {renderView()}
