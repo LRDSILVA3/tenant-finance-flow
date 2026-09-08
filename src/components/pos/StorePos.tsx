@@ -56,7 +56,10 @@ import {
   Store,
   Volume2,
   ArrowRight,
+  Camera,
+  Barcode,
 } from 'lucide-react';
+import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 
 // Web Audio API para Bipe Sonoro
 const playBeep = (freq = 880, duration = 0.08) => {
@@ -148,6 +151,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [isCollaboratorPickerOpen, setIsCollaboratorPickerOpen] = useState(false);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
 
   // Atalho de Teclado Foco e Scroll do Cupom
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -376,6 +380,36 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
     setTimeout(() => {
       cartEndRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' });
     }, 50);
+  };
+
+  // Leitura de Código de Barras via Câmera do Aparelho
+  const handleScanBarcodeInPos = (scannedCode: string) => {
+    const cleanCode = scannedCode.trim().toLowerCase();
+    const foundProduct = products.find(
+      (p) => (p.sku && p.sku.toLowerCase() === cleanCode) || (p.name && p.name.toLowerCase() === cleanCode)
+    );
+
+    if (foundProduct) {
+      handleAddToCart({
+        id: foundProduct.id,
+        isService: false,
+        name: foundProduct.name,
+        sku: foundProduct.sku,
+        salePrice: Number(foundProduct.sale_price) || 0,
+        costPrice: Number(foundProduct.cost_price) || 0,
+        currentStock: foundProduct.current_stock,
+      });
+      toast({
+        title: 'Produto Adicionado!',
+        description: `${foundProduct.name} incluído no cupom.`,
+      });
+    } else {
+      toast({
+        title: 'Produto não encontrado',
+        description: `Nenhum produto cadastrado com o código "${scannedCode}".`,
+        variant: 'destructive',
+      });
+    }
   };
 
   // Alterar quantidade
@@ -741,16 +775,29 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           {/* Barra de Pesquisa e Filtros Rápidos */}
           <div className="shrink-0 bg-card border rounded-xl p-2.5 space-y-2 shadow-xs">
             <div className="flex flex-col sm:flex-row gap-2">
-              {/* Campo de Busca / Leitor F2 */}
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Buscar produto, serviço ou código de barras... (F2)"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-8 text-xs"
-                />
+              {/* Campo de Busca / Leitor F2 e Botão Câmera */}
+              <div className="flex items-center gap-1.5 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Buscar produto, serviço ou código de barras... (F2)"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-8 text-xs"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCameraScannerOpen(true)}
+                  className="h-8 px-2.5 text-xs gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 shrink-0 shadow-2xs font-semibold"
+                  title="Abrir Câmera do Celular para Bipar"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Câmera</span>
+                </Button>
               </div>
 
               {/* Filtro: Todos | Produtos | Serviços */}
@@ -1333,6 +1380,41 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           </button>
         </div>
       )}
+
+      {/* MODAL DE LEITURA POR CÂMERA DO CELULAR */}
+      <Dialog open={isCameraScannerOpen} onOpenChange={setIsCameraScannerOpen}>
+        <DialogContent className="max-w-md p-4 space-y-3">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Camera className="h-5 w-5 text-emerald-600" />
+              Scanner de Câmera (Celular / Web)
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Aponte a câmera para o código de barras ou SKU do produto para incluir direto no cupom.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DeviceCameraScanner
+            active={isCameraScannerOpen}
+            onScan={handleScanBarcodeInPos}
+            placeholderText="Aproxime o código de barras do produto"
+          />
+
+          <div className="flex items-center justify-between pt-2 border-t text-xs">
+            <span className="font-semibold text-muted-foreground">
+              Itens no cupom: {cart.reduce((sum, item) => sum + item.quantity, 0)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsCameraScannerOpen(false)}
+              className="text-xs h-8"
+            >
+              Fechar Câmera
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE CONFIRMAÇÃO DE VENDA */}
       <Dialog open={isConfirmModalOpen} onOpenChange={setIsConfirmModalOpen}>

@@ -56,7 +56,9 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  Camera,
 } from 'lucide-react';
+import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 import { generateServiceOrderPdf } from './ServiceOrderPdf';
 
 // Web Audio API Beep helper
@@ -159,6 +161,7 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
 
   // Scanner de Código de Barras / Leitor Móvel para Peças da OS
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [scannerSource, setScannerSource] = useState<'device_camera' | 'remote_qr'>('device_camera');
   const [scanSessionId, setScanSessionId] = useState<string>(() => crypto.randomUUID());
   const [scanConnected, setScanConnected] = useState(false);
   const [localIp, setLocalIp] = useState('');
@@ -1447,70 +1450,109 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
             </Button>
           </form>
 
-          {/* Seção de Pareamento do Celular (QR Code) */}
-          <div className="border rounded-lg p-3 bg-muted/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold flex items-center gap-1.5 text-foreground">
-                <Smartphone className="h-4 w-4 text-primary" />
-                Câmera do Celular (Sem Fio)
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-[10px] text-muted-foreground gap-1 p-1"
-                onClick={() => {
-                  setScanSessionId(crypto.randomUUID());
-                  setScanConnected(false);
-                  toast({ title: 'Novo QR Code gerado!' });
-                }}
+          {/* Seção de Câmera do Aparelho vs Pareamento Remoto */}
+          <div className="border rounded-xl p-3 bg-muted/30 space-y-3">
+            <div className="flex bg-muted p-1 rounded-lg border gap-1">
+              <button
+                type="button"
+                onClick={() => setScannerSource('device_camera')}
+                className={cn(
+                  'flex-1 py-1.5 px-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5',
+                  scannerSource === 'device_camera'
+                    ? 'bg-card text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
               >
-                <RefreshCw className="h-3 w-3" />
-                Novo QR
-              </Button>
+                <Camera className="h-3.5 w-3.5 text-emerald-600" />
+                Câmera Deste Aparelho
+              </button>
+              <button
+                type="button"
+                onClick={() => setScannerSource('remote_qr')}
+                className={cn(
+                  'flex-1 py-1.5 px-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5',
+                  scannerSource === 'remote_qr'
+                    ? 'bg-card text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Smartphone className="h-3.5 w-3.5 text-primary" />
+                Parear Outro Celular
+              </button>
             </div>
 
-            <div className="flex flex-col items-center justify-center text-center space-y-2 pt-1">
-              <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-200">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
-                    scanUrl
-                  )}`}
-                  alt="QR Code do Scanner"
-                  className="w-[130px] h-[130px]"
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground max-w-xs leading-tight">
-                Aponte a câmera do celular para bipar peças de reposição diretamente para esta Ordem de Serviço.
-              </p>
-
-              {window.location.origin.includes('localhost') && (
-                <div className="w-full max-w-xs space-y-1 text-left pt-1">
-                  <Label htmlFor="os-local-ip" className="text-[10px] font-semibold text-amber-600">
-                    IP Local do PC (Rede Wi-Fi):
-                  </Label>
-                  <Input
-                    id="os-local-ip"
-                    placeholder="Ex: 192.168.1.15"
-                    className="h-7 text-xs"
-                    value={localIp}
-                    onChange={(e) => setLocalIp(e.target.value)}
-                  />
+            {scannerSource === 'device_camera' ? (
+              <DeviceCameraScanner
+                active={isScanModalOpen && scannerSource === 'device_camera'}
+                onScan={handleBarcodeReceived}
+                placeholderText="Aponte a câmera para o código da peça"
+              />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold flex items-center gap-1.5 text-foreground text-xs">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                    Câmera de Outro Celular (Sem Fio)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] text-muted-foreground gap-1 p-1"
+                    onClick={() => {
+                      setScanSessionId(crypto.randomUUID());
+                      setScanConnected(false);
+                      toast({ title: 'Novo QR Code gerado!' });
+                    }}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Novo QR
+                  </Button>
                 </div>
-              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-[11px] text-muted-foreground h-7"
-                onClick={() => {
-                  navigator.clipboard.writeText(scanUrl);
-                  toast({ title: 'Link de escaneamento copiado!' });
-                }}
-              >
-                <Copy className="h-3 w-3" />
-                Copiar link do scanner
-              </Button>
-            </div>
+                <div className="flex flex-col items-center justify-center text-center space-y-2 pt-1">
+                  <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-200">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
+                        scanUrl
+                      )}`}
+                      alt="QR Code do Scanner"
+                      className="w-[130px] h-[130px]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground max-w-xs leading-tight">
+                    Aponte a câmera de outro celular para o QR Code para bipar peças de reposição diretamente para esta Ordem de Serviço.
+                  </p>
+
+                  {window.location.origin.includes('localhost') && (
+                    <div className="w-full max-w-xs space-y-1 text-left pt-1">
+                      <Label htmlFor="os-local-ip" className="text-[10px] font-semibold text-amber-600">
+                        IP Local do PC (Rede Wi-Fi):
+                      </Label>
+                      <Input
+                        id="os-local-ip"
+                        placeholder="Ex: 192.168.1.15"
+                        className="h-7 text-xs"
+                        value={localIp}
+                        onChange={(e) => setLocalIp(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-[11px] text-muted-foreground h-7"
+                    onClick={() => {
+                      navigator.clipboard.writeText(scanUrl);
+                      toast({ title: 'Link de escaneamento copiado!' });
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copiar link do scanner
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lista de Peças Vinculadas */}

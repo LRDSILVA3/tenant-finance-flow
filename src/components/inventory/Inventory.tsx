@@ -55,8 +55,10 @@ import {
   Flame,
   ShieldAlert,
   AlertCircle,
-  X
+  X,
+  Camera,
 } from 'lucide-react';
+import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 
 const isSameCart = (cartA: any[], cartB: any[]) => {
   if (!cartA || !cartB) return false;
@@ -187,6 +189,7 @@ export const Inventory: React.FC = () => {
 
   // Realtime Scanner States
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [scannerSource, setScannerSource] = useState<'device_camera' | 'remote_qr'>('device_camera');
   const [scanSessionId, setScanSessionId] = useState<string>(() => crypto.randomUUID());
   const [scanConnected, setScanConnected] = useState(false);
   const [scanMode, setScanMode] = useState<'sale' | 'in' | 'adjustment'>('sale');
@@ -1776,18 +1779,46 @@ export const Inventory: React.FC = () => {
               </form>
             </div>
 
-            {/* Mobile Sync Pairing Section (only if not connected) */}
-            {!scanConnected && (
-              <div className="border rounded-lg p-3 bg-indigo-50/10 border-indigo-500/20 space-y-2">
-                <details className="group">
-                  <summary className="text-xs font-semibold flex items-center justify-between cursor-pointer text-indigo-600 dark:text-indigo-400 select-none">
-                    <span className="flex items-center gap-1.5">
-                      <Smartphone className="h-4 w-4" />
-                      Deseja usar o Celular como Leitor Sem Fio?
-                    </span>
-                    <span className="transition group-open:rotate-180">▼</span>
-                  </summary>
-                  <div className="pt-3 flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-200">
+            {/* Seção de Câmera do Aparelho vs Pareamento Remoto */}
+            <div className="border rounded-xl p-3 bg-muted/30 space-y-3">
+              <div className="flex bg-muted p-1 rounded-lg border gap-1">
+                <button
+                  type="button"
+                  onClick={() => setScannerSource('device_camera')}
+                  className={cn(
+                    'flex-1 py-1.5 px-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5',
+                    scannerSource === 'device_camera'
+                      ? 'bg-card text-foreground shadow-xs font-bold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Camera className="h-3.5 w-3.5 text-emerald-600" />
+                  Câmera Deste Aparelho
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScannerSource('remote_qr')}
+                  className={cn(
+                    'flex-1 py-1.5 px-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5',
+                    scannerSource === 'remote_qr'
+                      ? 'bg-card text-foreground shadow-xs font-bold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Smartphone className="h-3.5 w-3.5 text-primary" />
+                  Parear Outro Celular
+                </button>
+              </div>
+
+              {scannerSource === 'device_camera' ? (
+                <DeviceCameraScanner
+                  active={isScanModalOpen && scannerSource === 'device_camera'}
+                  onScan={handleBarcodeReceived}
+                  placeholderText="Aponte a câmera para o código do produto"
+                />
+              ) : (
+                !scanConnected && (
+                  <div className="pt-2 flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-200">
                     <div className="p-2.5 bg-white rounded-lg shadow border border-slate-200">
                       <img 
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(scanUrl)}`} 
@@ -1796,7 +1827,7 @@ export const Inventory: React.FC = () => {
                       />
                     </div>
                     <p className="text-[11px] text-muted-foreground max-w-sm">
-                      Aponte a câmera do celular para o QR Code acima para parear o dispositivo e escanear de onde estiver.
+                      Aponte a câmera de outro celular para o QR Code acima para parear o dispositivo e escanear de onde estiver.
                     </p>
                     {window.location.origin.includes('localhost') && (
                       <div className="w-full max-w-xs mx-auto space-y-1.5 text-left">
@@ -1823,9 +1854,9 @@ export const Inventory: React.FC = () => {
                       Copiar link de conexão
                     </Button>
                   </div>
-                </details>
-              </div>
-            )}
+                )
+              )}
+            </div>
 
             <div className="space-y-4 py-2">
               {/* Mobile sync workflow toggle */}
