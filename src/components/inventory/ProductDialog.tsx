@@ -166,7 +166,6 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
         location: form.location.trim() || null,
         description: form.description.trim() || null,
         expiration_date: form.expirationDate.trim() || null,
-        is_active: true,
       };
 
       if (product?.id) {
