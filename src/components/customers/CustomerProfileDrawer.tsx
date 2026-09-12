@@ -398,16 +398,61 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       list.push({ id: a.id, type: 'appointment', date: a.scheduledAt, data: a });
     });
 
-    // 4. Lançamentos Financeiros Avulsos de Venda / Receita (que não duplicam Pedido ou OS)
-    const standaloneTrans = transactions.filter(
-      (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
-    );
-    standaloneTrans.forEach((t) => {
-      list.push({ id: t.id, type: 'transaction', date: new Date(t.date), data: t });
-    });
+    // 4. Lançamentos Financeiros de Venda / Receita do Cliente (sem duplicar Pedido/OS já presentes)
+    transactions
+      .filter((t) => t.type === 'income')
+      .forEach((t) => {
+        const isDuplicatedByOrder = t.orderId && orders.some((o) => o.id === t.orderId);
+        const isDuplicatedBySO = t.serviceOrderId && serviceOrders.some((s) => s.id === t.serviceOrderId);
+        if (!isDuplicatedByOrder && !isDuplicatedBySO) {
+          list.push({ id: t.id, type: 'transaction', date: new Date(t.date), data: t });
+        }
+      });
 
     return list.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [orders, serviceOrders, appointments, transactions]);
+
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'paid' | 'pending'>('all');
+
+  const paidCount = useMemo(() => {
+    return unifiedTimeline.filter((e) => {
+      if (e.type === 'order') return (e.data as Order).paymentStatus === 'paid' || (e.data as Order).status === 'completed';
+      if (e.type === 'service_order') return (e.data as ServiceOrder).paymentStatus === 'paid' || (e.data as ServiceOrder).status === 'completed' || (e.data as ServiceOrder).status === 'invoiced';
+      if (e.type === 'transaction') return (e.data as Transaction).status === 'completed';
+      return false;
+    }).length;
+  }, [unifiedTimeline]);
+
+  const pendingCount = useMemo(() => {
+    return unifiedTimeline.filter((e) => {
+      if (e.type === 'order') return (e.data as Order).paymentStatus === 'pending';
+      if (e.type === 'service_order') return (e.data as ServiceOrder).paymentStatus === 'pending';
+      if (e.type === 'transaction') return (e.data as Transaction).status === 'pending';
+      return false;
+    }).length;
+  }, [unifiedTimeline]);
+
+  const filteredTimeline = useMemo(() => {
+    if (historyFilter === 'all') return unifiedTimeline;
+    return unifiedTimeline.filter((event) => {
+      if (event.type === 'order') {
+        const o = event.data as Order;
+        const isPaid = o.paymentStatus === 'paid' || o.status === 'completed';
+        return historyFilter === 'paid' ? isPaid : !isPaid;
+      }
+      if (event.type === 'service_order') {
+        const s = event.data as ServiceOrder;
+        const isPaid = s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
+        return historyFilter === 'paid' ? isPaid : !isPaid;
+      }
+      if (event.type === 'transaction') {
+        const t = event.data as Transaction;
+        const isPaid = t.status === 'completed';
+        return historyFilter === 'paid' ? isPaid : !isPaid;
+      }
+      return historyFilter === 'all';
+    });
+  }, [unifiedTimeline, historyFilter]);
 
   const handleDownloadPdf = (order: Order) => {
     try {
@@ -727,18 +772,71 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                       </div>
                     )}
 
-                    {unifiedTimeline.length === 0 ? (
+                    {/* Barra de Filtros de Histórico */}
+                    <div className="flex items-center justify-between gap-2 pb-1">
+                      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilter('all')}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md font-medium text-xs transition-all',
+                            historyFilter === 'all'
+                              ? 'bg-background text-foreground shadow-xs font-bold'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          Todas ({unifiedTimeline.filter((e) => e.type !== 'appointment').length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilter('paid')}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1',
+                            historyFilter === 'paid'
+                              ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                              : 'text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-400'
+                          )}
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                          Pagas / Quitadas ({paidCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilter('pending')}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1',
+                            historyFilter === 'pending'
+                              ? 'bg-amber-600 text-white shadow-xs font-bold'
+                              : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400'
+                          )}
+                        >
+                          <AlertCircle className="h-3 w-3" />
+                          Pendentes ({pendingCount})
+                        </button>
+                      </div>
+                    </div>
+
+                    {filteredTimeline.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground border rounded-lg border-dashed">
                         <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-xs font-semibold">Nenhuma compra ou serviço registrado</p>
+                        <p className="text-xs font-semibold">
+                          {historyFilter === 'paid'
+                            ? 'Nenhuma compra ou pagamento quitado encontrado'
+                            : historyFilter === 'pending'
+                            ? 'Nenhum débito ou lançamento pendente'
+                            : 'Nenhuma compra ou serviço registrado'}
+                        </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          As vendas feitas no PDV e OS deste cliente aparecerão aqui.
+                          {historyFilter !== 'all'
+                            ? 'Alterne o filtro acima para visualizar todas as movimentações.'
+                            : 'As vendas feitas no PDV e OS deste cliente aparecerão aqui.'}
                         </p>
                       </div>
                     ) : (
-                      unifiedTimeline.map((event) => {
+                      filteredTimeline.map((event) => {
                         if (event.type === 'order') {
                           const o = event.data as Order;
+                          const isPaid = o.paymentStatus === 'paid' || o.status === 'completed';
                           return (
                             <div
                               key={o.id}
@@ -750,29 +848,28 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                     🛒
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="text-xs font-bold text-foreground">
                                         Pedido #{o.orderNumber}
                                       </span>
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          'text-[9px] px-1 py-0 uppercase',
-                                          o.status === 'completed' && 'bg-emerald-50 text-emerald-700 border-emerald-300',
-                                          o.status === 'pending' && 'bg-amber-50 text-amber-700 border-amber-300',
-                                          o.status === 'cancelled' && 'bg-rose-50 text-rose-700 border-rose-300'
+                                          'text-[9px] px-1.5 py-0 font-bold',
+                                          isPaid
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
                                         )}
                                       >
-                                        {o.status === 'completed'
-                                          ? 'Concluído'
-                                          : o.status === 'pending'
-                                          ? 'Pendente'
-                                          : o.status === 'cancelled'
-                                          ? 'Cancelado'
-                                          : 'Rascunho'}
+                                        {isPaid ? '✓ PAGO' : '⚠️ PENDENTE'}
                                       </Badge>
+                                      {o.status === 'cancelled' && (
+                                        <Badge variant="destructive" className="text-[9px] px-1 py-0">
+                                          Cancelado
+                                        </Badge>
+                                      )}
                                     </div>
-                                    <p className="text-[10.5px] text-muted-foreground">
+                                    <p className="text-[10.5px] text-muted-foreground mt-0.5">
                                       {formatDate(o.createdAt)} • Pagamento:{' '}
                                       <strong className="text-foreground capitalize">{o.paymentMethod || 'Dinheiro'}</strong>
                                     </p>
@@ -839,6 +936,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
                         if (event.type === 'service_order') {
                           const s = event.data as ServiceOrder;
+                          const isPaid = s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
                           return (
                             <div
                               key={s.id}
@@ -850,15 +948,23 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                     🔧
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="text-xs font-bold text-foreground">
                                         OS #{s.osNumber} — {s.title}
                                       </span>
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0">
-                                        {s.status}
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          'text-[9px] px-1.5 py-0 font-bold',
+                                          isPaid
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
+                                        )}
+                                      >
+                                        {isPaid ? '✓ PAGO' : '⚠️ PENDENTE'}
                                       </Badge>
                                     </div>
-                                    <p className="text-[10.5px] text-muted-foreground">
+                                    <p className="text-[10.5px] text-muted-foreground mt-0.5">
                                       {formatDate(s.createdAt)} {s.equipmentInfo && `• ${s.equipmentInfo}`}
                                     </p>
                                   </div>
@@ -899,6 +1005,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
                         if (event.type === 'transaction') {
                           const t = event.data as Transaction;
+                          const isPaid = t.status === 'completed';
                           return (
                             <div
                               key={t.id}
@@ -910,23 +1017,23 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                     💵
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="text-xs font-bold text-foreground">
                                         {t.description || 'Lançamento de Venda / Receita'}
                                       </span>
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          'text-[9px] px-1 py-0 uppercase font-semibold',
-                                          t.status === 'completed'
-                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40'
-                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40'
+                                          'text-[9px] px-1.5 py-0 font-bold',
+                                          isPaid
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
                                         )}
                                       >
-                                        {t.status === 'completed' ? 'Recebido' : 'Pendente'}
+                                        {isPaid ? '✓ PAGO' : '⚠️ PENDENTE'}
                                       </Badge>
                                     </div>
-                                    <p className="text-[10.5px] text-muted-foreground">
+                                    <p className="text-[10.5px] text-muted-foreground mt-0.5">
                                       {formatDate(t.date)}
                                       {t.category ? ` • ${t.category}` : ''}
                                       {t.paymentMethod ? ` • ${(t.paymentMethod).toUpperCase()}` : ''}
@@ -939,7 +1046,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                   <p
                                     className={cn(
                                       'text-xs font-bold',
-                                      t.status === 'completed' ? 'text-emerald-600' : 'text-amber-600'
+                                      isPaid ? 'text-emerald-600' : 'text-amber-600'
                                     )}
                                   >
                                     {formatCurrency(t.amount)}
