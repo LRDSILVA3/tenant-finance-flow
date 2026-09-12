@@ -117,6 +117,9 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
         setForm(emptyForm);
       }
       setErrors({});
+    } else {
+      setForm(emptyForm);
+      setErrors({});
     }
   }, [open, customer]);
 

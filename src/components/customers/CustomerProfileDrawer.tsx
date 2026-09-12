@@ -1,6 +1,6 @@
 // CustomerProfileDrawer.tsx - Visão 360° do Cliente (Histórico de Compras, Métricas RFM & Preferências CRM)
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Customer, Order, ServiceOrder, Appointment, Transaction } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -57,12 +57,14 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pendingDebt, setPendingDebt] = useState<number>(0);
 
+  // Ref para rastrear o ID do cliente atualmente ativo e descartar respostas assíncronas obsoletas
+  const activeCustomerIdRef = useRef<string | null>(null);
+
   // Modal de Comprovante de Pedido (Reuso do Componente Oficial)
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<Order | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  const loadCustomerData = useCallback(async () => {
-    if (!customer?.id) return;
+  const loadCustomerData = useCallback(async (targetCustomerId: string) => {
     setLoading(true);
 
     try {
@@ -76,8 +78,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             product:products(name, sku)
           )
         `)
-        .eq('customer_id', customer.id)
+        .eq('customer_id', targetCustomerId)
         .order('created_at', { ascending: false });
+
+      // Se o cliente mudou durante a requisição, aborta para não vazar dados
+      if (activeCustomerIdRef.current !== targetCustomerId) return;
 
       if (ordersData) {
         const mappedOrders: Order[] = ordersData.map((o: any) => ({
@@ -111,7 +116,9 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             createdAt: new Date(i.created_at),
           })),
         }));
-        setOrders(mappedOrders);
+        if (activeCustomerIdRef.current === targetCustomerId) {
+          setOrders(mappedOrders);
+        }
       }
 
       // 2. Carregar Ordens de Serviço
@@ -122,8 +129,10 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
           service_order_services (*),
           service_order_products (*)
         `)
-        .eq('customer_id', customer.id)
+        .eq('customer_id', targetCustomerId)
         .order('created_at', { ascending: false });
+
+      if (activeCustomerIdRef.current !== targetCustomerId) return;
 
       if (soData) {
         const mappedSO: ServiceOrder[] = soData.map((s: any) => ({
@@ -151,61 +160,89 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
           createdAt: new Date(s.created_at),
           updatedAt: new Date(s.updated_at),
         }));
-        setServiceOrders(mappedSO);
+        if (activeCustomerIdRef.current === targetCustomerId) {
+          setServiceOrders(mappedSO);
+        }
       }
 
       // 3. Carregar Agendamentos
       const { data: appData } = await supabase
         .from('appointments')
         .select('*')
-        .eq('customer_id', customer.id)
+        .eq('customer_id', targetCustomerId)
         .order('scheduled_at', { ascending: false });
 
+      if (activeCustomerIdRef.current !== targetCustomerId) return;
+
       if (appData) {
-        setAppointments(
-          appData.map((a: any) => ({
-            id: a.id,
-            clientId: a.client_id,
-            customerId: a.customer_id,
-            serviceTypeId: a.service_type_id,
-            collaboratorId: a.collaborator_id,
-            title: a.title,
-            scheduledAt: new Date(a.scheduled_at),
-            durationMinutes: Number(a.duration_minutes) || 30,
-            price: Number(a.price) || 0,
-            status: a.status,
-            notes: a.notes,
-            transactionId: a.transaction_id,
-            createdAt: new Date(a.created_at),
-            updatedAt: new Date(a.updated_at),
-          }))
-        );
+        if (activeCustomerIdRef.current === targetCustomerId) {
+          setAppointments(
+            appData.map((a: any) => ({
+              id: a.id,
+              clientId: a.client_id,
+              customerId: a.customer_id,
+              serviceTypeId: a.service_type_id,
+              collaboratorId: a.collaborator_id,
+              title: a.title,
+              scheduledAt: new Date(a.scheduled_at),
+              durationMinutes: Number(a.duration_minutes) || 30,
+              price: Number(a.price) || 0,
+              status: a.status,
+              notes: a.notes,
+              transactionId: a.transaction_id,
+              createdAt: new Date(a.created_at),
+              updatedAt: new Date(a.updated_at),
+            }))
+          );
+        }
       }
 
       // 4. Carregar Saldo Devedor Pendente
       const { data: transData } = await supabase
         .from('transactions')
         .select('amount, status, type')
-        .eq('customer_id', customer.id)
+        .eq('customer_id', targetCustomerId)
         .eq('type', 'income')
         .eq('status', 'pending');
 
+      if (activeCustomerIdRef.current !== targetCustomerId) return;
+
       if (transData) {
         const debt = transData.reduce((acc, t: any) => acc + (Number(t.amount) || 0), 0);
-        setPendingDebt(debt);
+        if (activeCustomerIdRef.current === targetCustomerId) {
+          setPendingDebt(debt);
+        }
       }
     } catch (err) {
       console.error('Erro ao carregar histórico do cliente:', err);
     } finally {
+      if (activeCustomerIdRef.current === targetCustomerId) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  // Limpa o estado imediatamente e busca os novos dados ao abrir ou alternar cliente
+  useEffect(() => {
+    activeCustomerIdRef.current = customer?.id || null;
+    setSelectedOrderForReceipt(null);
+    setIsReceiptOpen(false);
+
+    if (open && customer?.id) {
+      setOrders([]);
+      setServiceOrders([]);
+      setAppointments([]);
+      setPendingDebt(0);
+      setActiveTab('history');
+      loadCustomerData(customer.id);
+    } else {
+      setOrders([]);
+      setServiceOrders([]);
+      setAppointments([]);
+      setPendingDebt(0);
       setLoading(false);
     }
-  }, [customer?.id]);
-
-  useEffect(() => {
-    if (open && customer) {
-      loadCustomerData();
-    }
-  }, [open, customer, loadCustomerData]);
+  }, [open, customer?.id, loadCustomerData]);
 
   // ─── Métricas RFM & Comerciais ──────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -443,7 +480,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                   <TrendingUp className="h-3 w-3 text-emerald-600" /> LTV Total Gasto
                 </p>
                 <p className="text-base font-bold text-foreground mt-0.5">
-                  {formatCurrency(metrics.totalSpentLTV)}
+                  {loading ? (
+                    <span className="text-xs font-normal text-muted-foreground animate-pulse">Carregando...</span>
+                  ) : (
+                    formatCurrency(metrics.totalSpentLTV)
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -454,10 +495,16 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                   <ShoppingBag className="h-3 w-3 text-blue-600" /> Compras / Pedidos
                 </p>
                 <p className="text-base font-bold text-foreground mt-0.5">
-                  {metrics.totalTransactionsCount}{' '}
-                  <span className="text-[10.5px] font-normal text-muted-foreground">
-                    ({orders.length} vendas)
-                  </span>
+                  {loading ? (
+                    <span className="text-xs font-normal text-muted-foreground animate-pulse">...</span>
+                  ) : (
+                    <>
+                      {metrics.totalTransactionsCount}{' '}
+                      <span className="text-[10.5px] font-normal text-muted-foreground">
+                        ({orders.length} vendas)
+                      </span>
+                    </>
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -468,7 +515,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                   <Percent className="h-3 w-3 text-indigo-600" /> Ticket Médio
                 </p>
                 <p className="text-base font-bold text-foreground mt-0.5">
-                  {formatCurrency(metrics.avgTicket)}
+                  {loading ? (
+                    <span className="text-xs font-normal text-muted-foreground animate-pulse">...</span>
+                  ) : (
+                    formatCurrency(metrics.avgTicket)
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -479,7 +530,13 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                   <CreditCard className="h-3 w-3" /> Saldo a Receber
                 </p>
                 <p className={cn("text-base font-bold mt-0.5", pendingDebt > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-600")}>
-                  {pendingDebt > 0 ? formatCurrency(pendingDebt) : 'Em dia (R$ 0)'}
+                  {loading ? (
+                    <span className="text-xs font-normal text-muted-foreground animate-pulse">...</span>
+                  ) : pendingDebt > 0 ? (
+                    formatCurrency(pendingDebt)
+                  ) : (
+                    'Em dia (R$ 0)'
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -495,11 +552,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
               <TabsList className="grid grid-cols-3 h-9 w-full">
                 <TabsTrigger value="history" className="text-xs gap-1.5">
                   <Receipt className="h-3.5 w-3.5" />
-                  Últimas Compras ({orders.length + serviceOrders.length})
+                  Últimas Compras {loading ? '' : `(${orders.length + serviceOrders.length})`}
                 </TabsTrigger>
                 <TabsTrigger value="top_items" className="text-xs gap-1.5">
                   <Package className="h-3.5 w-3.5 text-primary" />
-                  Mais Comprados ({topProducts.length})
+                  Mais Comprados {loading ? '' : `(${topProducts.length})`}
                 </TabsTrigger>
                 <TabsTrigger value="preferences" className="text-xs gap-1.5">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" />
