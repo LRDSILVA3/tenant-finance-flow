@@ -44,6 +44,7 @@
 - **Formatting**: Always use `formatDateForDB` (YYYY-MM-DD) when persisting dates to Supabase.
 
 ## Git Workflow & Commits
+- **Trigger**: **ONLY commit and push to git when EXPLICITLY requested by the user.** NEVER commit automatically on your own.
 - **Language**: Commit messages MUST ALWAYS be written in **English**.
 - **Format**: Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - **Author Identity**: Always commit as `Lucas Silva <rm.pessoal13@gmail.com>`.
