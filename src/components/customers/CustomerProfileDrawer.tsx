@@ -423,43 +423,36 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
   const [historyFilter, setHistoryFilter] = useState<'all' | 'paid' | 'pending'>('all');
 
+  const isEventPaid = (event: { type: string; data: any }) => {
+    if (event.type === 'order') {
+      const o = event.data as Order;
+      return o.paymentStatus === 'paid' || o.status === 'completed';
+    }
+    if (event.type === 'service_order') {
+      const s = event.data as ServiceOrder;
+      return s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
+    }
+    if (event.type === 'transaction') {
+      const t = event.data as Transaction;
+      return t.status === 'completed' || t.status === 'paid';
+    }
+    return true;
+  };
+
   const paidCount = useMemo(() => {
-    return unifiedTimeline.filter((e) => {
-      if (e.type === 'order') return (e.data as Order).paymentStatus === 'paid' || (e.data as Order).status === 'completed';
-      if (e.type === 'service_order') return (e.data as ServiceOrder).paymentStatus === 'paid' || (e.data as ServiceOrder).status === 'completed' || (e.data as ServiceOrder).status === 'invoiced';
-      if (e.type === 'transaction') return (e.data as Transaction).status === 'completed';
-      return false;
-    }).length;
+    return unifiedTimeline.filter((e) => e.type !== 'appointment' && isEventPaid(e)).length;
   }, [unifiedTimeline]);
 
   const pendingCount = useMemo(() => {
-    return unifiedTimeline.filter((e) => {
-      if (e.type === 'order') return (e.data as Order).paymentStatus === 'pending';
-      if (e.type === 'service_order') return (e.data as ServiceOrder).paymentStatus === 'pending';
-      if (e.type === 'transaction') return (e.data as Transaction).status === 'pending';
-      return false;
-    }).length;
+    return unifiedTimeline.filter((e) => e.type !== 'appointment' && !isEventPaid(e)).length;
   }, [unifiedTimeline]);
 
   const filteredTimeline = useMemo(() => {
     if (historyFilter === 'all') return unifiedTimeline;
     return unifiedTimeline.filter((event) => {
-      if (event.type === 'order') {
-        const o = event.data as Order;
-        const isPaid = o.paymentStatus === 'paid' || o.status === 'completed';
-        return historyFilter === 'paid' ? isPaid : !isPaid;
-      }
-      if (event.type === 'service_order') {
-        const s = event.data as ServiceOrder;
-        const isPaid = s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
-        return historyFilter === 'paid' ? isPaid : !isPaid;
-      }
-      if (event.type === 'transaction') {
-        const t = event.data as Transaction;
-        const isPaid = t.status === 'completed';
-        return historyFilter === 'paid' ? isPaid : !isPaid;
-      }
-      return historyFilter === 'all';
+      if (event.type === 'appointment') return historyFilter === 'all';
+      const isPaid = isEventPaid(event);
+      return historyFilter === 'paid' ? isPaid : !isPaid;
     });
   }, [unifiedTimeline, historyFilter]);
 
@@ -1014,7 +1007,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
                         if (event.type === 'transaction') {
                           const t = event.data as Transaction;
-                          const isPaid = t.status === 'completed';
+                          const isPaid = t.status === 'completed' || t.status === 'paid';
                           return (
                             <div
                               key={t.id}

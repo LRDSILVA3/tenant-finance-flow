@@ -148,7 +148,7 @@ export const generateCustomerStatementPdf = ({
   const completedOrders = orders.filter((o) => o.status !== 'cancelled');
   const completedSO = serviceOrders.filter((s) => s.status !== 'cancelled');
   const standaloneCompletedTrans = transactions.filter(
-    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income' && t.status === 'completed'
+    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income' && (t.status === 'completed' || t.status === 'paid')
   );
   const totalLTV =
     completedOrders.reduce((s, o) => s + o.totalAmount, 0) +
