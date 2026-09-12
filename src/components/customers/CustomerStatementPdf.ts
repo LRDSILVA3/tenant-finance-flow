@@ -147,14 +147,20 @@ export const generateCustomerStatementPdf = ({
   // Cálculos de totais
   const completedOrders = orders.filter((o) => o.status !== 'cancelled');
   const completedSO = serviceOrders.filter((s) => s.status !== 'cancelled');
-  const totalLTV = completedOrders.reduce((s, o) => s + o.totalAmount, 0) + completedSO.reduce((s, o) => s + o.totalAmount, 0);
-  const totalOrdersCount = completedOrders.length + completedSO.length;
+  const standaloneCompletedTrans = transactions.filter(
+    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income' && t.status === 'completed'
+  );
+  const totalLTV =
+    completedOrders.reduce((s, o) => s + o.totalAmount, 0) +
+    completedSO.reduce((s, o) => s + o.totalAmount, 0) +
+    standaloneCompletedTrans.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const totalOrdersCount = completedOrders.length + completedSO.length + standaloneCompletedTrans.length;
 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(100, 116, 139); // Slate-500
   doc.text('TOTAL HISTÓRICO COMPRADO (LTV)', 18, currentY + 6);
-  doc.text('TOTAL DE COMPRAS / OS', 75, currentY + 6);
+  doc.text('TOTAL DE COMPRAS / TRANSAÇÕES', 75, currentY + 6);
   doc.text('TOTAL DE DÉBITO EM ABERTO', 130, currentY + 6);
 
   doc.setFontSize(10.5);
@@ -284,7 +290,7 @@ export const generateCustomerStatementPdf = ({
     doc.text('✓ NENHUM DÉBITO PENDENTE: Este cliente está com todas as suas contas em dia.', 20, currentY + 12);
   }
 
-  // 5. TABELA 2: HISTÓRICO DE COMPRAS E SERVIÇOS RECENTES
+  // 5. TABELA 2: HISTÓRICO DE COMPRAS, SERVIÇOS E LANÇAMENTOS RECENTES
   const finalTable1Y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : currentY + 24;
   let nextSectionY = finalTable1Y;
 
@@ -296,40 +302,74 @@ export const generateCustomerStatementPdf = ({
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('2. HISTÓRICO DE PEDIDOS E SERVIÇOS REALIZADOS', 14, nextSectionY);
+  doc.text('2. HISTÓRICO DE COMPRAS, SERVIÇOS E LANÇAMENTOS REALIZADOS', 14, nextSectionY);
 
-  const historyRows: any[] = [];
+  const historyEvents: Array<{
+    date: Date;
+    docType: string;
+    items: string;
+    payment: string;
+    status: string;
+    amount: number;
+  }> = [];
 
-  // Pedidos
-  orders.slice(0, 10).forEach((o) => {
-    const itemsText = (o.items || []).map((i) => `${i.quantity}x ${i.productName}`).join(', ') || 'Produtos diversos';
-    historyRows.push([
-      formatDate(new Date(o.createdAt)),
-      `Pedido #${o.orderNumber}`,
-      itemsText,
-      (o.paymentMethod || 'Dinheiro').toUpperCase(),
-      o.status === 'completed' ? 'Concluído' : o.status === 'pending' ? 'Pendente' : 'Cancelado',
-      formatCurrency(o.totalAmount),
-    ]);
+  // Pedidos de Venda / PDV
+  orders.forEach((o) => {
+    const itemsText = (o.items || []).map((i) => `${i.quantity}x ${i.productName}`).join(', ') || 'Produtos de estoque';
+    historyEvents.push({
+      date: new Date(o.createdAt),
+      docType: `Pedido #${o.orderNumber}`,
+      items: itemsText,
+      payment: (o.paymentMethod || 'Dinheiro').toUpperCase(),
+      status: o.status === 'completed' ? 'Concluído' : o.status === 'pending' ? 'Pendente' : 'Cancelado',
+      amount: o.totalAmount,
+    });
   });
 
   // Ordens de Serviço
-  serviceOrders.slice(0, 10).forEach((s) => {
-    historyRows.push([
-      formatDate(new Date(s.createdAt)),
-      `OS #${s.osNumber}`,
-      s.title + (s.equipmentInfo ? ` (${s.equipmentInfo})` : ''),
-      (s.paymentMethod || 'Dinheiro').toUpperCase(),
-      s.status === 'completed' ? 'Finalizada' : 'Em andamento',
-      formatCurrency(s.totalAmount),
-    ]);
+  serviceOrders.forEach((s) => {
+    historyEvents.push({
+      date: new Date(s.createdAt),
+      docType: `OS #${s.osNumber}`,
+      items: s.title + (s.equipmentInfo ? ` (${s.equipmentInfo})` : ''),
+      payment: (s.paymentMethod || 'Dinheiro').toUpperCase(),
+      status: s.status === 'completed' ? 'Finalizada' : 'Em andamento',
+      amount: s.totalAmount,
+    });
   });
+
+  // Lançamentos Financeiros Avulsos de Venda / Receitas do Cliente
+  const standaloneTrans = transactions.filter(
+    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
+  );
+  standaloneTrans.forEach((t) => {
+    historyEvents.push({
+      date: new Date(t.date),
+      docType: 'Lançamento Avulso',
+      items: `${t.description || 'Venda / Receita'}${t.category ? ` [${t.category}]` : ''}${t.notes ? ` (${t.notes})` : ''}`,
+      payment: (t.paymentMethod || 'Dinheiro').toUpperCase(),
+      status: t.status === 'completed' ? 'Recebido' : 'Pendente',
+      amount: Number(t.amount) || 0,
+    });
+  });
+
+  // Ordenar eventos por data decrescente
+  historyEvents.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const historyRows = historyEvents.slice(0, 20).map((ev) => [
+    formatDate(ev.date),
+    ev.docType,
+    ev.items,
+    ev.payment,
+    ev.status,
+    formatCurrency(ev.amount),
+  ]);
 
   if (historyRows.length > 0) {
     autoTable(doc, {
       startY: nextSectionY + 3,
       margin: { left: 14, right: 14 },
-      head: [['Data', 'Documento', 'Itens / Serviços', 'Forma Pgto', 'Status', 'Valor Total (R$)']],
+      head: [['Data', 'Documento', 'Itens / Descrição', 'Forma Pgto', 'Status', 'Valor Total (R$)']],
       body: historyRows,
       theme: 'grid',
       headStyles: {
@@ -340,8 +380,8 @@ export const generateCustomerStatementPdf = ({
       },
       columnStyles: {
         0: { cellWidth: 20, fontSize: 7 },
-        1: { cellWidth: 26, fontSize: 7, fontStyle: 'bold' },
-        2: { cellWidth: 72, fontSize: 7 },
+        1: { cellWidth: 28, fontSize: 7, fontStyle: 'bold' },
+        2: { cellWidth: 70, fontSize: 7 },
         3: { cellWidth: 20, fontSize: 7 },
         4: { cellWidth: 20, fontSize: 7 },
         5: { cellWidth: 19, halign: 'right', fontSize: 7, fontStyle: 'bold' },
@@ -353,41 +393,7 @@ export const generateCustomerStatementPdf = ({
     });
   }
 
-  // 6. Termo de Acordo / Reconhecimento e Assinatura do Cliente
-  const finalTable2Y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 12 : nextSectionY + 20;
-  let signatureY = finalTable2Y;
-
-  if (signatureY > 240) {
-    doc.addPage();
-    signatureY = 25;
-  }
-
-  if (hasDebt && pdfSettings.showSignatures) {
-    doc.setFillColor(248, 250, 252);
-    doc.rect(14, signatureY, 182, 28, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(14, signatureY, 182, 28, 'S');
-
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(
-      'Reconheço a exatidão das compras, serviços e saldo devedor discriminado neste extrato, comprometendo-me com a sua quitação.',
-      18,
-      signatureY + 6
-    );
-
-    // Linha de assinatura
-    doc.setDrawColor(148, 163, 184);
-    doc.line(40, signatureY + 20, 170, signatureY + 20);
-
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Assinatura do Cliente / Responsável: ${customer.name}`, 105, signatureY + 24, { align: 'center' });
-  }
-
-  // 7. Rodapé em todas as páginas
+  // 6. Rodapé em todas as páginas
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

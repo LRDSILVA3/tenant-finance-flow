@@ -284,14 +284,25 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       .filter((s) => s.status !== 'cancelled')
       .reduce((sum, s) => sum + s.totalAmount, 0);
 
-    const totalSpentLTV = totalOrdersAmount + totalSOAmount;
-    const totalTransactionsCount = orders.length + serviceOrders.length;
+    const standaloneTransactions = transactions.filter(
+      (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
+    );
+    const totalTransactionsAmount = standaloneTransactions
+      .filter((t) => t.status === 'completed')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    const totalSpentLTV = totalOrdersAmount + totalSOAmount + totalTransactionsAmount;
+    const totalTransactionsCount =
+      orders.filter((o) => o.status !== 'cancelled').length +
+      serviceOrders.filter((s) => s.status !== 'cancelled').length +
+      standaloneTransactions.length;
     const avgTicket = totalTransactionsCount > 0 ? totalSpentLTV / totalTransactionsCount : 0;
 
-    // Última compra (data mais recente entre pedidos e OS)
+    // Última compra (data mais recente entre pedidos, OS e lançamentos)
     const orderDates = orders.map((o) => o.createdAt.getTime());
     const soDates = serviceOrders.map((s) => s.createdAt.getTime());
-    const allDates = [...orderDates, ...soDates];
+    const transDates = standaloneTransactions.map((t) => new Date(t.date).getTime());
+    const allDates = [...orderDates, ...soDates, ...transDates];
     const lastPurchaseTimestamp = allDates.length > 0 ? Math.max(...allDates) : null;
     const lastPurchaseDate = lastPurchaseTimestamp ? new Date(lastPurchaseTimestamp) : null;
 
@@ -308,12 +319,13 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       lastPurchaseDate,
       daysSinceLastPurchase,
     };
-  }, [orders, serviceOrders]);
+  }, [orders, serviceOrders, transactions]);
 
-  // ─── Top Produtos Comprados pelo Cliente ─────────────────────────────────────
+  // ─── Top Produtos Comprados pelo Cliente (Vendas de Estoque / Peças) ──────────
   const topProducts = useMemo(() => {
     const map = new Map<string, TopProductStat>();
 
+    // Itens de Pedidos de Venda / PDV
     orders.forEach((o) => {
       if (o.status === 'cancelled') return;
       (o.items || []).forEach((item) => {
@@ -327,7 +339,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         } else {
           map.set(item.productId, {
             id: item.productId,
-            name: item.productName || 'Produto',
+            name: item.productName || 'Produto de Estoque',
             quantity: item.quantity,
             totalAmount: item.totalPrice,
             lastBoughtAt: o.createdAt.toISOString(),
@@ -336,32 +348,66 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       });
     });
 
+    // Peças & Produtos aplicados em Ordens de Serviço
+    serviceOrders.forEach((s) => {
+      if (s.status === 'cancelled') return;
+      (s.products || []).forEach((item) => {
+        const existing = map.get(item.productId);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.totalAmount += item.totalPrice;
+          if (new Date(s.createdAt) > new Date(existing.lastBoughtAt)) {
+            existing.lastBoughtAt = s.createdAt.toISOString();
+          }
+        } else {
+          map.set(item.productId, {
+            id: item.productId,
+            name: item.productName || 'Peça / Material de Estoque',
+            quantity: item.quantity,
+            totalAmount: item.totalPrice,
+            lastBoughtAt: s.createdAt.toISOString(),
+          });
+        }
+      });
+    });
+
     return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity);
-  }, [orders]);
+  }, [orders, serviceOrders]);
 
   // ─── Timeline Unificada de Eventos Comerciais ──────────────────────────────
   const unifiedTimeline = useMemo(() => {
     const list: Array<{
       id: string;
-      type: 'order' | 'service_order' | 'appointment';
+      type: 'order' | 'service_order' | 'appointment' | 'transaction';
       date: Date;
       data: any;
     }> = [];
 
+    // 1. Pedidos de Venda
     orders.forEach((o) => {
       list.push({ id: o.id, type: 'order', date: o.createdAt, data: o });
     });
 
+    // 2. Ordens de Serviço
     serviceOrders.forEach((s) => {
       list.push({ id: s.id, type: 'service_order', date: s.createdAt, data: s });
     });
 
+    // 3. Agendamentos
     appointments.forEach((a) => {
       list.push({ id: a.id, type: 'appointment', date: a.scheduledAt, data: a });
     });
 
+    // 4. Lançamentos Financeiros Avulsos de Venda / Receita (que não duplicam Pedido ou OS)
+    const standaloneTrans = transactions.filter(
+      (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
+    );
+    standaloneTrans.forEach((t) => {
+      list.push({ id: t.id, type: 'transaction', date: new Date(t.date), data: t });
+    });
+
     return list.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [orders, serviceOrders, appointments]);
+  }, [orders, serviceOrders, appointments, transactions]);
 
   const handleDownloadPdf = (order: Order) => {
     try {
@@ -629,7 +675,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
               <TabsList className="grid grid-cols-3 h-9 w-full">
                 <TabsTrigger value="history" className="text-xs gap-1.5">
                   <Receipt className="h-3.5 w-3.5" />
-                  Últimas Compras {loading ? '' : `(${orders.length + serviceOrders.length})`}
+                  Últimas Compras {loading ? '' : `(${unifiedTimeline.filter((e) => e.type !== 'appointment').length})`}
                 </TabsTrigger>
                 <TabsTrigger value="top_items" className="text-xs gap-1.5">
                   <Package className="h-3.5 w-3.5 text-primary" />
@@ -847,6 +893,59 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                               <Badge variant="secondary" className="text-[10px]">
                                 {a.status}
                               </Badge>
+                            </div>
+                          );
+                        }
+
+                        if (event.type === 'transaction') {
+                          const t = event.data as Transaction;
+                          return (
+                            <div
+                              key={t.id}
+                              className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-all shadow-xs space-y-2"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                    💵
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-bold text-foreground">
+                                        {t.description || 'Lançamento de Venda / Receita'}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          'text-[9px] px-1 py-0 uppercase font-semibold',
+                                          t.status === 'completed'
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40'
+                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40'
+                                        )}
+                                      >
+                                        {t.status === 'completed' ? 'Recebido' : 'Pendente'}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[10.5px] text-muted-foreground">
+                                      {formatDate(t.date)}
+                                      {t.category ? ` • ${t.category}` : ''}
+                                      {t.paymentMethod ? ` • ${(t.paymentMethod).toUpperCase()}` : ''}
+                                      {t.notes ? ` • Obs: ${t.notes}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <p
+                                    className={cn(
+                                      'text-xs font-bold',
+                                      t.status === 'completed' ? 'text-emerald-600' : 'text-amber-600'
+                                    )}
+                                  >
+                                    {formatCurrency(t.amount)}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           );
                         }

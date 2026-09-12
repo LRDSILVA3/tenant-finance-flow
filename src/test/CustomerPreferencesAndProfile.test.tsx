@@ -66,15 +66,40 @@ vi.mock('@/integrations/supabase/client', () => ({
           }),
         } as any;
       }
-      if (table === 'service_orders' || table === 'appointments' || table === 'transactions') {
+      if (table === 'transactions') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'trans-1',
+                      client_id: 'client-123',
+                      description: 'Venda Avulsa de Balcão',
+                      amount: 85.5,
+                      date: new Date('2026-09-08T10:00:00Z').toISOString(),
+                      status: 'completed',
+                      type: 'income',
+                      payment_method: 'pix',
+                      category: 'Venda de Mercadorias',
+                      customer_id: 'cust-1',
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        } as any;
+      }
+      if (table === 'service_orders' || table === 'appointments') {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
             }),
           }),
         } as any;
@@ -136,10 +161,11 @@ describe('Customer 360 Profile and Preferences', () => {
       expect(screen.getByText(/5% Desc. Padrão/i)).toBeInTheDocument();
     });
 
-    // Deve exibir o histórico de pedidos
+    // Deve exibir o histórico de pedidos e lançamentos avulsos
     await waitFor(() => {
       expect(screen.getByText(/Pedido #1001/i)).toBeInTheDocument();
       expect(screen.getByText('Arroz Premium 5kg')).toBeInTheDocument();
+      expect(screen.getByText('Venda Avulsa de Balcão')).toBeInTheDocument();
     });
   });
 
