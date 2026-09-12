@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { ProductDialog } from './ProductDialog';
+import { ProductDialog, ProductDialogProduct } from './ProductDialog';
 import { 
   Package, 
   Plus, 
@@ -254,29 +254,13 @@ export const Inventory: React.FC = () => {
   const [manualDesktopSku, setManualDesktopSku] = useState('');
 
   // Selected Data for Edits / Adjustments
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | ProductDialogProduct | null>(null);
 
   // History Modal States
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [movementsHistory, setMovementsHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Form States - Product
-  const [productForm, setProductForm] = useState({
-    name: '',
-    sku: '',
-    supplierId: '',
-    costPrice: 0,
-    salePrice: 0,
-    minStock: 0,
-    initialStock: 0,
-    category: '',
-    unit: 'UN',
-    location: '',
-    description: '',
-    expirationDate: '',
-  });
 
   // Form States - Supplier
   const [supplierForm, setSupplierForm] = useState({
@@ -400,38 +384,18 @@ export const Inventory: React.FC = () => {
       if (!foundProduct) {
         toast({
           title: "Novo produto detectado",
-          description: "Buscando nome na base global de produtos..."
+          description: `Código lido: ${cleanCode}. Preencha o cadastro do produto.`
         });
-        setSelectedProduct(null);
-        setProductForm({
+        setSelectedProduct({
           name: '',
           sku: cleanCode,
-          supplierId: '',
-          costPrice: 0,
-          salePrice: 0,
-          minStock: 0,
-          initialStock: 1,
-          category: '',
+          cost_price: 0,
+          sale_price: 0,
+          min_stock: 0,
+          current_stock: 1,
           unit: 'UN',
-          location: '',
-          description: '',
         });
         setIsProductModalOpen(true);
-
-        // Async lookup na base global de produtos
-        fetchEanInfo(cleanCode).then((info) => {
-          if (info && info.name) {
-            setProductForm(prev => ({
-              ...prev,
-              name: info.name,
-              category: info.category || prev.category
-            }));
-            toast({
-              title: "✨ Produto localizado na base global!",
-              description: `Sugestão preenchida: "${info.name}"`
-            });
-          }
-        });
       } else {
         setScannedProductForAction(foundProduct);
         setScannedActionQty(1);
@@ -825,40 +789,12 @@ export const Inventory: React.FC = () => {
   // Open Create Product Modal
   const openCreateProduct = () => {
     setSelectedProduct(null);
-    setProductForm({
-      name: '',
-      sku: '',
-      supplierId: '',
-      costPrice: 0,
-      salePrice: 0,
-      minStock: 0,
-      initialStock: 0,
-      category: '',
-      unit: 'UN',
-      location: '',
-      description: '',
-      expirationDate: '',
-    });
     setIsProductModalOpen(true);
   };
 
   // Open Edit Product Modal
   const openEditProduct = (product: Product) => {
     setSelectedProduct(product);
-    setProductForm({
-      name: product.name,
-      sku: product.sku || '',
-      supplierId: product.supplier_id || '',
-      costPrice: product.cost_price,
-      salePrice: product.sale_price,
-      minStock: product.min_stock,
-      initialStock: product.current_stock,
-      category: product.category || '',
-      unit: product.unit || 'UN',
-      location: product.location || '',
-      description: product.description || '',
-      expirationDate: product.expiration_date || '',
-    });
     setIsProductModalOpen(true);
   };
 
@@ -913,66 +849,6 @@ export const Inventory: React.FC = () => {
     setScanSessionId(crypto.randomUUID());
     setScanConnected(false);
     toast({ title: "Sessão reiniciada!", description: "Novo QR Code de conexão gerado." });
-  };
-
-  // Save Product
-  const handleSaveProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentClient || !productForm.name.trim()) return;
-
-    try {
-      const payload: any = {
-        client_id: currentClient.id,
-        name: productForm.name.trim(),
-        sku: productForm.sku.trim() || null,
-        supplier_id: productForm.supplierId || null,
-        cost_price: productForm.costPrice,
-        sale_price: productForm.salePrice,
-        min_stock: productForm.minStock,
-        category: productForm.category.trim() || null,
-        unit: productForm.unit,
-        location: productForm.location.trim() || null,
-        description: productForm.description.trim() || null,
-        expiration_date: productForm.expirationDate || null,
-      };
-
-      if (selectedProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(payload)
-          .eq('id', selectedProduct.id);
-
-        if (error) throw error;
-        toast({ title: 'Produto atualizado com sucesso!' });
-      } else {
-        payload.current_stock = 0;
-        const { data: newProd, error } = await supabase
-          .from('products')
-          .insert(payload)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        if (productForm.initialStock > 0 && newProd) {
-          await supabase.from('stock_movements').insert({
-            client_id: currentClient.id,
-            product_id: newProd.id,
-            type: 'in',
-            quantity: productForm.initialStock,
-            notes: 'Ajuste inicial de estoque'
-          });
-        }
-
-        toast({ title: 'Produto cadastrado com sucesso!' });
-      }
-
-      setIsProductModalOpen(false);
-      loadProducts();
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Erro ao salvar produto', description: err instanceof Error ? err.message : 'Erro desconhecido', variant: 'destructive' });
-    }
   };
 
   // Delete Product

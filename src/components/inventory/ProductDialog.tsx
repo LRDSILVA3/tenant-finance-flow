@@ -25,13 +25,13 @@ import { Sparkles, Loader2 } from 'lucide-react';
 
 export interface ProductDialogProduct {
   id?: string;
-  name: string;
+  name?: string;
   sku?: string | null;
   supplier_id?: string | null;
-  cost_price: number;
-  sale_price: number;
-  min_stock: number;
-  current_stock: number;
+  cost_price?: number;
+  sale_price?: number;
+  min_stock?: number;
+  current_stock?: number;
   category?: string | null;
   unit?: string | null;
   location?: string | null;
@@ -111,36 +111,60 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
   });
 
   useEffect(() => {
-    if (product) {
-      setForm({
-        name: product.name || '',
-        sku: product.sku || '',
-        supplierId: product.supplier_id || '',
-        costPrice: Number(product.cost_price || 0),
-        salePrice: Number(product.sale_price || 0),
-        minStock: Number(product.min_stock || 0),
-        initialStock: Number(product.current_stock || 0),
-        category: product.category || '',
-        unit: product.unit || 'UN',
-        location: product.location || '',
-        description: product.description || '',
-        expirationDate: product.expiration_date || '',
-      });
-    } else {
-      setForm({
-        name: '',
-        sku: '',
-        supplierId: '',
-        costPrice: 0,
-        salePrice: 0,
-        minStock: 0,
-        initialStock: 0,
-        category: '',
-        unit: 'UN',
-        location: '',
-        description: '',
-        expirationDate: '',
-      });
+    if (open) {
+      if (product) {
+        setForm({
+          name: product.name || '',
+          sku: product.sku || '',
+          supplierId: product.supplier_id || '',
+          costPrice: Number(product.cost_price || 0),
+          salePrice: Number(product.sale_price || 0),
+          minStock: Number(product.min_stock || 0),
+          initialStock: Number(product.current_stock || 0),
+          category: product.category || '',
+          unit: product.unit || 'UN',
+          location: product.location || '',
+          description: product.description || '',
+          expirationDate: product.expiration_date || '',
+        });
+
+        if (!product.id && product.sku && !product.name) {
+          setFetchingEan(true);
+          fetchEanInfo(product.sku)
+            .then((info) => {
+              setFetchingEan(false);
+              if (info && info.name) {
+                setForm((p) => ({
+                  ...p,
+                  name: info.name,
+                  category: info.category || p.category || 'Geral',
+                }));
+                toast({
+                  title: '✨ Produto localizado na base global!',
+                  description: `Sugestão preenchida: "${info.name}"`,
+                });
+              }
+            })
+            .catch(() => {
+              setFetchingEan(false);
+            });
+        }
+      } else {
+        setForm({
+          name: '',
+          sku: '',
+          supplierId: '',
+          costPrice: 0,
+          salePrice: 0,
+          minStock: 0,
+          initialStock: 0,
+          category: '',
+          unit: 'UN',
+          location: '',
+          description: '',
+          expirationDate: '',
+        });
+      }
     }
   }, [product, open]);
 
@@ -177,7 +201,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
         if (error) throw error;
         toast({ title: 'Produto atualizado com sucesso!' });
       } else {
-        payload.current_stock = form.initialStock || 0;
+        payload.current_stock = 0;
         const { data: newProd, error } = await supabase
           .from('products')
           .insert(payload)

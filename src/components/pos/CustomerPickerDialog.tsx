@@ -279,11 +279,29 @@ export const CustomerPickerDialog: React.FC<CustomerPickerDialogProps> = ({
                         </div>
 
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-foreground truncate">{customer.name}</span>
                             {customer.personType === 'legal' && (
                               <Badge variant="outline" className="text-[8.5px] px-1 py-0">PJ</Badge>
                             )}
+                            {customer.tags && customer.tags.slice(0, 2).map((t) => (
+                              <Badge
+                                key={t}
+                                variant="outline"
+                                className={cn(
+                                  "text-[8px] px-1 py-0 h-3.5 font-semibold",
+                                  t === 'VIP' && "bg-amber-50 text-amber-900 border-amber-300 font-bold",
+                                  t === 'Atacado' && "bg-purple-50 text-purple-900 border-purple-300 font-bold"
+                                )}
+                              >
+                                {t}
+                              </Badge>
+                            ))}
+                            {customer.defaultDiscountPercent && customer.defaultDiscountPercent > 0 ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 text-[8px] px-1 py-0 h-3.5 font-bold border border-emerald-300">
+                                {customer.defaultDiscountPercent}% OFF
+                              </Badge>
+                            ) : null}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[10.5px] text-muted-foreground">

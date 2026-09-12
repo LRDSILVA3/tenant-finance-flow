@@ -17,9 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
+import { CustomerProfileDrawer } from '@/components/customers/CustomerProfileDrawer';
 import {
   Users, Plus, Search, Pencil, Trash2, UserCheck, UserX,
-  Phone, Mail, FileText, Loader2, CalendarDays, Cake, Wallet, Filter, ArrowUpDown, X
+  Phone, Mail, FileText, Loader2, CalendarDays, Cake, Wallet, Filter, ArrowUpDown, X, Eye, Sparkles
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -41,6 +42,13 @@ const mapRow = (r: Record<string, unknown>): Customer => ({
   state: r.state as string | undefined,
   notes: r.notes as string | undefined,
   isActive: r.is_active as boolean,
+  preferredPaymentMethod: r.preferred_payment_method as string | undefined,
+  defaultDiscountPercent: Number(r.default_discount_percent) || 0,
+  creditLimit: Number(r.credit_limit) || 0,
+  preferredContactChannel: (r.preferred_contact_channel as 'whatsapp' | 'email' | 'phone') || 'whatsapp',
+  deliveryInstructions: r.delivery_instructions as string | undefined,
+  tags: (r.tags as string[]) || [],
+  preferences: (r.preferences as any) || {},
   createdAt: new Date(r.created_at as string),
   updatedAt: new Date(r.updated_at as string),
 });
@@ -82,6 +90,11 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  // Perfil 360° / Histórico de Compras
+  const [selectedProfileCustomer, setSelectedProfileCustomer] = useState<Customer | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -462,7 +475,7 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                       <TableRow key={c.id} className={cn(!c.isActive && 'opacity-60')}>
                         <TableCell>
                           <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-semibold">{c.name}</span>
                               <Badge variant={c.personType === 'legal' ? 'outline' : 'secondary'} className={cn(
                                 "text-[9px] px-1 py-0 h-4 font-bold shrink-0",
@@ -470,6 +483,22 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                               )}>
                                 {c.personType === 'legal' ? 'PJ' : 'PF'}
                               </Badge>
+                              {c.tags && c.tags.slice(0, 2).map((t) => (
+                                <Badge
+                                  key={t}
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[8.5px] px-1 py-0 h-3.5 font-semibold",
+                                    t === 'VIP' && "bg-amber-50 text-amber-800 border-amber-300",
+                                    t === 'Atacado' && "bg-purple-50 text-purple-800 border-purple-300"
+                                  )}
+                                >
+                                  {t}
+                                </Badge>
+                              ))}
+                              {c.tags && c.tags.length > 2 && (
+                                <span className="text-[9px] text-muted-foreground font-mono">+{c.tags.length - 2}</span>
+                              )}
                             </div>
                             {c.city && c.state && (
                               <span className="text-[10px] text-muted-foreground mt-0.5">
@@ -502,6 +531,17 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="outline" size="sm"
+                              className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
+                              title="Ver Histórico 360° & Preferências"
+                              onClick={() => {
+                                setSelectedProfileCustomer(c);
+                                setIsProfileOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             {onNavigateToSchedule && (
                               <Button
                                 variant="outline" size="sm"
@@ -548,7 +588,14 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                   <div key={c.id} className={cn('finance-card p-4 space-y-3', !c.isActive && 'opacity-60')}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-semibold truncate">{c.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-semibold truncate">{c.name}</p>
+                          {c.tags && c.tags.map((t) => (
+                            <Badge key={t} variant="outline" className="text-[8.5px] px-1 py-0 h-3.5">
+                              {t}
+                            </Badge>
+                          ))}
+                        </div>
                         {c.phone && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Phone className="h-3 w-3" /> {c.phone}
@@ -564,18 +611,29 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
                         {c.isActive ? 'Ativo' : 'Inativo'}
                       </Badge>
                     </div>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                    <div className="flex items-center justify-end gap-1.5 pt-2 border-t flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 text-xs text-primary font-semibold"
+                        onClick={() => {
+                          setSelectedProfileCustomer(c);
+                          setIsProfileOpen(true);
+                        }}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Histórico 360°
+                      </Button>
                       {onNavigateToSchedule && (
-                        <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => onNavigateToSchedule(c.id)}>
+                        <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => onNavigateToSchedule(c.id)}>
                           <CalendarDays className="h-3.5 w-3.5" /> Agenda
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => openEdit(c)}>
+                      <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => openEdit(c)}>
                         <Pencil className="h-3.5 w-3.5" /> Editar
                       </Button>
                       <Button
                         variant="outline" size="sm"
-                        className="h-8 gap-1 text-destructive hover:text-destructive"
+                        className="h-8 gap-1 text-xs text-destructive hover:text-destructive"
                         onClick={() => { setSelectedCustomer(c); setIsDeleteOpen(true); }}
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Excluir
@@ -600,6 +658,18 @@ export const Customers: React.FC<{ onNavigateToSchedule?: (customerId: string) =
             reloadContextCustomers(currentClient.id);
           }
         }}
+      />
+
+      {/* Drawer 360° com Histórico de Compras e Preferências */}
+      <CustomerProfileDrawer
+        open={isProfileOpen}
+        onOpenChange={setIsProfileOpen}
+        customer={selectedProfileCustomer}
+        onEditCustomer={(c) => {
+          setSelectedCustomer(c);
+          setIsModalOpen(true);
+        }}
+        onNavigateToSchedule={onNavigateToSchedule}
       />
 
       {/* Delete Confirmation */}

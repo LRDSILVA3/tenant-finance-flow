@@ -1124,6 +1124,34 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                 </button>
               </div>
             </div>
+
+            {/* Chip Informativo de Preferências do Cliente Selecionado */}
+            {selectedCustomer && (
+              <div className="p-1.5 rounded-md bg-muted/40 border border-border/60 text-[10px] space-y-0.5 animate-fade-in">
+                <div className="flex items-center gap-1 flex-wrap font-medium">
+                  {selectedCustomer.tags && selectedCustomer.tags.map((t) => (
+                    <Badge key={t} variant="outline" className="text-[8px] px-1 py-0 h-3 font-semibold bg-background">
+                      {t}
+                    </Badge>
+                  ))}
+                  {selectedCustomer.defaultDiscountPercent && selectedCustomer.defaultDiscountPercent > 0 ? (
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                      ✨ {selectedCustomer.defaultDiscountPercent}% Desc.
+                    </span>
+                  ) : null}
+                  {selectedCustomer.preferredPaymentMethod && (
+                    <span className="text-muted-foreground capitalize">
+                      • Prefere: {selectedCustomer.preferredPaymentMethod}
+                    </span>
+                  )}
+                </div>
+                {selectedCustomer.preferences?.allergiesOrRestrictions && (
+                  <p className="text-rose-600 dark:text-rose-400 font-semibold truncate">
+                    ⚠️ {selectedCustomer.preferences.allergiesOrRestrictions}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Meio: Lista de Itens do Cupom - Ocupa 100% do Espaço Disponível com Rolagem */}
@@ -1622,7 +1650,26 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         onOpenChange={setIsCustomerPickerOpen}
         customers={customers}
         selectedCustomerId={selectedCustomerId}
-        onSelectCustomer={setSelectedCustomerId}
+        onSelectCustomer={(custId) => {
+          setSelectedCustomerId(custId);
+          const cust = customers.find((c) => c.id === custId);
+          if (cust) {
+            if (cust.preferredPaymentMethod) {
+              setPaymentMethod(cust.preferredPaymentMethod);
+            }
+            if (cust.preferences?.orderNotesDefault && !notes) {
+              setNotes(cust.preferences.orderNotesDefault);
+            }
+            if (cust.defaultDiscountPercent && cust.defaultDiscountPercent > 0 && globalDiscount === 0) {
+              const discVal = (subtotal * cust.defaultDiscountPercent) / 100;
+              setGlobalDiscount(discVal);
+              toast({
+                title: `✨ Desconto VIP de ${cust.defaultDiscountPercent}% aplicado`,
+                description: `Desconto padrão configurado para ${cust.name}.`,
+              });
+            }
+          }
+        }}
         onCustomerCreated={(newCust) => {
           setCustomers((prev) => [newCust, ...prev]);
         }}

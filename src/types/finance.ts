@@ -177,7 +177,16 @@ export interface FinancialSummary {
   balance: number;
 }
 
-// ─── Clientes (CRM Leve) ──────────────────────────────────────────────────────
+// ─── Clientes (CRM & Preferências) ───────────────────────────────────────────
+
+export interface CustomerPreferences {
+  favoriteProductIds?: string[];
+  orderNotesDefault?: string;
+  allergiesOrRestrictions?: string;
+  bestContactTime?: 'any' | 'morning' | 'afternoon' | 'night';
+  enablePromotions?: boolean;
+  [key: string]: unknown;
+}
 
 export interface Customer {
   id: string;
@@ -197,6 +206,14 @@ export interface Customer {
   notes?: string;
   isActive: boolean;
   asaasCustomerId?: string;
+  // Preferências e Condições Comerciais
+  preferredPaymentMethod?: string;
+  defaultDiscountPercent?: number;
+  creditLimit?: number;
+  preferredContactChannel?: 'whatsapp' | 'email' | 'phone';
+  deliveryInstructions?: string;
+  tags?: string[];
+  preferences?: CustomerPreferences;
   createdAt: Date;
   updatedAt: Date;
 }

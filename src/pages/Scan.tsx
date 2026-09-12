@@ -235,61 +235,63 @@ export const Scan: React.FC = () => {
     const timeString = new Date().toLocaleTimeString('pt-BR');
     setScannedCodes((prev) => [{ code, time: timeString }, ...prev.slice(0, 4)]);
 
-    if (channelRef.current) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'barcode',
-        payload: { code, timestamp: Date.now() },
-      });
-    }
-
-    if (mobileWorkflowEnabledRef.current && clientIdRef.current) {
-      setLoadingProduct(true);
-      setSelectedProduct(null);
-      setProductNotFoundCode(null);
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('client_id', clientIdRef.current)
-          .eq('sku', code)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-          // Mostra o painel de confirmação para pedir a quantidade em todos os modos
-          setSelectedProduct(data);
-          setScannedQty(scanModeRef.current === 'sale' ? 1 : (scanModeRef.current === 'adjustment' ? data.current_stock : 1));
-          setScannedCostPrice(data.cost_price || 0);
-          setScannedNotes(scanModeRef.current === 'in' ? 'Entrada via leitor móvel' : (scanModeRef.current === 'adjustment' ? 'Ajuste via leitor móvel' : ''));
-        } else {
-          // Produto não cadastrado: abre o cadastro
-          setProductNotFoundCode(code);
-          setNewProductForm({
-            name: '',
-            sku: code,
-            costPrice: 0,
-            salePrice: 0,
-            initialStock: 1,
-            category: '',
-            unit: 'UN',
-          });
-          toast({ title: "Código não cadastrado", description: `Deseja cadastrar o SKU: ${code}?`, variant: "destructive" });
-        }
-      } catch (err) {
-        console.error(err);
-        toast({ title: "Erro ao buscar produto", description: "Não foi possível carregar os detalhes do produto.", variant: "destructive" });
-        isProcessingRef.current = false;
-      } finally {
-        setLoadingProduct(false);
+    // Se o fluxo móvel detalhado estiver desativado, o celular opera como leitor sem fio puro (dispara código para o PC)
+    if (!mobileWorkflowEnabledRef.current || !clientIdRef.current) {
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'barcode',
+          payload: { code, timestamp: Date.now() },
+        });
       }
-    } else {
       toast({
-        title: "Código enviado!",
+        title: "Código enviado ao computador!",
         description: `Código: ${code}`,
       });
       isProcessingRef.current = false;
+      return;
+    }
+
+    // Se o fluxo móvel detalhado estiver ativo, carrega o produto para o operador definir quantidade no próprio celular
+    setLoadingProduct(true);
+    setSelectedProduct(null);
+    setProductNotFoundCode(null);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('client_id', clientIdRef.current)
+        .eq('sku', code)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        // Mostra o painel de confirmação para pedir a quantidade no celular
+        setSelectedProduct(data);
+        setScannedQty(scanModeRef.current === 'sale' ? 1 : (scanModeRef.current === 'adjustment' ? data.current_stock : 1));
+        setScannedCostPrice(data.cost_price || 0);
+        setScannedNotes(scanModeRef.current === 'in' ? 'Entrada via leitor móvel' : (scanModeRef.current === 'adjustment' ? 'Ajuste via leitor móvel' : ''));
+      } else {
+        // Produto não cadastrado: abre o cadastro
+        setProductNotFoundCode(code);
+        setNewProductForm({
+          name: '',
+          sku: code,
+          costPrice: 0,
+          salePrice: 0,
+          initialStock: 1,
+          category: '',
+          unit: 'UN',
+        });
+        toast({ title: "Código não cadastrado", description: `Deseja cadastrar o SKU: ${code}?`, variant: "destructive" });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro ao buscar produto", description: "Não foi possível carregar os detalhes do produto.", variant: "destructive" });
+      isProcessingRef.current = false;
+    } finally {
+      setLoadingProduct(false);
     }
   };
 
@@ -303,21 +305,18 @@ export const Scan: React.FC = () => {
         product_id: selectedProduct.id,
         type: 'in',
         quantity: scannedQty,
+        cost_price: scannedCostPrice > 0 ? scannedCostPrice : null,
         notes: scannedNotes || 'Entrada via scanner móvel'
       });
       if (moveError) throw moveError;
 
-      // Update product's cost price and stock
-      const newStock = selectedProduct.current_stock + scannedQty;
-      const { error: prodError } = await supabase
-        .from('products')
-        .update({ 
-          current_stock: newStock,
-          cost_price: scannedCostPrice > 0 ? scannedCostPrice : selectedProduct.cost_price
-        })
-        .eq('id', selectedProduct.id);
-
-      if (prodError) throw prodError;
+      // Se o preço de custo foi informado e for diferente, atualiza os metadados do produto
+      if (scannedCostPrice > 0 && scannedCostPrice !== selectedProduct.cost_price) {
+        await supabase
+          .from('products')
+          .update({ cost_price: scannedCostPrice })
+          .eq('id', selectedProduct.id);
+      }
 
       toast({ title: "Entrada registrada!", description: `Adicionado ${scannedQty} unidades a ${selectedProduct.name}` });
       
@@ -431,6 +430,7 @@ export const Scan: React.FC = () => {
     if (!clientId || !newProductForm.name.trim() || !newProductForm.sku.trim()) return;
     setLoadingProduct(true);
     try {
+      const initialStock = Number(newProductForm.initialStock) || 0;
       const { data, error } = await supabase
         .from('products')
         .insert({
@@ -439,7 +439,7 @@ export const Scan: React.FC = () => {
           sku: newProductForm.sku.trim(),
           cost_price: newProductForm.costPrice,
           sale_price: newProductForm.salePrice,
-          current_stock: newProductForm.initialStock,
+          current_stock: 0,
           unit: newProductForm.unit,
           category: newProductForm.category.trim(),
         })
@@ -448,38 +448,45 @@ export const Scan: React.FC = () => {
 
       if (error) throw error;
 
-      toast({ title: "Produto cadastrado!", description: data.name });
-      
       // If there was an initial stock, create a stock movement entry for it
-      if (newProductForm.initialStock > 0) {
+      if (initialStock > 0) {
         await supabase.from('stock_movements').insert({
           client_id: clientId,
           product_id: data.id,
           type: 'in',
-          quantity: newProductForm.initialStock,
+          quantity: initialStock,
           notes: 'Saldo inicial no cadastro móvel'
         });
       }
+
+      toast({ title: "Produto cadastrado com sucesso!", description: data.name });
 
       // Sync PC
       if (channelRef.current) {
         channelRef.current.send({
           type: 'broadcast',
           event: 'stock_updated',
-          payload: { productName: data.name, type: 'in', quantity: newProductForm.initialStock }
+          payload: { productName: data.name, type: 'in', quantity: initialStock }
         });
       }
 
-      // Immediately select the product for manual confirmation
-      setSelectedProduct(data);
-      setScannedQty(scanMode === 'sale' ? 1 : (scanMode === 'adjustment' ? data.current_stock : 1));
-      setScannedCostPrice(data.cost_price || 0);
-      setScannedNotes(scanMode === 'in' ? 'Entrada via leitor móvel' : (scanMode === 'adjustment' ? 'Ajuste via leitor móvel' : ''));
+      // Close registration panel and reset form
       setProductNotFoundCode(null);
+      setSelectedProduct(null);
+      setNewProductForm({
+        name: '',
+        sku: '',
+        costPrice: 0,
+        salePrice: 0,
+        initialStock: 1,
+        category: '',
+        unit: 'UN',
+      });
     } catch (err) {
       toast({ title: "Erro ao cadastrar produto", description: err instanceof Error ? err.message : 'Erro desconhecido', variant: "destructive" });
     } finally {
       setLoadingProduct(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -839,7 +846,7 @@ export const Scan: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-300 font-semibold">Preço de Custo</Label>
+                    <Label htmlFor="scanned-cost" className="text-xs text-slate-300 font-semibold">Preço de Custo</Label>
                     <MoneyInput 
                       id="scanned-cost"
                       value={scannedCostPrice} 

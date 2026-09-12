@@ -129,8 +129,13 @@ export const DeviceCameraScanner: React.FC<DeviceCameraScannerProps> = ({
           if (!cleanCode) return;
 
           const now = Date.now();
-          // Debounce: evitar disparos repetidos do mesmo código em menos de 2.2 segundos
-          if (lastScannedRef.current === cleanCode && now - lastScannedTimeRef.current < 2200) {
+          // Debounce geral: evitar qualquer disparo consecutivo em menos de 1.2 segundos
+          if (now - lastScannedTimeRef.current < 1200) {
+            return;
+          }
+
+          // Debounce específico: evitar disparos repetidos do mesmo código em menos de 3.5 segundos
+          if (lastScannedRef.current === cleanCode && now - lastScannedTimeRef.current < 3500) {
             return;
           }
 

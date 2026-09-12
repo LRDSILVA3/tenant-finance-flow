@@ -236,4 +236,35 @@ describe('Inventory Component - Controle de Lote de Estoque', () => {
       }));
     });
   });
+
+  it('deve abrir o modal de cadastro com o código/SKU preenchido ao escanear código novo na entrada de estoque', async () => {
+    render(<Inventory />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Coca-Cola 2L')).toBeInTheDocument();
+    });
+
+    // Abrir o modal do scanner
+    const scanBtn = screen.getByRole('button', { name: /Leitor de Código/i });
+    fireEvent.click(scanBtn);
+
+    // Mudar para o modo "Entrada de Estoque"
+    const inModeBtn = screen.getByRole('button', { name: /Entrada de Estoque/i });
+    fireEvent.click(inModeBtn);
+
+    // Digitar um SKU não cadastrado
+    const skuInput = screen.getByPlaceholderText('Aponte o leitor físico USB e bipe o código aqui...');
+    fireEvent.change(skuInput, { target: { value: '7891000100103' } });
+
+    // Submeter o código
+    const submitCodeBtn = screen.getByRole('button', { name: 'Enviar Código' });
+    fireEvent.click(submitCodeBtn);
+
+    // O modal de cadastro de produto deve abrir com o SKU já preenchido no input de código de barras
+    await waitFor(() => {
+      const productSkuField = screen.getByPlaceholderText('Código de barras');
+      expect(productSkuField).toBeInTheDocument();
+      expect(productSkuField).toHaveValue('7891000100103');
+    });
+  });
 });

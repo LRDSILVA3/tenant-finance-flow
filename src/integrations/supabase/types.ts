@@ -391,6 +391,9 @@ export type Database = {
           city: string | null
           client_id: string
           created_at: string
+          credit_limit: number | null
+          default_discount_percent: number | null
+          delivery_instructions: string | null
           document: string | null
           email: string | null
           id: string
@@ -401,8 +404,12 @@ export type Database = {
           number: string | null
           person_type: string | null
           phone: string | null
+          preferences: Json | null
+          preferred_contact_channel: string | null
+          preferred_payment_method: string | null
           state: string | null
           street: string | null
+          tags: string[] | null
           updated_at: string
         }
         Insert: {
@@ -411,6 +418,9 @@ export type Database = {
           city?: string | null
           client_id: string
           created_at?: string
+          credit_limit?: number | null
+          default_discount_percent?: number | null
+          delivery_instructions?: string | null
           document?: string | null
           email?: string | null
           id?: string
@@ -421,8 +431,12 @@ export type Database = {
           number?: string | null
           person_type?: string | null
           phone?: string | null
+          preferences?: Json | null
+          preferred_contact_channel?: string | null
+          preferred_payment_method?: string | null
           state?: string | null
           street?: string | null
+          tags?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -431,6 +445,9 @@ export type Database = {
           city?: string | null
           client_id?: string
           created_at?: string
+          credit_limit?: number | null
+          default_discount_percent?: number | null
+          delivery_instructions?: string | null
           document?: string | null
           email?: string | null
           id?: string
@@ -441,8 +458,12 @@ export type Database = {
           number?: string | null
           person_type?: string | null
           phone?: string | null
+          preferences?: Json | null
+          preferred_contact_channel?: string | null
+          preferred_payment_method?: string | null
           state?: string | null
           street?: string | null
+          tags?: string[] | null
           updated_at?: string
         }
         Relationships: [
