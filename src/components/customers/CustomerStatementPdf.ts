@@ -177,91 +177,216 @@ export const generateCustomerStatementPdf = ({
     doc.text('R$ 0,00 (Quitado)', 130, currentY + 13);
   }
 
-  // 4. TABELA 1: DETALHAMENTO DE DÉBITOS PENDENTES (O que deve e de onde veio)
+  // 4. TABELA ÚNICA CONSOLIDADA: EXTRATO COMPLETO DE COMPRAS, SERVIÇOS E DÉBITOS
   currentY += 24;
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('1. DISCRIMINAÇÃO DETALHADA DE DÉBITOS EM ABERTO', 14, currentY);
+  doc.text('EXTRATO CONSOLIDADO DE COMPRAS, SERVIÇOS E DÉBITOS', 14, currentY);
 
-  const pendingTransactions = transactions.filter((t) => t.status === 'pending' && t.type === 'income');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  // Montagem das linhas de débito com composição detalhada
-  const debtRows = pendingTransactions.map((t) => {
-    const dueDate = t.dueDate ? new Date(t.dueDate) : (t.date ? new Date(t.date) : new Date());
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueTime = new Date(dueDate);
-    dueTime.setHours(0, 0, 0, 0);
+  interface ConsolidatedRow {
+    date: Date;
+    docType: string;
+    description: string;
+    dueDateAndPayment: string;
+    situation: string;
+    isPending: boolean;
+    amount: number;
+  }
 
-    const diffDays = Math.round((today.getTime() - dueTime.getTime()) / (1000 * 60 * 60 * 24));
-    let statusSituation = 'A vencer';
-    if (diffDays > 0) {
-      statusSituation = `Vencido há ${diffDays} dia(s)`;
-    } else if (diffDays === 0) {
-      statusSituation = 'Vence Hoje';
-    } else {
-      statusSituation = `A vencer em ${Math.abs(diffDays)} dia(s)`;
-    }
+  const consolidatedList: ConsolidatedRow[] = [];
 
-    // Origem e Itens que compõem a dívida
-    let originStr = 'Lançamento Avulso / Conta a Receber';
-    let detailItemsStr = t.description || 'Venda / Serviço a prazo';
+  // 1. Pedidos de Venda / PDV
+  orders.forEach((o) => {
+    const itemsSummary = (o.items || [])
+      .map((item) => `${item.quantity}x ${item.productName}`)
+      .join(' | ') || (o.notes || 'Produtos de estoque');
 
-    if (t.orderId) {
-      const matchedOrder = orders.find((o) => o.id === t.orderId);
-      if (matchedOrder) {
-        originStr = `Pedido de Venda #${matchedOrder.orderNumber}`;
-        if (matchedOrder.items && matchedOrder.items.length > 0) {
-          const itemsSummary = matchedOrder.items
-            .map((item) => `${item.quantity}x ${item.productName}`)
-            .join(' | ');
-          detailItemsStr = `Itens: ${itemsSummary}${t.notes ? ` (Obs: ${t.notes})` : ''}`;
+    const linkedTrans = transactions.find((t) => t.orderId === o.id);
+    const dueDate = linkedTrans?.dueDate ? new Date(linkedTrans.dueDate) : (o.dueDate ? new Date(o.dueDate) : undefined);
+    const paymentMethodStr = (linkedTrans?.paymentMethod || o.paymentMethod || 'Dinheiro').toUpperCase();
+
+    let situation = '✓ Quitado / Pago';
+    let isPending = false;
+
+    if (o.status === 'cancelled') {
+      situation = 'Cancelado';
+    } else if (o.paymentStatus === 'pending' || linkedTrans?.status === 'pending') {
+      isPending = true;
+      if (dueDate) {
+        const dueTime = new Date(dueDate);
+        dueTime.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((today.getTime() - dueTime.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) {
+          situation = `Vencido (${diffDays}d)`;
+        } else if (diffDays === 0) {
+          situation = 'Vence Hoje';
+        } else {
+          situation = `A vencer (${Math.abs(diffDays)}d)`;
         }
       } else {
-        originStr = 'Pedido de Venda';
-      }
-    } else if (t.serviceOrderId) {
-      const matchedSO = serviceOrders.find((s) => s.id === t.serviceOrderId);
-      if (matchedSO) {
-        originStr = `Ordem de Serviço #${matchedSO.osNumber}`;
-        detailItemsStr = `OS: ${matchedSO.title}${matchedSO.equipmentInfo ? ` (${matchedSO.equipmentInfo})` : ''}`;
-      } else {
-        originStr = 'Ordem de Serviço';
+        situation = 'Pendente';
       }
     }
 
-    return [
-      formatDate(dueDate),
-      originStr,
-      detailItemsStr,
-      (t.paymentMethod || 'A Prazo / Crediário').toUpperCase(),
-      statusSituation,
-      formatCurrency(Number(t.amount) || 0),
-    ];
+    const duePaymentStr = dueDate
+      ? `${formatDate(dueDate)} • ${paymentMethodStr}`
+      : paymentMethodStr;
+
+    consolidatedList.push({
+      date: new Date(o.createdAt),
+      docType: `Pedido #${o.orderNumber}`,
+      description: itemsSummary + (o.notes && !itemsSummary.includes(o.notes) ? ` (Obs: ${o.notes})` : ''),
+      dueDateAndPayment: duePaymentStr,
+      situation,
+      isPending,
+      amount: o.totalAmount,
+    });
   });
 
-  if (debtRows.length > 0) {
+  // 2. Ordens de Serviço
+  serviceOrders.forEach((s) => {
+    const partsAndServices: string[] = [];
+    if (s.services && s.services.length > 0) {
+      partsAndServices.push(`Serviços: ${s.services.map((sv) => sv.name).join(', ')}`);
+    }
+    if (s.products && s.products.length > 0) {
+      partsAndServices.push(`Peças: ${s.products.map((p) => `${p.quantity}x ${p.productName}`).join(', ')}`);
+    }
+    const descriptionStr = `${s.title}${s.equipmentInfo ? ` (${s.equipmentInfo})` : ''}${partsAndServices.length > 0 ? ` [${partsAndServices.join(' | ')}]` : ''}`;
+
+    const linkedTrans = transactions.find((t) => t.serviceOrderId === s.id);
+    const dueDate = linkedTrans?.dueDate ? new Date(linkedTrans.dueDate) : undefined;
+    const paymentMethodStr = (linkedTrans?.paymentMethod || s.paymentMethod || 'Dinheiro').toUpperCase();
+
+    let situation = '✓ Quitado / Finalizada';
+    let isPending = false;
+
+    if (s.status === 'cancelled') {
+      situation = 'Cancelado';
+    } else if (s.paymentStatus === 'pending' || linkedTrans?.status === 'pending') {
+      isPending = true;
+      if (dueDate) {
+        const dueTime = new Date(dueDate);
+        dueTime.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((today.getTime() - dueTime.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) {
+          situation = `Vencido (${diffDays}d)`;
+        } else if (diffDays === 0) {
+          situation = 'Vence Hoje';
+        } else {
+          situation = `A vencer (${Math.abs(diffDays)}d)`;
+        }
+      } else {
+        situation = 'Pendente';
+      }
+    }
+
+    const duePaymentStr = dueDate
+      ? `${formatDate(dueDate)} • ${paymentMethodStr}`
+      : paymentMethodStr;
+
+    consolidatedList.push({
+      date: new Date(s.createdAt),
+      docType: `OS #${s.osNumber}`,
+      description: descriptionStr,
+      dueDateAndPayment: duePaymentStr,
+      situation,
+      isPending,
+      amount: s.totalAmount,
+    });
+  });
+
+  // 3. Lançamentos Financeiros Avulsos (sem duplicar Pedidos ou OS já processados)
+  const standaloneTrans = transactions.filter(
+    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
+  );
+  standaloneTrans.forEach((t) => {
+    const dueDate = t.dueDate ? new Date(t.dueDate) : (t.date ? new Date(t.date) : undefined);
+    const paymentMethodStr = (t.paymentMethod || 'Dinheiro').toUpperCase();
+
+    let situation = '✓ Quitado / Recebido';
+    let isPending = false;
+
+    if (t.status === 'pending') {
+      isPending = true;
+      if (dueDate) {
+        const dueTime = new Date(dueDate);
+        dueTime.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((today.getTime() - dueTime.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) {
+          situation = `Vencido (${diffDays}d)`;
+        } else if (diffDays === 0) {
+          situation = 'Vence Hoje';
+        } else {
+          situation = `A vencer (${Math.abs(diffDays)}d)`;
+        }
+      } else {
+        situation = 'Pendente';
+      }
+    }
+
+    const duePaymentStr = dueDate
+      ? `${formatDate(dueDate)} • ${paymentMethodStr}`
+      : paymentMethodStr;
+
+    consolidatedList.push({
+      date: new Date(t.date),
+      docType: 'Lançamento Avulso',
+      description: `${t.description || 'Venda / Receita'}${t.category ? ` [${t.category}]` : ''}${t.notes ? ` (${t.notes})` : ''}`,
+      dueDateAndPayment: duePaymentStr,
+      situation,
+      isPending,
+      amount: Number(t.amount) || 0,
+    });
+  });
+
+  // Ordenar lista por data decrescente
+  consolidatedList.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const tableBody = consolidatedList.map((row) => [
+    formatDate(row.date),
+    row.docType,
+    row.description,
+    row.dueDateAndPayment,
+    row.situation,
+    formatCurrency(row.amount),
+  ]);
+
+  if (tableBody.length > 0) {
     autoTable(doc, {
       startY: currentY + 3,
       margin: { left: 14, right: 14 },
-      head: [['Vencimento', 'Origem da Dívida', 'Composição / Itens do Débito', 'Forma Prev.', 'Situação', 'Valor (R$)']],
-      body: debtRows,
-      theme: 'striped',
+      head: [['Data', 'Documento', 'Itens / Discriminação', 'Vencimento / Forma', 'Situação', 'Valor (R$)']],
+      body: tableBody,
+      theme: 'grid',
       headStyles: {
         fillColor: [headerRgb[0], headerRgb[1], headerRgb[2]],
         textColor: 255,
         fontSize: 7.5,
         fontStyle: 'bold',
-        halign: 'left',
       },
       columnStyles: {
-        0: { cellWidth: 20, fontSize: 7.5 },
-        1: { cellWidth: 30, fontSize: 7.5, fontStyle: 'bold' },
-        2: { cellWidth: 60, fontSize: 7 },
-        3: { cellWidth: 22, fontSize: 7 },
-        4: { cellWidth: 25, fontSize: 7, fontStyle: 'bold', textColor: [185, 28, 28] },
+        0: { cellWidth: 18, fontSize: 7 },
+        1: { cellWidth: 26, fontSize: 7, fontStyle: 'bold' },
+        2: { cellWidth: 64, fontSize: 7 },
+        3: { cellWidth: 28, fontSize: 7 },
+        4: { cellWidth: 26, fontSize: 7, fontStyle: 'bold' },
         5: { cellWidth: 20, halign: 'right', fontSize: 7.5, fontStyle: 'bold' },
+      },
+      didParseCell: (data) => {
+        // Destacar em vermelho se estiver vencido/pendente na coluna Situação
+        if (data.section === 'body' && data.column.index === 4) {
+          const rowObj = consolidatedList[data.row.index];
+          if (rowObj && rowObj.isPending) {
+            data.cell.styles.textColor = [185, 28, 28]; // Red-700
+          } else {
+            data.cell.styles.textColor = [22, 101, 52]; // Green-800
+          }
+        }
       },
       styles: {
         cellPadding: 2,
@@ -269,8 +394,20 @@ export const generateCustomerStatementPdf = ({
       },
       foot: [
         [
-          { content: 'TOTAL DE DÉBITOS PENDENTES:', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold', fontSize: 8.5 } },
-          { content: formatCurrency(pendingDebt), styles: { halign: 'right', fontStyle: 'bold', fontSize: 8.5, textColor: [185, 28, 28] } },
+          { content: 'TOTAL HISTÓRICO MOVIMENTADO (LTV):', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold', fontSize: 8 } },
+          { content: formatCurrency(totalLTV), styles: { halign: 'right', fontStyle: 'bold', fontSize: 8 } },
+        ],
+        [
+          { content: 'TOTAL DE DÉBITOS PENDENTES (SALDO DEVEDOR):', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold', fontSize: 8.5 } },
+          {
+            content: formatCurrency(pendingDebt),
+            styles: {
+              halign: 'right',
+              fontStyle: 'bold',
+              fontSize: 8.5,
+              textColor: hasDebt ? [185, 28, 28] : [22, 101, 52],
+            },
+          },
         ],
       ],
       footStyles: {
@@ -278,119 +415,15 @@ export const generateCustomerStatementPdf = ({
       },
     });
   } else {
-    // Bloco amigável caso não haja débitos
-    doc.setFillColor(240, 253, 244); // Green-50
+    // Sem movimentações
+    doc.setFillColor(248, 250, 252);
     doc.rect(14, currentY + 4, 182, 14, 'F');
-    doc.setDrawColor(187, 247, 208); // Green-200
+    doc.setDrawColor(226, 232, 240);
     doc.rect(14, currentY + 4, 182, 14, 'S');
-
     doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(22, 101, 52); // Green-800
-    doc.text('✓ NENHUM DÉBITO PENDENTE: Este cliente está com todas as suas contas em dia.', 20, currentY + 12);
-  }
-
-  // 5. TABELA 2: HISTÓRICO DE COMPRAS, SERVIÇOS E LANÇAMENTOS RECENTES
-  const finalTable1Y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : currentY + 24;
-  let nextSectionY = finalTable1Y;
-
-  if (nextSectionY > 230) {
-    doc.addPage();
-    nextSectionY = 20;
-  }
-
-  doc.setTextColor(30, 41, 59);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('2. HISTÓRICO DE COMPRAS, SERVIÇOS E LANÇAMENTOS REALIZADOS', 14, nextSectionY);
-
-  const historyEvents: Array<{
-    date: Date;
-    docType: string;
-    items: string;
-    payment: string;
-    status: string;
-    amount: number;
-  }> = [];
-
-  // Pedidos de Venda / PDV
-  orders.forEach((o) => {
-    const itemsText = (o.items || []).map((i) => `${i.quantity}x ${i.productName}`).join(', ') || 'Produtos de estoque';
-    historyEvents.push({
-      date: new Date(o.createdAt),
-      docType: `Pedido #${o.orderNumber}`,
-      items: itemsText,
-      payment: (o.paymentMethod || 'Dinheiro').toUpperCase(),
-      status: o.status === 'completed' ? 'Concluído' : o.status === 'pending' ? 'Pendente' : 'Cancelado',
-      amount: o.totalAmount,
-    });
-  });
-
-  // Ordens de Serviço
-  serviceOrders.forEach((s) => {
-    historyEvents.push({
-      date: new Date(s.createdAt),
-      docType: `OS #${s.osNumber}`,
-      items: s.title + (s.equipmentInfo ? ` (${s.equipmentInfo})` : ''),
-      payment: (s.paymentMethod || 'Dinheiro').toUpperCase(),
-      status: s.status === 'completed' ? 'Finalizada' : 'Em andamento',
-      amount: s.totalAmount,
-    });
-  });
-
-  // Lançamentos Financeiros Avulsos de Venda / Receitas do Cliente
-  const standaloneTrans = transactions.filter(
-    (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
-  );
-  standaloneTrans.forEach((t) => {
-    historyEvents.push({
-      date: new Date(t.date),
-      docType: 'Lançamento Avulso',
-      items: `${t.description || 'Venda / Receita'}${t.category ? ` [${t.category}]` : ''}${t.notes ? ` (${t.notes})` : ''}`,
-      payment: (t.paymentMethod || 'Dinheiro').toUpperCase(),
-      status: t.status === 'completed' ? 'Recebido' : 'Pendente',
-      amount: Number(t.amount) || 0,
-    });
-  });
-
-  // Ordenar eventos por data decrescente
-  historyEvents.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-  const historyRows = historyEvents.slice(0, 20).map((ev) => [
-    formatDate(ev.date),
-    ev.docType,
-    ev.items,
-    ev.payment,
-    ev.status,
-    formatCurrency(ev.amount),
-  ]);
-
-  if (historyRows.length > 0) {
-    autoTable(doc, {
-      startY: nextSectionY + 3,
-      margin: { left: 14, right: 14 },
-      head: [['Data', 'Documento', 'Itens / Descrição', 'Forma Pgto', 'Status', 'Valor Total (R$)']],
-      body: historyRows,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [tableHeaderRgb[0], tableHeaderRgb[1], tableHeaderRgb[2]],
-        textColor: 255,
-        fontSize: 7.5,
-        fontStyle: 'bold',
-      },
-      columnStyles: {
-        0: { cellWidth: 20, fontSize: 7 },
-        1: { cellWidth: 28, fontSize: 7, fontStyle: 'bold' },
-        2: { cellWidth: 70, fontSize: 7 },
-        3: { cellWidth: 20, fontSize: 7 },
-        4: { cellWidth: 20, fontSize: 7 },
-        5: { cellWidth: 19, halign: 'right', fontSize: 7, fontStyle: 'bold' },
-      },
-      styles: {
-        cellPadding: 2,
-        overflow: 'linebreak',
-      },
-    });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('Nenhuma movimentação, compra ou serviço registrado para este cliente.', 20, currentY + 12);
   }
 
   // 6. Rodapé em todas as páginas
