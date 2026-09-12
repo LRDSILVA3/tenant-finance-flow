@@ -1,5 +1,3 @@
-// CustomerProfileDrawer.tsx - Visão 360° do Cliente (Histórico de Compras, Métricas RFM & Preferências CRM)
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Customer, Order, ServiceOrder, Appointment, Transaction } from '@/types/finance';
@@ -20,10 +18,12 @@ import {
   User, Phone, Mail, FileText, ShoppingBag, Wrench, CalendarDays,
   CreditCard, Tag, Sparkles, Receipt, Download, TrendingUp, Clock,
   MapPin, ShieldAlert, ArrowUpRight, CheckCircle2, AlertCircle, Loader2,
-  ExternalLink, MessageSquare, ChevronRight, Package, Percent
+  ExternalLink, MessageSquare, ChevronRight, Package, Percent, FileDown,
+  Printer
 } from 'lucide-react';
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
+import { generateCustomerStatementPdf } from '@/components/customers/CustomerStatementPdf';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -52,9 +52,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences'>('history');
   const [loading, setLoading] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingDebt, setPendingDebt] = useState<number>(0);
 
   // Ref para rastrear o ID do cliente atualmente ativo e descartar respostas assíncronas obsoletas
@@ -197,19 +199,43 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         }
       }
 
-      // 4. Carregar Saldo Devedor Pendente
+      // 4. Carregar Lançamentos / Contas a Receber (completas)
       const { data: transData } = await supabase
         .from('transactions')
-        .select('amount, status, type')
+        .select('*')
         .eq('customer_id', targetCustomerId)
         .eq('type', 'income')
-        .eq('status', 'pending');
+        .order('date', { ascending: true });
 
       if (activeCustomerIdRef.current !== targetCustomerId) return;
 
       if (transData) {
-        const debt = transData.reduce((acc, t: any) => acc + (Number(t.amount) || 0), 0);
+        const mappedTrans: Transaction[] = transData.map((t: any) => ({
+          id: t.id,
+          clientId: t.client_id,
+          description: t.description,
+          amount: Number(t.amount) || 0,
+          date: new Date(t.date),
+          dueDate: t.due_date ? new Date(t.due_date) : undefined,
+          status: t.status,
+          type: t.type,
+          paymentMethod: t.payment_method,
+          category: t.category,
+          subCategory: t.sub_category,
+          customerId: t.customer_id,
+          supplierId: t.supplier_id,
+          orderId: t.order_id,
+          serviceOrderId: t.service_order_id,
+          notes: t.notes,
+          createdAt: new Date(t.created_at),
+          updatedAt: new Date(t.updated_at),
+        }));
+
         if (activeCustomerIdRef.current === targetCustomerId) {
+          setTransactions(mappedTrans);
+          const debt = mappedTrans
+            .filter((t) => t.status === 'pending')
+            .reduce((acc, t) => acc + t.amount, 0);
           setPendingDebt(debt);
         }
       }
@@ -232,6 +258,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setOrders([]);
       setServiceOrders([]);
       setAppointments([]);
+      setTransactions([]);
       setPendingDebt(0);
       setActiveTab('history');
       loadCustomerData(customer.id);
@@ -239,6 +266,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setOrders([]);
       setServiceOrders([]);
       setAppointments([]);
+      setTransactions([]);
       setPendingDebt(0);
       setLoading(false);
     }
@@ -346,6 +374,32 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     }
   };
 
+  const handleExportStatementPdf = () => {
+    if (!customer) return;
+    setExportingPdf(true);
+    try {
+      generateCustomerStatementPdf({
+        customer,
+        orders,
+        serviceOrders,
+        transactions,
+        pendingDebt,
+      });
+      toast({
+        title: 'Ficha do Cliente exportada com sucesso!',
+        description: 'O PDF com dados cadastrais e extrato detalhado de débitos foi gerado.',
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Erro ao gerar PDF da ficha',
+        description: e.message || 'Não foi possível gerar a ficha do cliente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const cleanWhatsappNumber = customer?.phone?.replace(/\D/g, '') || '';
   const whatsappUrl = cleanWhatsappNumber
     ? `https://wa.me/55${cleanWhatsappNumber}`
@@ -415,20 +469,39 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Botão de Editar */}
-              {onEditCustomer && (
+              {/* Ações de Cabeçalho: Exportar Ficha e Editar */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    onOpenChange(false);
-                    onEditCustomer(customer);
-                  }}
-                  className="h-8 text-xs gap-1 shrink-0 font-medium"
+                  onClick={handleExportStatementPdf}
+                  disabled={exportingPdf || loading}
+                  className="h-8 text-xs gap-1.5 font-medium bg-background text-foreground hover:bg-muted"
+                  title="Exportar Ficha Cadastral e Extrato de Débitos em PDF"
                 >
-                  Editar
+                  {exportingPdf ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  ) : (
+                    <FileDown className="h-3.5 w-3.5 text-primary" />
+                  )}
+                  <span className="hidden sm:inline">Exportar Ficha</span>
+                  <span className="sm:hidden">Ficha</span>
                 </Button>
-              )}
+
+                {onEditCustomer && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onEditCustomer(customer);
+                    }}
+                    className="h-8 text-xs gap-1 font-medium"
+                  >
+                    Editar
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Tags e Badges Rápidos */}
@@ -576,6 +649,34 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                 <>
                   {/* ABA 1: HISTÓRICO / LINHA DO TEMPO */}
                   <TabsContent value="history" className="mt-0 space-y-3">
+                    {/* Alerta de Débito com Botão de Extrato Rápido */}
+                    {pendingDebt > 0 && (
+                      <div className="p-3.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-amber-950 dark:text-amber-200">
+                              Débito Total em Aberto: {formatCurrency(pendingDebt)}
+                            </p>
+                            <p className="text-[11px] text-amber-800/90 dark:text-amber-400 mt-0.5">
+                              {transactions.filter((t) => t.status === 'pending').length} lançamento(s) pendente(s) aguardando liquidação.
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleExportStatementPdf}
+                          disabled={exportingPdf || loading}
+                          className="h-7 text-xs font-semibold border-amber-400 bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 gap-1.5 shrink-0 self-end sm:self-auto shadow-xs"
+                        >
+                          <FileDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                          Extrato da Dívida (PDF)
+                        </Button>
+                      </div>
+                    )}
+
                     {unifiedTimeline.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground border rounded-lg border-dashed">
                         <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-40" />

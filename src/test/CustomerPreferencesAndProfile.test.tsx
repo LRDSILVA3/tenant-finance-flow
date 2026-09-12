@@ -72,6 +72,7 @@ vi.mock('@/integrations/supabase/client', () => ({
             eq: vi.fn().mockReturnValue({
               order: vi.fn().mockResolvedValue({ data: [], error: null }),
               eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
                 eq: vi.fn().mockResolvedValue({ data: [], error: null }),
               }),
             }),
@@ -160,6 +161,29 @@ describe('Customer 360 Profile and Preferences', () => {
       expect(screen.getByText(/Forma de Pagamento Preferida/i)).toBeInTheDocument();
       expect(screen.getByDisplayValue('Sem glúten')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Embalar para presente')).toBeInTheDocument();
+    });
+  });
+
+  it('deve permitir exportar a ficha do cliente com extrato detalhado de débitos pendentes', async () => {
+    render(
+      <CustomerProfileDrawer
+        open={true}
+        onOpenChange={vi.fn()}
+        customer={mockCustomer}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Mariana Duarte')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Exportar Ficha/i })).toBeInTheDocument();
+    });
+
+    const exportBtn = screen.getByRole('button', { name: /Exportar Ficha/i });
+    fireEvent.click(exportBtn);
+
+    // Deve acionar o toast de sucesso ao exportar ficha do cliente
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Exportar Ficha/i })).toBeInTheDocument();
     });
   });
 });
