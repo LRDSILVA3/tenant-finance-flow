@@ -11,9 +11,10 @@ export const generateServiceOrderPdf = (
   companyNameParam?: string
 ) => {
   const doc = new jsPDF();
-  const pdfSettings = getPdfSettings(os.clientId);
-
-  const finalCompanyName = companyNameParam || pdfSettings.companyName || 'Previna Gestão';
+  const finalCompanyName =
+    (pdfSettings.companyName && pdfSettings.companyName.trim() !== '' && pdfSettings.companyName !== 'Previna Gestão')
+      ? pdfSettings.companyName.trim()
+      : (companyNameParam && companyNameParam !== 'Previna Gestão' ? companyNameParam : (pdfSettings.companyName || 'Empresa'));
   const headerRgb = hexToRgb(pdfSettings.headerColor);
   const accentRgb = hexToRgb(pdfSettings.accentColor);
   const tableHeaderRgb = hexToRgb(pdfSettings.tableHeaderColor);
@@ -292,8 +293,8 @@ export const generateServiceOrderPdf = (
   // Rodapé
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Documento emitido em ${formatDate(new Date())} ${pdfSettings.footerText || 'via Previna Gestão Financeira.'}`, 14, 288);
+  const footerNote = (pdfSettings.footerText && !pdfSettings.footerText.includes('Previna')) ? pdfSettings.footerText : `Emitido por ${finalCompanyName}`;
+  doc.text(`Documento emitido em ${formatDate(new Date())} | ${footerNote}`, 14, 288);
   doc.text(`Página 1 de 1`, 190, 288, { align: 'right' });
 
   doc.save(`OS_${os.osNumber}.pdf`);

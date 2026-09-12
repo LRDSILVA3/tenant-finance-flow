@@ -1690,7 +1690,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           open={isReceiptOpen}
           onOpenChange={setIsReceiptOpen}
           order={completedOrder}
-          companyName={currentClient?.name || 'Previna Gestão'}
+          companyName={currentClient?.name || 'Empresa'}
         />
       )}
     </div>

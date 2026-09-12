@@ -45,7 +45,7 @@ export const PdfCustomizationTab: React.FC = () => {
     if (currentClient?.id) {
       const current = getPdfSettings(currentClient.id);
       if (!current.companyName || current.companyName === 'Previna Gestão') {
-        current.companyName = currentClient.name || 'Previna Gestão';
+        current.companyName = currentClient.name || '';
       }
       setSettings(current);
     }
@@ -158,7 +158,7 @@ export const PdfCustomizationTab: React.FC = () => {
       updatedAt: new Date(),
     };
 
-    generateOrderPdf(mockOrder, settings.companyName || currentClient?.name || 'Previna Gestão');
+    generateOrderPdf(mockOrder, settings.companyName || currentClient?.name);
   };
 
   // Demonstração rápida de OS
@@ -253,7 +253,7 @@ export const PdfCustomizationTab: React.FC = () => {
       updatedAt: new Date(),
     };
 
-    generateServiceOrderPdf(mockOS, settings.companyName || currentClient?.name || 'Previna Gestão');
+    generateServiceOrderPdf(mockOS, settings.companyName || currentClient?.name);
   };
 
   return (

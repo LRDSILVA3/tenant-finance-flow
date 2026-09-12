@@ -499,7 +499,7 @@ export const ServiceOrders: React.FC = () => {
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10"
-                          onClick={() => generateServiceOrderPdf(os, currentClient?.name || 'Previna Gestão')}
+                          onClick={() => generateServiceOrderPdf(os, currentClient?.name)}
                           title="Baixar PDF Estilizado da OS"
                         >
                           <Download className="h-3.5 w-3.5" />

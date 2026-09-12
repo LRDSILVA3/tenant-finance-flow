@@ -785,7 +785,7 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
       updatedAt: new Date(),
     };
 
-    generateServiceOrderPdf(fullOsForPdf, currentClient?.name || 'Previna Gestão');
+    generateServiceOrderPdf(fullOsForPdf, currentClient?.name);
   };
 
   return (

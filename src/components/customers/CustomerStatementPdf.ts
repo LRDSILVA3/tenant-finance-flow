@@ -31,8 +31,8 @@ export const generateCustomerStatementPdf = ({
 
   const finalCompanyName =
     (pdfSettings.companyName && pdfSettings.companyName.trim() !== '' && pdfSettings.companyName !== 'Previna Gestão')
-      ? pdfSettings.companyName
-      : (companyNameParam || pdfSettings.companyName || 'Empresa');
+      ? pdfSettings.companyName.trim()
+      : (companyNameParam && companyNameParam !== 'Previna Gestão' ? companyNameParam : (pdfSettings.companyName || 'Empresa'));
   const headerRgb = hexToRgb(pdfSettings.headerColor);
   const accentRgb = hexToRgb(pdfSettings.accentColor);
   const tableHeaderRgb = hexToRgb(pdfSettings.tableHeaderColor);
@@ -396,7 +396,8 @@ export const generateCustomerStatementPdf = ({
     doc.setTextColor(148, 163, 184);
     doc.text(`Ficha Financeira do Cliente - ${customer.name}`, 14, 290);
     doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
-    doc.text(pdfSettings.footerText || `via ${finalCompanyName}`, 196, 290, { align: 'right' });
+    const footerNote = (pdfSettings.footerText && !pdfSettings.footerText.includes('Previna')) ? pdfSettings.footerText : `Emitido por ${finalCompanyName}`;
+    doc.text(footerNote, 196, 290, { align: 'right' });
   }
 
   // Salvar PDF no navegador

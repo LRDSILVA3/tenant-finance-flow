@@ -1490,7 +1490,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                                 variant="outline"
                                 size="sm"
                                 className="h-7 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10"
-                                onClick={() => generateOrderPdf(order, currentClient?.name || 'Previna Gestão')}
+                                onClick={() => generateOrderPdf(order, currentClient?.name)}
                                 title="Baixar PDF Estilizado do Pedido"
                               >
                                 <Download className="h-3.5 w-3.5" />
@@ -1735,7 +1735,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
         order={selectedOrderForReceipt}
         open={isReceiptOpen}
         onOpenChange={setIsReceiptOpen}
-        companyName={currentClient?.name || 'Previna Gestão'}
+        companyName={currentClient?.name || 'Empresa'}
       />
 
       {/* Modal de Cadastro Rápido de Cliente */}

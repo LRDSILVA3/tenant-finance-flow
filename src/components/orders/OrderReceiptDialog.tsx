@@ -51,7 +51,7 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
   order,
   open,
   onOpenChange,
-  companyName = 'Previna Gestão',
+  companyName = 'Empresa',
 }) => {
   const [activeTab, setActiveTab] = useState<'items' | 'customer' | 'payment' | 'preview'>('items');
 

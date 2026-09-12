@@ -20,7 +20,7 @@ export const defaultPdfSettings: PdfCustomizationSettings = {
   headerColor: '#0f172a', // Slate-900
   accentColor: '#10b981', // Emerald-500
   tableHeaderColor: '#1e293b', // Slate-800
-  companyName: 'Previna Gestão',
+  companyName: '',
   documentNumber: '',
   phone: '',
   email: '',
@@ -29,7 +29,7 @@ export const defaultPdfSettings: PdfCustomizationSettings = {
   showSku: true,
   orderTerms: 'Declaro que conferi e recebi os produtos constantes neste pedido em perfeito estado.',
   serviceOrderTerms: '90 dias de garantia legal contra defeitos de serviços prestados e peças aplicadas.',
-  footerText: 'via Previna Gestão Financeira.',
+  footerText: '',
 };
 
 export const pdfThemePresets = [
@@ -76,7 +76,15 @@ export const getPdfSettings = (clientId?: string): PdfCustomizationSettings => {
     const key = `pdf_settings_${clientId || 'default'}`;
     const stored = localStorage.getItem(key);
     if (stored) {
-      return { ...defaultPdfSettings, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      // Clean up any legacy default "Previna Gestão" that might have been saved in old records
+      if (parsed.companyName === 'Previna Gestão') {
+        parsed.companyName = '';
+      }
+      if (parsed.footerText === 'via Previna Gestão Financeira.') {
+        parsed.footerText = '';
+      }
+      return { ...defaultPdfSettings, ...parsed };
     }
   } catch (err) {
     console.error('Erro ao ler configurações de PDF:', err);
