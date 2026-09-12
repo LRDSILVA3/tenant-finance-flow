@@ -73,7 +73,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
     try {
       // 1. Carregar Pedidos com Itens
-      const { data: ordersData } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           *,
@@ -81,9 +81,15 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             id, order_id, product_id, quantity, unit_price, cost_price, discount_amount, total_price, created_at,
             product:products(name, sku)
           )
-        `)
-        .eq('customer_id', targetCustomerId)
-        .order('created_at', { ascending: false });
+        `);
+
+      if (targetCustomerName && targetCustomerName.trim().length > 2) {
+        ordersQuery = ordersQuery.or(`customer_id.eq.${targetCustomerId},notes.ilike.%${targetCustomerName.trim()}%`);
+      } else {
+        ordersQuery = ordersQuery.eq('customer_id', targetCustomerId);
+      }
+
+      const { data: ordersData } = await ordersQuery.order('created_at', { ascending: false });
 
       // Se o cliente mudou durante a requisição, aborta para não vazar dados
       if (activeCustomerIdRef.current !== targetCustomerId) return;
@@ -126,15 +132,24 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       }
 
       // 2. Carregar Ordens de Serviço
-      const { data: soData } = await supabase
+      let soQuery = supabase
         .from('service_orders')
         .select(`
           *,
           service_order_services (*),
-          service_order_products (*)
-        `)
-        .eq('customer_id', targetCustomerId)
-        .order('created_at', { ascending: false });
+          service_order_products (
+            *,
+            product:products(name, sku)
+          )
+        `);
+
+      if (targetCustomerName && targetCustomerName.trim().length > 2) {
+        soQuery = soQuery.or(`customer_id.eq.${targetCustomerId},notes.ilike.%${targetCustomerName.trim()}%,title.ilike.%${targetCustomerName.trim()}%`);
+      } else {
+        soQuery = soQuery.eq('customer_id', targetCustomerId);
+      }
+
+      const { data: soData } = await soQuery.order('created_at', { ascending: false });
 
       if (activeCustomerIdRef.current !== targetCustomerId) return;
 
@@ -163,6 +178,31 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
           notes: s.notes,
           createdAt: new Date(s.created_at),
           updatedAt: new Date(s.updated_at),
+          services: (s.service_order_services || []).map((srv: any) => ({
+            id: srv.id,
+            serviceOrderId: srv.service_order_id,
+            serviceTypeId: srv.service_type_id,
+            collaboratorId: srv.collaborator_id,
+            name: srv.name || 'Serviço',
+            quantity: Number(srv.quantity) || 1,
+            unitPrice: Number(srv.unit_price) || 0,
+            discountAmount: Number(srv.discount_amount) || 0,
+            totalPrice: Number(srv.total_price) || 0,
+            createdAt: new Date(srv.created_at),
+          })),
+          products: (s.service_order_products || []).map((p: any) => ({
+            id: p.id,
+            serviceOrderId: p.service_order_id,
+            productId: p.product_id,
+            productName: p.product?.name || 'Peça / Material',
+            productSku: p.product?.sku,
+            quantity: Number(p.quantity) || 1,
+            unitPrice: Number(p.unit_price) || 0,
+            costPrice: Number(p.cost_price) || 0,
+            discountAmount: Number(p.discount_amount) || 0,
+            totalPrice: Number(p.total_price) || 0,
+            createdAt: new Date(p.created_at),
+          })),
         }));
         if (activeCustomerIdRef.current === targetCustomerId) {
           setServiceOrders(mappedSO);
@@ -330,15 +370,17 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     };
   }, [orders, serviceOrders, transactions]);
 
-  // ─── Top Produtos Comprados pelo Cliente (Vendas de Estoque / Peças) ──────────
+  // ─── Top Produtos & Serviços Consumidos pelo Cliente ─────────────────────────
   const topProducts = useMemo(() => {
     const map = new Map<string, TopProductStat>();
 
-    // Itens de Pedidos de Venda / PDV
+    // 1. Itens de Pedidos de Venda / PDV
     orders.forEach((o) => {
       if (o.status === 'cancelled') return;
       (o.items || []).forEach((item) => {
-        const existing = map.get(item.productId);
+        const key = item.productId || item.productName || item.id;
+        const name = item.productName || 'Produto';
+        const existing = map.get(key);
         if (existing) {
           existing.quantity += item.quantity;
           existing.totalAmount += item.totalPrice;
@@ -346,9 +388,9 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             existing.lastBoughtAt = o.createdAt.toISOString();
           }
         } else {
-          map.set(item.productId, {
-            id: item.productId,
-            name: item.productName || 'Produto de Estoque',
+          map.set(key, {
+            id: key,
+            name,
             quantity: item.quantity,
             totalAmount: item.totalPrice,
             lastBoughtAt: o.createdAt.toISOString(),
@@ -357,11 +399,13 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       });
     });
 
-    // Peças & Produtos aplicados em Ordens de Serviço
+    // 2. Peças & Produtos aplicados em Ordens de Serviço
     serviceOrders.forEach((s) => {
       if (s.status === 'cancelled') return;
       (s.products || []).forEach((item) => {
-        const existing = map.get(item.productId);
+        const key = item.productId || item.productName || item.id;
+        const name = item.productName || 'Peça / Material';
+        const existing = map.get(key);
         if (existing) {
           existing.quantity += item.quantity;
           existing.totalAmount += item.totalPrice;
@@ -369,19 +413,64 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             existing.lastBoughtAt = s.createdAt.toISOString();
           }
         } else {
-          map.set(item.productId, {
-            id: item.productId,
-            name: item.productName || 'Peça / Material de Estoque',
+          map.set(key, {
+            id: key,
+            name,
             quantity: item.quantity,
             totalAmount: item.totalPrice,
             lastBoughtAt: s.createdAt.toISOString(),
           });
         }
       });
+
+      // Serviços executados na OS
+      (s.services || []).forEach((srv) => {
+        const key = srv.serviceTypeId || srv.name || srv.id;
+        const name = srv.name || 'Serviço';
+        const existing = map.get(key);
+        if (existing) {
+          existing.quantity += srv.quantity;
+          existing.totalAmount += srv.totalPrice;
+          if (new Date(s.createdAt) > new Date(existing.lastBoughtAt)) {
+            existing.lastBoughtAt = s.createdAt.toISOString();
+          }
+        } else {
+          map.set(key, {
+            id: key,
+            name,
+            quantity: srv.quantity,
+            totalAmount: srv.totalPrice,
+            lastBoughtAt: s.createdAt.toISOString(),
+          });
+        }
+      });
+    });
+
+    // 3. Agendamentos de serviços
+    appointments.forEach((a) => {
+      if (a.status === 'cancelled') return;
+      const key = a.serviceTypeId || a.title || a.id;
+      const name = a.title || 'Serviço Agendado';
+      const existing = map.get(key);
+      if (existing) {
+        existing.quantity += 1;
+        existing.totalAmount += a.price || 0;
+        if (new Date(a.scheduledAt) > new Date(existing.lastBoughtAt)) {
+          existing.lastBoughtAt = a.scheduledAt.toISOString();
+        }
+      } else {
+        map.set(key, {
+          id: key,
+          name,
+          quantity: 1,
+          totalAmount: a.price || 0,
+          lastBoughtAt: a.scheduledAt.toISOString(),
+        });
+      }
     });
 
     return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity);
-  }, [orders, serviceOrders]);
+  }, [orders, serviceOrders, appointments]);
 
   // ─── Timeline Unificada de Eventos Comerciais ──────────────────────────────
   const unifiedTimeline = useMemo(() => {

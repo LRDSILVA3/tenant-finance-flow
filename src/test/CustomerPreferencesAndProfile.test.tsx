@@ -27,43 +27,47 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn((table: string) => {
       if (table === 'orders') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
+        const queryHandler = {
+          order: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'ord-1',
+                client_id: 'client-123',
+                order_number: '1001',
+                customer_id: 'cust-1',
+                status: 'completed',
+                subtotal_amount: 150,
+                discount_amount: 10,
+                total_amount: 140,
+                payment_method: 'pix',
+                payment_status: 'paid',
+                created_at: new Date('2026-09-10T12:00:00Z').toISOString(),
+                updated_at: new Date('2026-09-10T12:00:00Z').toISOString(),
+                order_items: [
                   {
-                    id: 'ord-1',
-                    client_id: 'client-123',
-                    order_number: '1001',
-                    customer_id: 'cust-1',
-                    status: 'completed',
-                    subtotal_amount: 150,
+                    id: 'item-1',
+                    order_id: 'ord-1',
+                    product_id: 'prod-1',
+                    quantity: 2,
+                    unit_price: 75,
                     discount_amount: 10,
-                    total_amount: 140,
-                    payment_method: 'pix',
-                    payment_status: 'paid',
-                    created_at: new Date('2026-09-10T12:00:00Z').toISOString(),
-                    updated_at: new Date('2026-09-10T12:00:00Z').toISOString(),
-                    order_items: [
-                      {
-                        id: 'item-1',
-                        order_id: 'ord-1',
-                        product_id: 'prod-1',
-                        quantity: 2,
-                        unit_price: 75,
-                        discount_amount: 10,
-                        total_price: 140,
-                        created_at: new Date().toISOString(),
-                        product: { name: 'Arroz Premium 5kg', sku: 'ARR-5' },
-                      },
-                    ],
+                    total_price: 140,
+                    created_at: new Date().toISOString(),
+                    product: { name: 'Arroz Premium 5kg', sku: 'ARR-5' },
                   },
                 ],
-                error: null,
-              }),
-            }),
+              },
+            ],
+            error: null,
           }),
+        };
+        const filterHandler = {
+          eq: vi.fn().mockReturnValue(queryHandler),
+          or: vi.fn().mockReturnValue(queryHandler),
+          order: queryHandler.order,
+        };
+        return {
+          select: vi.fn().mockReturnValue(filterHandler),
         } as any;
       }
       if (table === 'transactions') {
@@ -98,12 +102,16 @@ vi.mock('@/integrations/supabase/client', () => ({
         } as any;
       }
       if (table === 'service_orders' || table === 'appointments') {
+        const queryHandler = {
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+        const filterHandler = {
+          eq: vi.fn().mockReturnValue(queryHandler),
+          or: vi.fn().mockReturnValue(queryHandler),
+          order: queryHandler.order,
+        };
         return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
+          select: vi.fn().mockReturnValue(filterHandler),
         } as any;
       }
       return {
