@@ -101,6 +101,35 @@ vi.mock('@/integrations/supabase/client', () => ({
           select: vi.fn().mockReturnValue(filterHandler),
         } as any;
       }
+      if (table === 'order_items') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'item-1',
+                  order_id: 'ord-1',
+                  product_id: 'prod-1',
+                  quantity: 2,
+                  unit_price: 75,
+                  discount_amount: 10,
+                  total_price: 140,
+                  created_at: new Date().toISOString(),
+                  product: { name: 'Arroz Premium 5kg', sku: 'ARR-5' },
+                },
+              ],
+              error: null,
+            }),
+          }),
+        } as any;
+      }
+      if (table === 'service_order_products' || table === 'service_order_services') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        } as any;
+      }
       if (table === 'service_orders' || table === 'appointments') {
         const queryHandler = {
           order: vi.fn().mockResolvedValue({ data: [], error: null }),

@@ -72,16 +72,10 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     setLoading(true);
 
     try {
-      // 1. Carregar Pedidos com Itens
+      // 1. Carregar Pedidos do Cliente
       let ordersQuery = supabase
         .from('orders')
-        .select(`
-          *,
-          order_items (
-            id, order_id, product_id, quantity, unit_price, cost_price, discount_amount, total_price, created_at,
-            product:products(name, sku)
-          )
-        `);
+        .select('*');
 
       if (targetCustomerName && targetCustomerName.trim().length > 2) {
         ordersQuery = ordersQuery.or(`customer_id.eq.${targetCustomerId},notes.ilike.%${targetCustomerName.trim()}%`);
@@ -94,54 +88,65 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       // Se o cliente mudou durante a requisição, aborta para não vazar dados
       if (activeCustomerIdRef.current !== targetCustomerId) return;
 
-      if (ordersData) {
-        const mappedOrders: Order[] = ordersData.map((o: any) => ({
-          id: o.id,
-          clientId: o.client_id,
-          orderNumber: o.order_number,
-          customerId: o.customer_id,
-          collaboratorId: o.collaborator_id,
-          status: o.status,
-          subtotalAmount: Number(o.subtotal_amount) || 0,
-          discountAmount: Number(o.discount_amount) || 0,
-          totalAmount: Number(o.total_amount) || 0,
-          paymentMethod: o.payment_method,
-          paymentStatus: o.payment_status,
-          dueDate: o.due_date ? new Date(o.due_date) : undefined,
-          notes: o.notes,
-          transactionId: o.transaction_id,
-          createdAt: new Date(o.created_at),
-          updatedAt: new Date(o.updated_at),
-          items: (o.order_items || []).map((i: any) => ({
-            id: i.id,
-            orderId: i.order_id,
-            productId: i.product_id,
-            quantity: Number(i.quantity) || 1,
-            unitPrice: Number(i.unit_price) || 0,
-            costPrice: Number(i.cost_price) || 0,
-            discountAmount: Number(i.discount_amount) || 0,
-            totalPrice: Number(i.total_price) || 0,
-            productName: i.product?.name || 'Produto',
-            productSku: i.product?.sku,
-            createdAt: new Date(i.created_at),
-          })),
-        }));
-        if (activeCustomerIdRef.current === targetCustomerId) {
-          setOrders(mappedOrders);
-        }
+      const orderList = ordersData || [];
+      const orderIds = orderList.map((o: any) => o.id);
+      const itemsByOrder: Record<string, OrderItem[]> = {};
+
+      if (orderIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('order_items')
+          .select(`
+            *,
+            product:products(name, sku)
+          `)
+          .in('order_id', orderIds);
+
+        (itemsData || []).forEach((item: any) => {
+          if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+          itemsByOrder[item.order_id].push({
+            id: item.id,
+            orderId: item.order_id,
+            productId: item.product_id,
+            quantity: Number(item.quantity) || 1,
+            unitPrice: Number(item.unit_price) || 0,
+            costPrice: Number(item.cost_price) || 0,
+            discountAmount: Number(item.discount_amount) || 0,
+            totalPrice: Number(item.total_price) || 0,
+            productName: item.product?.name || 'Produto',
+            productSku: item.product?.sku,
+            createdAt: new Date(item.created_at),
+          });
+        });
+      }
+
+      const mappedOrders: Order[] = orderList.map((o: any) => ({
+        id: o.id,
+        clientId: o.client_id,
+        orderNumber: o.order_number,
+        customerId: o.customer_id,
+        collaboratorId: o.collaborator_id,
+        status: o.status,
+        subtotalAmount: Number(o.subtotal_amount) || 0,
+        discountAmount: Number(o.discount_amount) || 0,
+        totalAmount: Number(o.total_amount) || 0,
+        paymentMethod: o.payment_method,
+        paymentStatus: o.payment_status,
+        dueDate: o.due_date ? new Date(o.due_date) : undefined,
+        notes: o.notes,
+        transactionId: o.transaction_id,
+        createdAt: new Date(o.created_at),
+        updatedAt: new Date(o.updated_at),
+        items: itemsByOrder[o.id] || [],
+      }));
+
+      if (activeCustomerIdRef.current === targetCustomerId) {
+        setOrders(mappedOrders);
       }
 
       // 2. Carregar Ordens de Serviço
       let soQuery = supabase
         .from('service_orders')
-        .select(`
-          *,
-          service_order_services (*),
-          service_order_products (
-            *,
-            product:products(name, sku)
-          )
-        `);
+        .select('*');
 
       if (targetCustomerName && targetCustomerName.trim().length > 2) {
         soQuery = soQuery.or(`customer_id.eq.${targetCustomerId},notes.ilike.%${targetCustomerName.trim()}%,title.ilike.%${targetCustomerName.trim()}%`);
@@ -153,44 +158,29 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
       if (activeCustomerIdRef.current !== targetCustomerId) return;
 
-      if (soData) {
-        const mappedSO: ServiceOrder[] = soData.map((s: any) => ({
-          id: s.id,
-          clientId: s.client_id,
-          osNumber: s.os_number,
-          customerId: s.customer_id,
-          collaboratorId: s.collaborator_id,
-          status: s.status,
-          title: s.title,
-          equipmentInfo: s.equipment_info,
-          reportedDefect: s.reported_defect,
-          technicalDiagnosis: s.technical_diagnosis,
-          scheduledAt: s.scheduled_at ? new Date(s.scheduled_at) : undefined,
-          completedAt: s.completed_at ? new Date(s.completed_at) : undefined,
-          warrantyTerms: s.warranty_terms,
-          servicesTotal: Number(s.services_total) || 0,
-          productsTotal: Number(s.products_total) || 0,
-          discountAmount: Number(s.discount_amount) || 0,
-          totalAmount: Number(s.total_amount) || 0,
-          paymentMethod: s.payment_method,
-          paymentStatus: s.payment_status,
-          transactionId: s.transaction_id,
-          notes: s.notes,
-          createdAt: new Date(s.created_at),
-          updatedAt: new Date(s.updated_at),
-          services: (s.service_order_services || []).map((srv: any) => ({
-            id: srv.id,
-            serviceOrderId: srv.service_order_id,
-            serviceTypeId: srv.service_type_id,
-            collaboratorId: srv.collaborator_id,
-            name: srv.name || 'Serviço',
-            quantity: Number(srv.quantity) || 1,
-            unitPrice: Number(srv.unit_price) || 0,
-            discountAmount: Number(srv.discount_amount) || 0,
-            totalPrice: Number(srv.total_price) || 0,
-            createdAt: new Date(srv.created_at),
-          })),
-          products: (s.service_order_products || []).map((p: any) => ({
+      const soList = soData || [];
+      const osIds = soList.map((s: any) => s.id);
+      const productsByOS: Record<string, any[]> = {};
+      const servicesByOS: Record<string, any[]> = {};
+
+      if (osIds.length > 0) {
+        const [pRes, sRes] = await Promise.all([
+          supabase
+            .from('service_order_products')
+            .select(`
+              *,
+              product:products(name, sku)
+            `)
+            .in('service_order_id', osIds),
+          supabase
+            .from('service_order_services')
+            .select('*')
+            .in('service_order_id', osIds),
+        ]);
+
+        (pRes.data || []).forEach((p: any) => {
+          if (!productsByOS[p.service_order_id]) productsByOS[p.service_order_id] = [];
+          productsByOS[p.service_order_id].push({
             id: p.id,
             serviceOrderId: p.service_order_id,
             productId: p.product_id,
@@ -202,11 +192,56 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             discountAmount: Number(p.discount_amount) || 0,
             totalPrice: Number(p.total_price) || 0,
             createdAt: new Date(p.created_at),
-          })),
-        }));
-        if (activeCustomerIdRef.current === targetCustomerId) {
-          setServiceOrders(mappedSO);
-        }
+          });
+        });
+
+        (sRes.data || []).forEach((srv: any) => {
+          if (!servicesByOS[srv.service_order_id]) servicesByOS[srv.service_order_id] = [];
+          servicesByOS[srv.service_order_id].push({
+            id: srv.id,
+            serviceOrderId: srv.service_order_id,
+            serviceTypeId: srv.service_type_id,
+            collaboratorId: srv.collaborator_id,
+            name: srv.name || 'Serviço',
+            quantity: Number(srv.quantity) || 1,
+            unitPrice: Number(srv.unit_price) || 0,
+            discountAmount: Number(srv.discount_amount) || 0,
+            totalPrice: Number(srv.total_price) || 0,
+            createdAt: new Date(srv.created_at),
+          });
+        });
+      }
+
+      const mappedSO: ServiceOrder[] = soList.map((s: any) => ({
+        id: s.id,
+        clientId: s.client_id,
+        osNumber: s.os_number,
+        customerId: s.customer_id,
+        collaboratorId: s.collaborator_id,
+        status: s.status,
+        title: s.title,
+        equipmentInfo: s.equipment_info,
+        reportedDefect: s.reported_defect,
+        technicalDiagnosis: s.technical_diagnosis,
+        scheduledAt: s.scheduled_at ? new Date(s.scheduled_at) : undefined,
+        completedAt: s.completed_at ? new Date(s.completed_at) : undefined,
+        warrantyTerms: s.warranty_terms,
+        servicesTotal: Number(s.services_total) || 0,
+        productsTotal: Number(s.products_total) || 0,
+        discountAmount: Number(s.discount_amount) || 0,
+        totalAmount: Number(s.total_amount) || 0,
+        paymentMethod: s.payment_method,
+        paymentStatus: s.payment_status,
+        transactionId: s.transaction_id,
+        notes: s.notes,
+        createdAt: new Date(s.created_at),
+        updatedAt: new Date(s.updated_at),
+        services: servicesByOS[s.id] || [],
+        products: productsByOS[s.id] || [],
+      }));
+
+      if (activeCustomerIdRef.current === targetCustomerId) {
+        setServiceOrders(mappedSO);
       }
 
       // 3. Carregar Agendamentos
@@ -279,6 +314,67 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             createdAt: new Date(t.created_at),
             updatedAt: new Date(t.updated_at),
           }));
+
+        // Se houver transações com order_id ainda não carregadas em mappedOrders
+        const loadedOrderIds = new Set(orderIds);
+        const missingOrderIds = mappedTrans
+          .map((t) => t.orderId)
+          .filter((oid): oid is string => Boolean(oid && !loadedOrderIds.has(oid)));
+
+        if (missingOrderIds.length > 0) {
+          const { data: extraOrders } = await supabase
+            .from('orders')
+            .select('*')
+            .in('id', missingOrderIds);
+
+          if (extraOrders && extraOrders.length > 0) {
+            const { data: extraItems } = await supabase
+              .from('order_items')
+              .select('*, product:products(name, sku)')
+              .in('order_id', missingOrderIds);
+
+            (extraItems || []).forEach((item: any) => {
+              if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+              itemsByOrder[item.order_id].push({
+                id: item.id,
+                orderId: item.order_id,
+                productId: item.product_id,
+                quantity: Number(item.quantity) || 1,
+                unitPrice: Number(item.unit_price) || 0,
+                costPrice: Number(item.cost_price) || 0,
+                discountAmount: Number(item.discount_amount) || 0,
+                totalPrice: Number(item.total_price) || 0,
+                productName: item.product?.name || 'Produto',
+                productSku: item.product?.sku,
+                createdAt: new Date(item.created_at),
+              });
+            });
+
+            const mappedExtraOrders: Order[] = extraOrders.map((o: any) => ({
+              id: o.id,
+              clientId: o.client_id,
+              orderNumber: o.order_number,
+              customerId: o.customer_id,
+              collaboratorId: o.collaborator_id,
+              status: o.status,
+              subtotalAmount: Number(o.subtotal_amount) || 0,
+              discountAmount: Number(o.discount_amount) || 0,
+              totalAmount: Number(o.total_amount) || 0,
+              paymentMethod: o.payment_method,
+              paymentStatus: o.payment_status,
+              dueDate: o.due_date ? new Date(o.due_date) : undefined,
+              notes: o.notes,
+              transactionId: o.transaction_id,
+              createdAt: new Date(o.created_at),
+              updatedAt: new Date(o.updated_at),
+              items: itemsByOrder[o.id] || [],
+            }));
+
+            if (activeCustomerIdRef.current === targetCustomerId) {
+              setOrders((prev) => [...prev, ...mappedExtraOrders]);
+            }
+          }
+        }
 
         if (activeCustomerIdRef.current === targetCustomerId) {
           setTransactions(mappedTrans);
