@@ -67,32 +67,34 @@ vi.mock('@/integrations/supabase/client', () => ({
         } as any;
       }
       if (table === 'transactions') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'trans-1',
-                      client_id: 'client-123',
-                      description: 'Venda Avulsa de Balcão',
-                      amount: 85.5,
-                      date: new Date('2026-09-08T10:00:00Z').toISOString(),
-                      status: 'completed',
-                      type: 'income',
-                      payment_method: 'pix',
-                      category: 'Venda de Mercadorias',
-                      customer_id: 'cust-1',
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
+        const queryHandler = {
+          order: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'trans-1',
+                client_id: 'client-123',
+                description: 'Venda Avulsa de Balcão',
+                amount: 85.5,
+                date: new Date('2026-09-08T10:00:00Z').toISOString(),
+                status: 'completed',
+                type: 'income',
+                payment_method: 'pix',
+                category: 'Venda de Mercadorias',
+                customer_id: 'cust-1',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+            ],
+            error: null,
           }),
+        };
+        const filterHandler = {
+          eq: vi.fn().mockReturnValue(queryHandler),
+          or: vi.fn().mockReturnValue(queryHandler),
+          order: queryHandler.order,
+        };
+        return {
+          select: vi.fn().mockReturnValue(filterHandler),
         } as any;
       }
       if (table === 'service_orders' || table === 'appointments') {

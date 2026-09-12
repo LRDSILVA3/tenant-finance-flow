@@ -68,7 +68,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<Order | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  const loadCustomerData = useCallback(async (targetCustomerId: string) => {
+  const loadCustomerData = useCallback(async (targetCustomerId: string, targetCustomerName?: string) => {
     setLoading(true);
 
     try {
@@ -201,37 +201,44 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         }
       }
 
-      // 4. Carregar Lançamentos / Contas a Receber (completas)
-      const { data: transData } = await supabase
+      // 4. Carregar Lançamentos Financeiros (todas as receitas e pagamentos do cliente)
+      let transQuery = supabase
         .from('transactions')
-        .select('*')
-        .eq('customer_id', targetCustomerId)
-        .eq('type', 'income')
-        .order('date', { ascending: true });
+        .select('*');
+
+      if (targetCustomerName && targetCustomerName.trim().length > 2) {
+        transQuery = transQuery.or(`customer_id.eq.${targetCustomerId},description.ilike.%${targetCustomerName.trim()}%,notes.ilike.%${targetCustomerName.trim()}%`);
+      } else {
+        transQuery = transQuery.eq('customer_id', targetCustomerId);
+      }
+
+      const { data: transData } = await transQuery.order('date', { ascending: false });
 
       if (activeCustomerIdRef.current !== targetCustomerId) return;
 
       if (transData) {
-        const mappedTrans: Transaction[] = transData.map((t: any) => ({
-          id: t.id,
-          clientId: t.client_id,
-          description: t.description,
-          amount: Number(t.amount) || 0,
-          date: new Date(t.date),
-          dueDate: t.due_date ? new Date(t.due_date) : undefined,
-          status: t.status,
-          type: t.type,
-          paymentMethod: t.payment_method,
-          category: t.category,
-          subCategory: t.sub_category,
-          customerId: t.customer_id,
-          supplierId: t.supplier_id,
-          orderId: t.order_id,
-          serviceOrderId: t.service_order_id,
-          notes: t.notes,
-          createdAt: new Date(t.created_at),
-          updatedAt: new Date(t.updated_at),
-        }));
+        const mappedTrans: Transaction[] = transData
+          .filter((t: any) => t.type !== 'expense')
+          .map((t: any) => ({
+            id: t.id,
+            clientId: t.client_id,
+            description: t.description,
+            amount: Number(t.amount) || 0,
+            date: new Date(t.date),
+            dueDate: t.due_date ? new Date(t.due_date) : undefined,
+            status: t.status,
+            type: t.type || 'income',
+            paymentMethod: t.payment_method,
+            category: t.category,
+            subCategory: t.sub_category,
+            customerId: t.customer_id,
+            supplierId: t.supplier_id,
+            orderId: t.order_id,
+            serviceOrderId: t.service_order_id,
+            notes: t.notes,
+            createdAt: new Date(t.created_at),
+            updatedAt: new Date(t.updated_at),
+          }));
 
         if (activeCustomerIdRef.current === targetCustomerId) {
           setTransactions(mappedTrans);
@@ -263,7 +270,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setTransactions([]);
       setPendingDebt(0);
       setActiveTab('history');
-      loadCustomerData(customer.id);
+      loadCustomerData(customer.id, customer.name);
     } else {
       setOrders([]);
       setServiceOrders([]);
@@ -272,7 +279,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setPendingDebt(0);
       setLoading(false);
     }
-  }, [open, customer?.id, loadCustomerData]);
+  }, [open, customer?.id, customer?.name, loadCustomerData]);
 
   // ─── Métricas RFM & Comerciais ──────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -285,10 +292,12 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       .reduce((sum, s) => sum + s.totalAmount, 0);
 
     const standaloneTransactions = transactions.filter(
-      (t) => !t.orderId && !t.serviceOrderId && t.type === 'income'
+      (t) => (!t.orderId || !orders.some((o) => o.id === t.orderId)) &&
+             (!t.serviceOrderId || !serviceOrders.some((s) => s.id === t.serviceOrderId)) &&
+             t.type !== 'expense'
     );
     const totalTransactionsAmount = standaloneTransactions
-      .filter((t) => t.status === 'completed')
+      .filter((t) => t.status === 'completed' || t.status === 'paid')
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
     const totalSpentLTV = totalOrdersAmount + totalSOAmount + totalTransactionsAmount;
