@@ -12,6 +12,7 @@ export interface CustomerStatementPdfData {
   serviceOrders: ServiceOrder[];
   transactions: Transaction[];
   pendingDebt: number;
+  clientId?: string;
   companyNameParam?: string;
 }
 
@@ -21,12 +22,17 @@ export const generateCustomerStatementPdf = ({
   serviceOrders = [],
   transactions = [],
   pendingDebt = 0,
+  clientId,
   companyNameParam,
 }: CustomerStatementPdfData) => {
   const doc = new jsPDF();
-  const pdfSettings = getPdfSettings(customer.clientId);
+  const effectiveClientId = clientId || customer.clientId;
+  const pdfSettings = getPdfSettings(effectiveClientId);
 
-  const finalCompanyName = companyNameParam || pdfSettings.companyName || 'Previna Gestão';
+  const finalCompanyName =
+    (pdfSettings.companyName && pdfSettings.companyName.trim() !== '' && pdfSettings.companyName !== 'Previna Gestão')
+      ? pdfSettings.companyName
+      : (companyNameParam || pdfSettings.companyName || 'Empresa');
   const headerRgb = hexToRgb(pdfSettings.headerColor);
   const accentRgb = hexToRgb(pdfSettings.accentColor);
   const tableHeaderRgb = hexToRgb(pdfSettings.tableHeaderColor);
@@ -390,7 +396,7 @@ export const generateCustomerStatementPdf = ({
     doc.setTextColor(148, 163, 184);
     doc.text(`Ficha Financeira do Cliente - ${customer.name}`, 14, 290);
     doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
-    doc.text(pdfSettings.footerText || 'via Previna Gestão Financeira', 196, 290, { align: 'right' });
+    doc.text(pdfSettings.footerText || `via ${finalCompanyName}`, 196, 290, { align: 'right' });
   }
 
   // Salvar PDF no navegador

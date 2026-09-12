@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client';
 import { Customer, Order, ServiceOrder, Appointment, Transaction } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useFinance } from '@/contexts/FinanceContext';
 import {
   Sheet,
   SheetContent,
@@ -50,6 +51,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   onEditCustomer,
   onNavigateToSchedule,
 }) => {
+  const { currentClient } = useFinance();
   const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences'>('history');
   const [loading, setLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -363,7 +365,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
   const handleDownloadPdf = (order: Order) => {
     try {
-      generateOrderPdf(order);
+      generateOrderPdf(order, currentClient?.name);
       toast({ title: 'PDF gerado com sucesso!' });
     } catch (e: any) {
       toast({
@@ -384,6 +386,8 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         serviceOrders,
         transactions,
         pendingDebt,
+        clientId: currentClient?.id || customer.clientId,
+        companyNameParam: currentClient?.name,
       });
       toast({
         title: 'Ficha do Cliente exportada com sucesso!',
