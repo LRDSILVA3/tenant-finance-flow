@@ -565,8 +565,60 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       }
     });
 
+    // 4. Produtos e Itens extraídos de Vendas de Estoque / Lançamentos Financeiros
+    transactions.forEach((t) => {
+      if (t.type === 'expense') return;
+      const fullText = `${t.notes || ''} ${t.description || ''}`;
+      if (!fullText.trim()) return;
+
+      // Procura especificamente por "Itens vendidos: ..."
+      const matchItens = fullText.match(/Itens vendidos:\s*(.+)/i);
+      let itemsString = matchItens ? matchItens[1] : '';
+
+      // Se encontrou "Itens vendidos:", limpa sufixos de baixa / logs adicionados
+      if (itemsString) {
+        itemsString = itemsString.split(/Lançamento original|Baixa realizada|em \d{2}\/\d{2}/i)[0].trim();
+      } else if (/\b\d+\s*x\s+/i.test(fullText)) {
+        itemsString = fullText;
+      }
+
+      if (itemsString) {
+        // Divide itens separados por vírgula ou ponto e vírgula
+        const parts = itemsString.split(/,\s*(?=\d+\s*x\s+)|[,;]/i);
+        parts.forEach((part) => {
+          const itemMatch = part.trim().match(/(\d+(?:[.,]\d+)?)\s*x\s+([^,;]+)/i);
+          if (itemMatch) {
+            const qty = parseFloat(itemMatch[1].replace(',', '.')) || 1;
+            let prodName = itemMatch[2]
+              .split(/Lançamento original|Baixa realizada|em \d{2}\/\d{2}/i)[0]
+              .trim();
+            prodName = prodName.replace(/[.,;]+$/, '').trim();
+            if (prodName && prodName.length > 1) {
+              const key = prodName.toUpperCase();
+              const existing = map.get(key);
+              if (existing) {
+                existing.quantity += qty;
+                existing.totalAmount += (Number(t.amount) || 0) / Math.max(1, parts.length);
+                if (new Date(t.date) > new Date(existing.lastBoughtAt)) {
+                  existing.lastBoughtAt = new Date(t.date).toISOString();
+                }
+              } else {
+                map.set(key, {
+                  id: key,
+                  name: prodName,
+                  quantity: qty,
+                  totalAmount: (Number(t.amount) || 0) / Math.max(1, parts.length),
+                  lastBoughtAt: new Date(t.date).toISOString(),
+                });
+              }
+            }
+          }
+        });
+      }
+    });
+
     return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity);
-  }, [orders, serviceOrders, appointments]);
+  }, [orders, serviceOrders, appointments, transactions]);
 
   // ─── Timeline Unificada de Eventos Comerciais ──────────────────────────────
   const unifiedTimeline = useMemo(() => {
