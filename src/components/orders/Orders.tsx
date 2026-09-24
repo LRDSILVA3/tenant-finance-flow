@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { MoneyInput } from '@/components/ui/money-input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -26,7 +27,7 @@ import {
   Receipt, ArrowRight, CheckCircle2, Clock, X, Sparkles, Percent, Tag,
   CreditCard, Barcode, CalendarIcon, Eye, RotateCcw, AlertTriangle, ChevronRight,
   TrendingUp, Users, Check, AlertCircle, ShoppingBag, Download, Smartphone,
-  Copy, Wifi, WifiOff, RefreshCw, Store, Camera
+  Copy, Wifi, WifiOff, RefreshCw, Store, Camera, MoreVertical, XCircle, CheckCircle, Edit3
 } from 'lucide-react';
 import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 import { OrderReceiptDialog } from './OrderReceiptDialog';
@@ -763,6 +764,172 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
     }
   };
 
+  // ─── Aprovação / Finalização de Orçamento como Venda Concluída ──────────
+  const handleApproveOrder = async (order: Order) => {
+    if (!currentClient) return;
+    try {
+      let createdTransactionId = order.transactionId;
+
+      // 1. Cria a transação financeira se ainda não existir
+      if (!createdTransactionId) {
+        const incomeCats = categories.filter((c) => c.type === 'income');
+        const vendaCat = incomeCats.find((c) => c.name.toLowerCase().includes('venda')) || incomeCats[0];
+        const categoryId = vendaCat ? vendaCat.id : incomeCats[0]?.id;
+
+        if (categoryId) {
+          const itemsSummary = (order.items || []).map((i) => `${i.quantity}x ${i.productName}`).join(', ');
+          const createdTx = await addTransaction({
+            clientId: currentClient.id,
+            type: 'income',
+            categoryId,
+            amount: order.totalAmount,
+            description: `Pedido de Venda #${order.orderNumber} (${(order.items || []).length} itens)`,
+            date: order.dueDate || new Date(),
+            reference: order.orderNumber,
+            notes: `Itens: ${itemsSummary}${order.notes ? ` | Obs: ${order.notes}` : ''}`,
+            paymentMethod: (order.paymentMethod as any) || 'cash',
+            status: order.paymentStatus || 'paid',
+            customerId: order.customerId || undefined,
+          });
+          if (createdTx && (createdTx as any).id) {
+            createdTransactionId = (createdTx as any).id;
+          }
+        }
+      }
+
+      // 2. Baixa no estoque dos produtos do pedido caso seja aprovado a partir de rascunho
+      if (order.status === 'draft') {
+        for (const item of order.items || []) {
+          if (item.productId) {
+            await supabase.from('stock_movements').insert({
+              client_id: currentClient.id,
+              product_id: item.productId,
+              type: 'out',
+              quantity: item.quantity,
+              cost_price: item.costPrice,
+              notes: `Saída por Aprovação do Pedido #${order.orderNumber}`,
+            });
+
+            const prod = products.find((p) => p.id === item.productId);
+            if (prod) {
+              const newStock = Math.max(0, prod.current_stock - item.quantity);
+              await supabase.from('products').update({ current_stock: newStock }).eq('id', item.productId);
+            }
+          }
+        }
+      }
+
+      // 3. Atualiza o status do pedido para 'completed'
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'completed',
+          transaction_id: createdTransactionId || null,
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Orçamento Aprovado com Sucesso! 🛒',
+        description: `O Pedido #${order.orderNumber} foi finalizado e o lançamento financeiro gerado.`,
+      });
+
+      await loadProducts();
+      await loadOrders();
+      await loadTransactions();
+    } catch (err) {
+      console.error('Erro ao aprovar pedido:', err);
+      toast({ title: 'Erro ao aprovar orçamento', variant: 'destructive' });
+    }
+  };
+
+  // ─── Cancelamento de Pedido ──────────────────────────────────────────────
+  const handleCancelOrder = async (order: Order) => {
+    if (!confirm(`Deseja realmente cancelar o Pedido #${order.orderNumber}?`)) return;
+    try {
+      // Se estava completed, estorna o estoque
+      if (order.status === 'completed') {
+        for (const item of order.items || []) {
+          if (item.productId) {
+            await supabase.from('stock_movements').insert({
+              client_id: currentClient.id,
+              product_id: item.productId,
+              type: 'in',
+              quantity: item.quantity,
+              cost_price: item.costPrice,
+              notes: `Estorno por Cancelamento do Pedido #${order.orderNumber}`,
+            });
+
+            const prod = products.find((p) => p.id === item.productId);
+            if (prod) {
+              const newStock = prod.current_stock + item.quantity;
+              await supabase.from('products').update({ current_stock: newStock }).eq('id', item.productId);
+            }
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pedido Cancelado',
+        description: `O Pedido #${order.orderNumber} foi cancelado.`,
+      });
+
+      await loadProducts();
+      await loadOrders();
+      await loadTransactions();
+    } catch (err) {
+      console.error('Erro ao cancelar pedido:', err);
+      toast({ title: 'Erro ao cancelar pedido', variant: 'destructive' });
+    }
+  };
+
+  // ─── Carregar Orçamento no Carrinho ───────────────────────────────────────
+  const handleLoadDraftToCart = (order: Order) => {
+    const loadedCart: CartItem[] = (order.items || []).map((item) => {
+      const foundProduct = products.find((p) => p.id === item.productId) || {
+        id: item.productId,
+        client_id: currentClient?.id || '',
+        name: item.productName || 'Produto',
+        sku: item.productSku || null,
+        sale_price: item.unitPrice,
+        cost_price: item.costPrice || 0,
+        current_stock: 999,
+        min_stock: 0,
+        category_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      return {
+        product: foundProduct,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+      };
+    });
+
+    setCartItems(loadedCart);
+    setSelectedCustomerId(order.customerId || 'none');
+    setSelectedCollaboratorId(order.collaboratorId || 'none');
+    setOrderNotes(order.notes || '');
+    setDiscountType('fixed');
+    setGlobalDiscount(order.discountAmount || 0);
+    setActiveTab('pos');
+
+    toast({
+      title: `Orçamento #${order.orderNumber} carregado!`,
+      description: 'Os itens foram adicionados ao carrinho para edição ou fechamento.',
+    });
+  };
+
   // Histórico Filtrado
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -1191,6 +1358,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                             <SelectItem value="pix">PIX</SelectItem>
                             <SelectItem value="card">Cartão</SelectItem>
                             <SelectItem value="boleto">Boleto</SelectItem>
+                            <SelectItem value="crediario">Crediário Próprio (A Prazo / Fiado)</SelectItem>
                             {(customPaymentMethods || []).map((m) => (
                               <SelectItem key={m.id} value={m.name.toLowerCase()}>
                                 {m.name}
@@ -1485,7 +1653,20 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                             {formatCurrency(order.totalAmount)}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1">
+                              {order.status === 'draft' && (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                                  onClick={() => handleApproveOrder(order)}
+                                  title="Aprovar e Finalizar Venda"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Aprovar</span>
+                                </Button>
+                              )}
+
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1494,8 +1675,9 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                                 title="Baixar PDF Estilizado do Pedido"
                               >
                                 <Download className="h-3.5 w-3.5" />
-                                PDF
+                                <span className="hidden md:inline">PDF</span>
                               </Button>
+
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1504,10 +1686,56 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                                   setSelectedOrderForReceipt(order);
                                   setIsReceiptOpen(true);
                                 }}
+                                title="Ver Comprovante Térmico"
                               >
                                 <Eye className="h-3.5 w-3.5" />
-                                Comprovante
+                                <span className="hidden md:inline">Comprovante</span>
                               </Button>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="text-xs">
+                                  {order.status === 'draft' && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => handleApproveOrder(order)}
+                                        className="gap-2 text-emerald-600 font-semibold cursor-pointer"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                        Aprovar / Finalizar Venda
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handleLoadDraftToCart(order)}
+                                        className="gap-2 cursor-pointer"
+                                      >
+                                        <Edit3 className="h-4 w-4 text-primary" />
+                                        Editar no Carrinho
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+
+                                  {order.status !== 'cancelled' && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleCancelOrder(order)}
+                                      className="gap-2 text-destructive cursor-pointer"
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                      Cancelar Pedido
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {order.status === 'cancelled' && (
+                                    <DropdownMenuItem disabled className="text-muted-foreground text-[11px]">
+                                      Pedido Cancelado
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </TableRow>

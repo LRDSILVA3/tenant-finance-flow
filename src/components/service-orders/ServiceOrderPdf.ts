@@ -11,6 +11,7 @@ export const generateServiceOrderPdf = (
   companyNameParam?: string
 ) => {
   const doc = new jsPDF();
+  const pdfSettings = getPdfSettings(os.clientId);
   const finalCompanyName =
     (pdfSettings.companyName && pdfSettings.companyName.trim() !== '' && pdfSettings.companyName !== 'Previna Gestão')
       ? pdfSettings.companyName.trim()

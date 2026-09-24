@@ -48,14 +48,17 @@ import {
   Filter,
   X,
   Boxes,
-  RefreshCw
+  RefreshCw,
+  Archive
 } from 'lucide-react';
+import { accountantPackageService } from '@/services/accountantPackageService';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, Legend, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { CommissionManager } from '@/components/collaborators/CommissionManager';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -127,6 +130,7 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
 
   // Inventory Sub-tabs and Filters State
   const [subTabInventory, setSubTabInventory] = useState<'overview' | 'abc' | 'turnover' | 'expirations' | 'kardex'>('overview');
+  const [exportingZip, setExportingZip] = useState(false);
   const [invCategoryFilter, setInvCategoryFilter] = useState<string>('all');
   const [invSupplierFilter, setInvSupplierFilter] = useState<string>('all');
   const [invKardexProductFilter, setInvKardexProductFilter] = useState<string>('all');
@@ -1290,6 +1294,41 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
     window.print();
   };
 
+  const handleExportAccountantZip = async () => {
+    if (!currentClient) return;
+    setExportingZip(true);
+    try {
+      await accountantPackageService.downloadPackage({
+        companyName: currentClient.name,
+        startDate: startDate || subMonths(new Date(), 1),
+        endDate: endDate || new Date(),
+        dreData: {
+          grossRevenue: dreData.grossRevenue,
+          totalExpenses: dreData.totalExpenses,
+          operatingExpenses: dreData.operatingExpenses,
+          netResult: dreData.netResult,
+          marginPercent: dreData.marginPercent,
+        },
+        transactions: filteredTransactions,
+        categories,
+        products,
+      });
+      toast({
+        title: "Pacote Contábil Gerado!",
+        description: "O arquivo ZIP com DRE, lançamentos, balancetes e comprovantes foi gerado com sucesso.",
+      });
+    } catch (err) {
+      console.error("Erro ao gerar pacote contábil:", err);
+      toast({
+        title: "Erro ao gerar pacote",
+        description: "Não foi possível compilar o pacote do contador.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingZip(false);
+    }
+  };
+
   if (!currentClient) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -1306,8 +1345,26 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
           <h2 className="page-title">Relatórios Personalizados</h2>
           <p className="page-subtitle">Análises contábeis e de comissão para a tomada de decisão.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExportPdf} className="gap-2 mr-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="default"
+            onClick={handleExportAccountantZip}
+            disabled={exportingZip}
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+          >
+            {exportingZip ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Gerando ZIP...
+              </>
+            ) : (
+              <>
+                <Archive className="h-4 w-4" />
+                Pacote do Contador (ZIP)
+              </>
+            )}
+          </Button>
+          <Button variant="outline" onClick={handleExportPdf} className="gap-2">
             <Download className="h-4 w-4" />
             Exportar PDF
           </Button>
@@ -1632,57 +1689,7 @@ export const Reports: React.FC<ReportsProps> = ({ activeTab, onTabChange }) => {
           {/* Commissions Tab */}
           {userSettings.enableCommission && (
             <TabsContent value="commissions" className="space-y-4 print:block">
-              <Card className="border shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Relatório de Comissões por Colaborador
-                  </CardTitle>
-                  <CardDescription className="print:hidden">
-                    Visão detalhada das vendas efetuadas e comissões associadas a cada colaborador.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto border rounded-lg">
-                    <Table className="min-w-[650px]">
-                      <TableHeader className="bg-muted/50">
-                        <TableRow>
-                          <TableHead className="font-semibold text-foreground">Colaborador</TableHead>
-                          <TableHead className="text-right font-semibold text-foreground">Serviços/Vendas Totais</TableHead>
-                          <TableHead className="text-right font-semibold text-foreground">Média p/ Lançamento</TableHead>
-                          <TableHead className="text-right font-semibold text-foreground">Lançamentos</TableHead>
-                          <TableHead className="text-right font-semibold text-foreground">Comissão Gerada</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {collaboratorReport.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                              Nenhuma venda com comissão encontrada no período.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          collaboratorReport.map((col, idx) => {
-                            const avgSale = col.txCount > 0 ? col.totalSales / col.txCount : 0;
-                            return (
-                              <TableRow key={idx} className="hover:bg-muted/30">
-                                <TableCell className="font-medium text-foreground flex items-center gap-2">
-                                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                                  {col.name}
-                                </TableCell>
-                                <TableCell className="text-right font-mono">{formatCurrency(col.totalSales)}</TableCell>
-                                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(avgSale)}</TableCell>
-                                <TableCell className="text-right font-mono text-muted-foreground">{col.txCount}</TableCell>
-                                <TableCell className="text-right font-semibold font-mono text-income">{formatCurrency(col.totalCommissions)}</TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
+              <CommissionManager startDate={startDate} endDate={endDate} />
             </TabsContent>
           )}
 

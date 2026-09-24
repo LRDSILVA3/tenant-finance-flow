@@ -145,8 +145,8 @@ export const generateCustomerStatementPdf = ({
   doc.rect(14, currentY, 182, 18, 'S');
 
   // Cálculos de totais
-  const completedOrders = orders.filter((o) => o.status !== 'cancelled');
-  const completedSO = serviceOrders.filter((s) => s.status !== 'cancelled');
+  const completedOrders = orders.filter((o) => o.status !== 'cancelled' && o.status !== 'draft');
+  const completedSO = serviceOrders.filter((s) => s.status !== 'cancelled' && s.status !== 'draft');
   const standaloneCompletedTrans = transactions.filter(
     (t) => !t.orderId && !t.serviceOrderId && t.type === 'income' && (t.status === 'completed' || t.status === 'paid')
   );
@@ -174,7 +174,7 @@ export const generateCustomerStatementPdf = ({
     doc.text(formatCurrency(pendingDebt), 130, currentY + 13);
   } else {
     doc.setTextColor(22, 163, 74); // Emerald-600
-    doc.text('R$ 0,00 (Quitado)', 130, currentY + 13);
+    doc.text('R$ 0,00 (Em Dia)', 130, currentY + 13);
   }
 
   // 4. TABELA ÚNICA CONSOLIDADA: EXTRATO COMPLETO DE COMPRAS, SERVIÇOS E DÉBITOS
@@ -209,7 +209,7 @@ export const generateCustomerStatementPdf = ({
     const dueDate = linkedTrans?.dueDate ? new Date(linkedTrans.dueDate) : (o.dueDate ? new Date(o.dueDate) : undefined);
     const paymentMethodStr = (linkedTrans?.paymentMethod || o.paymentMethod || 'Dinheiro').toUpperCase();
 
-    let situation = '✓ Quitado / Pago';
+    let situation = '✓ Recebido';
     let isPending = false;
 
     if (o.status === 'cancelled') {
@@ -262,7 +262,7 @@ export const generateCustomerStatementPdf = ({
     const dueDate = linkedTrans?.dueDate ? new Date(linkedTrans.dueDate) : undefined;
     const paymentMethodStr = (linkedTrans?.paymentMethod || s.paymentMethod || 'Dinheiro').toUpperCase();
 
-    let situation = '✓ Quitado / Finalizada';
+    let situation = '✓ Recebido';
     let isPending = false;
 
     if (s.status === 'cancelled') {
@@ -308,7 +308,7 @@ export const generateCustomerStatementPdf = ({
     const dueDate = t.dueDate ? new Date(t.dueDate) : (t.date ? new Date(t.date) : undefined);
     const paymentMethodStr = (t.paymentMethod || 'Dinheiro').toUpperCase();
 
-    let situation = '✓ Quitado / Recebido';
+    let situation = '✓ Recebido';
     let isPending = false;
 
     if (t.status === 'pending') {

@@ -6,16 +6,6 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/hooks/use-toast';
 import { Transaction } from '@/types/finance';
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
-
-// Mock scrollIntoView
-window.HTMLElement.prototype.scrollIntoView = vi.fn();
-
 // Mock useFinance
 vi.mock('@/contexts/FinanceContext', () => ({
   useFinance: vi.fn(),

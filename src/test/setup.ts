@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { cleanup } from "@testing-library/react";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -15,9 +16,33 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 class ResizeObserverMock {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
 }
 
-window.ResizeObserver = window.ResizeObserver || ResizeObserverMock;
+window.ResizeObserver = ResizeObserverMock as any;
+global.ResizeObserver = ResizeObserverMock as any;
+
+class IntersectionObserverMock {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+window.IntersectionObserver = IntersectionObserverMock as any;
+global.IntersectionObserver = IntersectionObserverMock as any;
+
+// Mock window.HTMLElement.prototype.scrollIntoView
+if (typeof window !== 'undefined' && window.HTMLElement) {
+  window.HTMLElement.prototype.scrollIntoView = window.HTMLElement.prototype.scrollIntoView || vi.fn();
+}
+
+afterEach(() => {
+  cleanup();
+  document.body.innerHTML = '';
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {}
+});

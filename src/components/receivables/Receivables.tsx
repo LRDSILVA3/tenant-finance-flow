@@ -53,11 +53,13 @@ import {
   List,
   ShoppingBag,
   Eye,
-  Download
+  Download,
+  MessageSquare
 } from 'lucide-react';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
+import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 import { Order } from '@/types/finance';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -227,6 +229,37 @@ export const Receivables: React.FC = () => {
   const [firstInstallmentDate, setFirstInstallmentDate] = useState<string>('');
   const [interestRate, setInterestRate] = useState<number>(0);
   const [confirming, setConfirming] = useState(false);
+
+  // WhatsApp reminder modal state
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [whatsappModalData, setWhatsappModalData] = useState<{
+    customerPhone: string;
+    customerName: string;
+    description: string;
+    amount: number;
+    dueDate: string;
+    daysOverdue: number;
+  } | null>(null);
+
+  const handleOpenWhatsAppReminder = (tx: Transaction) => {
+    const cust = tx.customerId ? getCustomerById(tx.customerId) : null;
+    const txDate = parseDateSafe(tx.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const txMidnight = new Date(txDate);
+    txMidnight.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - txMidnight.getTime()) / (1000 * 60 * 60 * 24));
+
+    setWhatsappModalData({
+      customerPhone: cust?.phone || '',
+      customerName: cust?.name || '',
+      description: tx.description,
+      amount: tx.amount,
+      dueDate: formatDate(tx.date),
+      daysOverdue: Math.max(0, diffDays)
+    });
+    setWhatsappModalOpen(true);
+  };
 
   // Filter pending income transactions
   const pendingTransactions = useMemo(() => {
@@ -958,8 +991,18 @@ export const Receivables: React.FC = () => {
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
+                              <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-t-0 pt-2 sm:pt-0">
                                 <span className="font-bold text-amber-600 money-font text-sm">{formatCurrency(tx.amount)}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                                  onClick={() => handleOpenWhatsAppReminder(tx)}
+                                  title="Enviar lembrete / cobrança no WhatsApp"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span className="hidden sm:inline">WhatsApp</span>
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1096,15 +1139,26 @@ export const Receivables: React.FC = () => {
                               {formatCurrency(tx.amount)}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleOpenPaymentDialog(tx)}
-                                className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Receber
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenWhatsAppReminder(tx)}
+                                  className="h-8 w-8 p-0 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                  title="Enviar cobrança / lembrete no WhatsApp"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenPaymentDialog(tx)}
+                                  className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Receber
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -1194,12 +1248,21 @@ export const Receivables: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="pt-2 border-t flex justify-end">
+                        <div className="pt-2 border-t flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenWhatsAppReminder(tx)}
+                            className="flex-1 sm:flex-initial h-8 text-xs border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium gap-1.5 justify-center"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>WhatsApp</span>
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleOpenPaymentDialog(tx)}
-                            className="w-full sm:w-auto h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1.5 justify-center"
+                            className="flex-1 sm:flex-initial h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold gap-1.5 justify-center"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Receber
@@ -1463,6 +1526,24 @@ export const Receivables: React.FC = () => {
         onOpenChange={(isOpen) => !isOpen && setSelectedOrderForView(null)}
         companyName={currentClient?.name}
       />
+
+      {whatsappModalData && (
+        <WhatsAppSendModal
+          open={whatsappModalOpen}
+          onOpenChange={setWhatsappModalOpen}
+          customerName={whatsappModalData.customerName}
+          customerPhone={whatsappModalData.customerPhone}
+          category="billing"
+          sourceModule="receivables"
+          documentTitle={whatsappModalData.description}
+          variablesContext={{
+            nome_cliente: whatsappModalData.customerName,
+            valor_total: whatsappModalData.amount,
+            data_vencimento: whatsappModalData.dueDate,
+            dias_atraso: whatsappModalData.daysOverdue
+          }}
+        />
+      )}
     </div>
   );
 };

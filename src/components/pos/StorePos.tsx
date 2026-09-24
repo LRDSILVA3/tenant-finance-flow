@@ -58,7 +58,17 @@ import {
   ArrowRight,
   Camera,
   Barcode,
+  BookOpen,
+  CalendarClock,
+  AlertTriangle,
+  ShieldAlert,
+  Edit2,
+  X,
+  PlusCircle,
+  Split,
+  ShieldCheck,
 } from 'lucide-react';
+import { addDays, addMonths, format, parseISO } from 'date-fns';
 import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 
 // Web Audio API para Bipe Sonoro
@@ -80,6 +90,17 @@ const playBeep = (freq = 880, duration = 0.08) => {
   }
 };
 
+// Vibração tátil no Kiosk / Mobile
+const vibrateTouch = (ms = 25) => {
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(ms);
+    }
+  } catch {
+    // Ignore vibration errors
+  }
+};
+
 interface CartItem {
   id: string; // unique item id
   productId?: string;
@@ -93,11 +114,28 @@ interface CartItem {
   availableStock?: number;
 }
 
+export interface PosComanda {
+  id: string;
+  name: string;
+  cart: CartItem[];
+  selectedCustomerId: string;
+  selectedCollaboratorId: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: TransactionStatus;
+  notes: string;
+  globalDiscount: number;
+  cashGiven: number;
+  crediarioInstallments?: number;
+  crediarioFirstDueDate?: string;
+  createdAt: string;
+}
+
 export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOrders }) => {
   const {
     collaborators = [],
     customPaymentMethods = [],
     categories: financeCategories = [],
+    transactions = [],
     currentClient,
     addTransaction,
   } = useFinance();
@@ -119,6 +157,242 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const [paymentStatus, setPaymentStatus] = useState<TransactionStatus>('paid');
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
+  const [cashGiven, setCashGiven] = useState<number>(0);
+
+  // Estados do Crediário Próprio / Fiado Moderno
+  const [crediarioInstallments, setCrediarioInstallments] = useState<number>(1);
+  const [crediarioFirstDueDate, setCrediarioFirstDueDate] = useState<string>(() =>
+    format(addDays(new Date(), 30), 'yyyy-MM-dd')
+  );
+  const [crediarioLimitAuthorized, setCrediarioLimitAuthorized] = useState<boolean>(false);
+
+  // Modo Comandas / Atendimentos Simultâneos
+  const comandasStorageKey = `tf_pos_comandas_${currentClient?.id || 'default'}`;
+  const [comandas, setComandas] = useState<PosComanda[]>(() => {
+    try {
+      const saved = localStorage.getItem(`tf_pos_comandas_${currentClient?.id || 'default'}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      {
+        id: 'cmd_1',
+        name: 'Comanda #01',
+        cart: [],
+        selectedCustomerId: 'none',
+        selectedCollaboratorId: 'none',
+        paymentMethod: 'pix',
+        paymentStatus: 'paid',
+        notes: '',
+        globalDiscount: 0,
+        cashGiven: 0,
+        crediarioInstallments: 1,
+        crediarioFirstDueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  });
+
+  const [activeComandaId, setActiveComandaId] = useState<string>(() => comandas[0]?.id || 'cmd_1');
+  const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
+  const [editingComandaName, setEditingComandaName] = useState<string>('');
+
+  // Sincroniza a comanda ativa no localStorage sempre que o cupom mudar
+  useEffect(() => {
+    setComandas((prev) => {
+      const updated = prev.map((cmd) => {
+        if (cmd.id === activeComandaId) {
+          return {
+            ...cmd,
+            cart,
+            selectedCustomerId,
+            selectedCollaboratorId,
+            paymentMethod,
+            paymentStatus,
+            notes,
+            globalDiscount,
+            cashGiven,
+            crediarioInstallments,
+            crediarioFirstDueDate,
+          };
+        }
+        return cmd;
+      });
+      try {
+        localStorage.setItem(comandasStorageKey, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, [
+    cart,
+    selectedCustomerId,
+    selectedCollaboratorId,
+    paymentMethod,
+    paymentStatus,
+    notes,
+    globalDiscount,
+    cashGiven,
+    crediarioInstallments,
+    crediarioFirstDueDate,
+    activeComandaId,
+    comandasStorageKey,
+  ]);
+
+  const handleSwitchComanda = (targetId: string) => {
+    if (targetId === activeComandaId) return;
+
+    // 1. Salva comanda atual
+    const updated = comandas.map((cmd) => {
+      if (cmd.id === activeComandaId) {
+        return {
+          ...cmd,
+          cart,
+          selectedCustomerId,
+          selectedCollaboratorId,
+          paymentMethod,
+          paymentStatus,
+          notes,
+          globalDiscount,
+          cashGiven,
+          crediarioInstallments,
+          crediarioFirstDueDate,
+        };
+      }
+      return cmd;
+    });
+
+    // 2. Carrega comanda alvo
+    const target = updated.find((c) => c.id === targetId);
+    if (target) {
+      setCart(target.cart || []);
+      setSelectedCustomerId(target.selectedCustomerId || 'none');
+      setSelectedCollaboratorId(target.selectedCollaboratorId || 'none');
+      setPaymentMethod(target.paymentMethod || 'pix');
+      setPaymentStatus(target.paymentStatus || 'paid');
+      setNotes(target.notes || '');
+      setGlobalDiscount(target.globalDiscount || 0);
+      setCashGiven(target.cashGiven || 0);
+      setCrediarioInstallments(target.crediarioInstallments || 1);
+      setCrediarioFirstDueDate(target.crediarioFirstDueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'));
+      setCrediarioLimitAuthorized(false);
+    }
+
+    setComandas(updated);
+    setActiveComandaId(targetId);
+    try {
+      localStorage.setItem(comandasStorageKey, JSON.stringify(updated));
+    } catch {}
+    vibrateTouch(20);
+  };
+
+  const handleCreateComanda = () => {
+    const newId = `cmd_${Date.now()}`;
+    const newName = `Comanda #${String(comandas.length + 1).padStart(2, '0')}`;
+    const newCmd: PosComanda = {
+      id: newId,
+      name: newName,
+      cart: [],
+      selectedCustomerId: 'none',
+      selectedCollaboratorId: 'none',
+      paymentMethod: 'pix',
+      paymentStatus: 'paid',
+      notes: '',
+      globalDiscount: 0,
+      cashGiven: 0,
+      crediarioInstallments: 1,
+      crediarioFirstDueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = comandas.map((cmd) => {
+      if (cmd.id === activeComandaId) {
+        return {
+          ...cmd,
+          cart,
+          selectedCustomerId,
+          selectedCollaboratorId,
+          paymentMethod,
+          paymentStatus,
+          notes,
+          globalDiscount,
+          cashGiven,
+          crediarioInstallments,
+          crediarioFirstDueDate,
+        };
+      }
+      return cmd;
+    });
+
+    const result = [...updated, newCmd];
+    setComandas(result);
+    setActiveComandaId(newId);
+    setCart([]);
+    setSelectedCustomerId('none');
+    setSelectedCollaboratorId('none');
+    setPaymentMethod('pix');
+    setPaymentStatus('paid');
+    setNotes('');
+    setGlobalDiscount(0);
+    setCashGiven(0);
+    setCrediarioInstallments(1);
+    setCrediarioFirstDueDate(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
+    setCrediarioLimitAuthorized(false);
+
+    try {
+      localStorage.setItem(comandasStorageKey, JSON.stringify(result));
+    } catch {}
+
+    toast({
+      title: 'Nova Comanda Aberta! 📋',
+      description: `${newName} disponível para atendimento simultâneo.`,
+    });
+    vibrateTouch(30);
+  };
+
+  const handleRenameComanda = (id: string, newName: string) => {
+    if (!newName.trim()) {
+      setEditingComandaId(null);
+      return;
+    }
+    const updated = comandas.map((c) => (c.id === id ? { ...c, name: newName.trim() } : c));
+    setComandas(updated);
+    setEditingComandaId(null);
+    try {
+      localStorage.setItem(comandasStorageKey, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleCloseComanda = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (comandas.length <= 1) {
+      setCart([]);
+      setGlobalDiscount(0);
+      setNotes('');
+      toast({ title: 'Comanda limpa', description: 'Todos os itens foram removidos.' });
+      return;
+    }
+
+    const remaining = comandas.filter((c) => c.id !== id);
+    setComandas(remaining);
+    try {
+      localStorage.setItem(comandasStorageKey, JSON.stringify(remaining));
+    } catch {}
+
+    if (activeComandaId === id) {
+      const next = remaining[0];
+      setActiveComandaId(next.id);
+      setCart(next.cart || []);
+      setSelectedCustomerId(next.selectedCustomerId || 'none');
+      setSelectedCollaboratorId(next.selectedCollaboratorId || 'none');
+      setPaymentMethod(next.paymentMethod || 'pix');
+      setPaymentStatus(next.paymentStatus || 'paid');
+      setNotes(next.notes || '');
+      setGlobalDiscount(next.globalDiscount || 0);
+      setCashGiven(next.cashGiven || 0);
+    }
+  };
 
   const selectedCustomer = useMemo(() => {
     return customers.find((c) => c.id === selectedCustomerId);
@@ -127,6 +401,20 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
   const selectedCollaborator = useMemo(() => {
     return collaborators.find((c) => c.id === selectedCollaboratorId);
   }, [collaborators, selectedCollaboratorId]);
+
+  // Cálculos do Crediário Próprio
+  const customerPendingDebt = useMemo(() => {
+    if (!selectedCustomerId || selectedCustomerId === 'none') return 0;
+    return (transactions || [])
+      .filter((t) => t.customerId === selectedCustomerId && t.type === 'income' && t.status === 'pending')
+      .reduce((acc, t) => acc + t.amount, 0);
+  }, [transactions, selectedCustomerId]);
+
+  const customerCreditLimit = selectedCustomer?.creditLimit || 0;
+  const hasCustomerCreditLimit = customerCreditLimit > 0;
+  const isCreditLimitExceeded = hasCustomerCreditLimit && customerPendingDebt + grandTotal > customerCreditLimit;
+  const creditExcess = isCreditLimitExceeded ? customerPendingDebt + grandTotal - customerCreditLimit : 0;
+  const availableCredit = Math.max(0, customerCreditLimit - customerPendingDebt);
 
   // Filtros do Catálogo Touch
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,9 +426,6 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
   // Aba Ativa no Mobile (Catálogo vs Cupom)
   const [mobileTab, setMobileTab] = useState<'catalog' | 'cupom'>('catalog');
-
-  // Calculadora de Troco Dinheiro
-  const [cashGiven, setCashGiven] = useState<number>(0);
 
   // Estados de Conclusão / Modais
   const [completing, setCompleting] = useState(false);
@@ -495,6 +780,26 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       return;
     }
 
+    if (paymentMethod === 'crediario') {
+      if (!selectedCustomerId || selectedCustomerId === 'none' || !selectedCustomer) {
+        toast({
+          title: 'Cliente Obrigatório',
+          description: 'A venda no crediário requer a seleção de um cliente cadastrado.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (isCreditLimitExceeded && !crediarioLimitAuthorized) {
+        toast({
+          title: 'Limite de Crédito Excedido',
+          description: `O limite foi ultrapassado em ${formatCurrency(creditExcess)}. Autorize a liberação extraordinária para prosseguir.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setCompleting(true);
 
     try {
@@ -502,6 +807,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       const orderNumber = `PED-${Math.floor(100000 + Math.random() * 900000)}`;
       const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
       const selectedCollaborator = collaborators.find((c) => c.id === selectedCollaboratorId);
+      const actualPaymentStatus: TransactionStatus = paymentMethod === 'crediario' ? 'pending' : paymentStatus;
 
       // 2. Cria Lançamento Financeiro se faturado
       let transactionId: string | undefined = undefined;
@@ -524,24 +830,59 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
         if (categoryId) {
           const itemsSummary = cart.map((i) => `${i.quantity}x ${i.name}`).join(', ');
-          const createdTx = await addTransaction({
-            clientId: currentClient.id,
-            categoryId,
-            type: 'income',
-            amount: grandTotal,
-            description: `Venda Modo Loja #${orderNumber}${
-              selectedCustomer ? ` - ${selectedCustomer.name}` : ' - Cliente Balcão'
-            }`,
-            date: new Date(),
-            reference: orderNumber,
-            notes: `Itens: ${itemsSummary}${notes ? ` | Obs: ${notes}` : ''}`,
-            paymentMethod: paymentMethod,
-            status: paymentStatus,
-            customerId: selectedCustomerId !== 'none' ? selectedCustomerId : undefined,
-          });
 
-          if (createdTx && (createdTx as any).id) {
-            transactionId = (createdTx as any).id;
+          if (paymentMethod === 'crediario' && crediarioInstallments > 1) {
+            const baseInstAmount = Math.floor((grandTotal / crediarioInstallments) * 100) / 100;
+            const remainder = Math.round((grandTotal - baseInstAmount * crediarioInstallments) * 100) / 100;
+
+            for (let i = 1; i <= crediarioInstallments; i++) {
+              const instAmount = i === crediarioInstallments ? baseInstAmount + remainder : baseInstAmount;
+              const instDueDate = addMonths(parseISO(crediarioFirstDueDate), i - 1);
+
+              const createdTx = await addTransaction({
+                clientId: currentClient.id,
+                categoryId,
+                type: 'income',
+                amount: instAmount,
+                description: `Venda Crediário #${orderNumber} (${i}/${crediarioInstallments}) - ${selectedCustomer?.name}`,
+                date: instDueDate,
+                reference: `${orderNumber} - ${i}/${crediarioInstallments}`,
+                notes: `Itens: ${itemsSummary}${notes ? ` | Obs: ${notes}` : ''}`,
+                paymentMethod: 'crediario',
+                status: 'pending',
+                customerId: selectedCustomerId !== 'none' ? selectedCustomerId : undefined,
+                collaboratorId: selectedCollaboratorId !== 'none' ? selectedCollaboratorId : undefined,
+              });
+
+              if (i === 1 && createdTx && (createdTx as any).id) {
+                transactionId = (createdTx as any).id;
+              }
+            }
+          } else {
+            const txDueDate = paymentMethod === 'crediario'
+              ? new Date(crediarioFirstDueDate + 'T12:00:00')
+              : new Date();
+
+            const createdTx = await addTransaction({
+              clientId: currentClient.id,
+              categoryId,
+              type: 'income',
+              amount: grandTotal,
+              description: `${paymentMethod === 'crediario' ? 'Venda Crediário' : 'Venda Modo Loja'} #${orderNumber}${
+                selectedCustomer ? ` - ${selectedCustomer.name}` : ' - Cliente Balcão'
+              }`,
+              date: txDueDate,
+              reference: orderNumber,
+              notes: `Itens: ${itemsSummary}${notes ? ` | Obs: ${notes}` : ''}`,
+              paymentMethod: paymentMethod,
+              status: actualPaymentStatus,
+              customerId: selectedCustomerId !== 'none' ? selectedCustomerId : undefined,
+              collaboratorId: selectedCollaboratorId !== 'none' ? selectedCollaboratorId : undefined,
+            });
+
+            if (createdTx && (createdTx as any).id) {
+              transactionId = (createdTx as any).id;
+            }
           }
         }
       }
@@ -559,7 +900,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           discount_amount: globalDiscount,
           total_amount: grandTotal,
           payment_method: paymentMethod,
-          payment_status: paymentStatus,
+          payment_status: actualPaymentStatus,
           transaction_id: transactionId || null,
           notes: notes.trim() || null,
         })
@@ -649,15 +990,46 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       setIsConfirmModalOpen(false);
       setIsReceiptOpen(true);
 
-      // Limpar formulário para a próxima venda
-      setCart([]);
-      setGlobalDiscount(0);
-      setCashGiven(0);
-      setNotes('');
+      // Limpar ou avançar comanda para a próxima venda
+      if (comandas.length > 1) {
+        const remaining = comandas.filter((c) => c.id !== activeComandaId);
+        setComandas(remaining);
+        const next = remaining[0];
+        setActiveComandaId(next.id);
+        setCart(next.cart || []);
+        setSelectedCustomerId(next.selectedCustomerId || 'none');
+        setSelectedCollaboratorId(next.selectedCollaboratorId || 'none');
+        setPaymentMethod(next.paymentMethod || 'pix');
+        setPaymentStatus(next.paymentStatus || 'paid');
+        setNotes(next.notes || '');
+        setGlobalDiscount(next.globalDiscount || 0);
+        setCashGiven(next.cashGiven || 0);
+        setCrediarioInstallments(next.crediarioInstallments || 1);
+        setCrediarioFirstDueDate(next.crediarioFirstDueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'));
+        setCrediarioLimitAuthorized(false);
+        try {
+          localStorage.setItem(comandasStorageKey, JSON.stringify(remaining));
+        } catch {}
+      } else {
+        setCart([]);
+        setSelectedCustomerId('none');
+        setSelectedCollaboratorId('none');
+        setPaymentMethod('pix');
+        setPaymentStatus('paid');
+        setGlobalDiscount(0);
+        setCashGiven(0);
+        setNotes('');
+        setCrediarioInstallments(1);
+        setCrediarioFirstDueDate(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
+        setCrediarioLimitAuthorized(false);
+      }
 
       toast({
-        title: 'Venda Concluída com Sucesso! 🛒',
-        description: `Pedido #${orderNumber} finalizado. Estoque e financeiro sincronizados.`,
+        title: paymentMethod === 'crediario' ? 'Venda no Crediário Registrada! 📝' : 'Venda Concluída com Sucesso! 🛒',
+        description:
+          paymentMethod === 'crediario'
+            ? `Pedido #${orderNumber} lançado em Contas a Receber.`
+            : `Pedido #${orderNumber} finalizado. Estoque e financeiro sincronizados.`,
       });
     } catch (err: any) {
       toast({
@@ -713,6 +1085,118 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
             <span className="hidden sm:inline">{isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia'}</span>
           </Button>
+        </div>
+      </div>
+
+      {/* Barra de Comandas / Atendimentos Simultâneos */}
+      <div className="shrink-0 bg-muted/40 border rounded-xl p-1.5 flex items-center justify-between gap-2 overflow-x-auto shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+          <div className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground px-2 shrink-0 border-r pr-2.5 mr-1">
+            <Split className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden sm:inline">Comandas:</span>
+          </div>
+
+          {comandas.map((cmd) => {
+            const isActive = cmd.id === activeComandaId;
+            const itemsCount = cmd.cart ? cmd.cart.reduce((acc, i) => acc + i.quantity, 0) : 0;
+            const totalVal = cmd.cart
+              ? Math.max(
+                  0,
+                  cmd.cart.reduce((acc, i) => acc + i.quantity * i.unitPrice - (i.discountAmount || 0), 0) -
+                    (cmd.globalDiscount || 0)
+                )
+              : 0;
+
+            if (editingComandaId === cmd.id) {
+              return (
+                <div key={cmd.id} className="flex items-center gap-1 shrink-0 bg-background border rounded-lg px-2 py-1">
+                  <Input
+                    autoFocus
+                    value={editingComandaName}
+                    onChange={(e) => setEditingComandaName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRenameComanda(cmd.id, editingComandaName);
+                      if (e.key === 'Escape') setEditingComandaId(null);
+                    }}
+                    onBlur={() => handleRenameComanda(cmd.id, editingComandaName)}
+                    className="h-6 text-xs w-28 px-1.5"
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={cmd.id}
+                onClick={() => handleSwitchComanda(cmd.id)}
+                className={cn(
+                  'cursor-pointer shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold flex items-center gap-2 transition-all border select-none',
+                  isActive
+                    ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                    : 'bg-background hover:bg-muted/70 text-foreground border-border/70'
+                )}
+                title="Clique para alternar. Clique duplo para renomear."
+                onDoubleClick={() => {
+                  setEditingComandaId(cmd.id);
+                  setEditingComandaName(cmd.name);
+                }}
+              >
+                <span className="truncate max-w-[120px]">{cmd.name}</span>
+                {itemsCount > 0 ? (
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'text-[9px] px-1 py-0 h-4 font-bold',
+                      isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {itemsCount} • {formatCurrency(totalVal)}
+                  </Badge>
+                ) : (
+                  <span
+                    className={cn(
+                      'text-[9.5px]',
+                      isActive ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                    )}
+                  >
+                    Vazia
+                  </span>
+                )}
+
+                {/* Botão de Fechar / Limpar Comanda */}
+                {comandas.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleCloseComanda(cmd.id, e)}
+                    className={cn(
+                      'p-0.5 rounded-full hover:bg-black/20 dark:hover:bg-white/20 transition-all -mr-1',
+                      isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    title="Excluir Comanda"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCreateComanda}
+            className="h-7 text-xs gap-1 text-primary hover:bg-primary/10 shrink-0 font-bold px-2"
+          >
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span>Nova Comanda</span>
+          </Button>
+        </div>
+
+        <div className="hidden md:flex items-center gap-1.5 text-[10.5px] text-muted-foreground shrink-0 pr-1">
+          <Badge variant="outline" className="text-[10px] font-mono">
+            {comandas.length} {comandas.length === 1 ? 'comanda ativa' : 'comandas abertas'}
+          </Badge>
         </div>
       </div>
 
@@ -1263,10 +1747,13 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             {/* Formas de Pagamento Express */}
             <div className="space-y-1">
               <Label className="text-[10px] text-muted-foreground font-semibold">Forma de Pagamento</Label>
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-4 gap-1">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('pix')}
+                  onClick={() => {
+                    setPaymentMethod('pix');
+                    vibrateTouch(20);
+                  }}
                   className={cn(
                     'p-1.5 rounded-lg border text-center text-xs font-bold flex flex-col items-center gap-0.5 transition-all',
                     paymentMethod === 'pix'
@@ -1280,7 +1767,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('card')}
+                  onClick={() => {
+                    setPaymentMethod('card');
+                    vibrateTouch(20);
+                  }}
                   className={cn(
                     'p-1.5 rounded-lg border text-center text-xs font-bold flex flex-col items-center gap-0.5 transition-all',
                     paymentMethod === 'card'
@@ -1297,6 +1787,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                   onClick={() => {
                     setPaymentMethod('cash');
                     if (cashGiven === 0) setCashGiven(grandTotal);
+                    vibrateTouch(20);
                   }}
                   className={cn(
                     'p-1.5 rounded-lg border text-center text-xs font-bold flex flex-col items-center gap-0.5 transition-all',
@@ -1308,8 +1799,134 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                   <DollarSign className="h-3.5 w-3.5" />
                   Dinheiro
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('crediario');
+                    vibrateTouch(20);
+                  }}
+                  className={cn(
+                    'p-1.5 rounded-lg border text-center text-xs font-bold flex flex-col items-center gap-0.5 transition-all',
+                    paymentMethod === 'crediario'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                      : 'bg-muted/40 hover:bg-muted text-foreground'
+                  )}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Crediário
+                </button>
               </div>
             </div>
+
+            {/* Bloco de Crediário Próprio / Fiado Moderno */}
+            {paymentMethod === 'crediario' && (
+              <div className="p-2.5 bg-purple-500/10 border border-purple-500/30 rounded-lg space-y-2 text-xs animate-fade-in">
+                {selectedCustomerId === 'none' ? (
+                  <div className="flex flex-col gap-1.5 text-center py-1">
+                    <p className="text-[11px] font-semibold text-purple-900 dark:text-purple-300">
+                      ⚠️ Crediário exige a identificação do cliente
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setIsCustomerPickerOpen(true)}
+                      className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold gap-1"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                      Selecionar Cliente Agora
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Análise de Limite de Crédito */}
+                    <div className="bg-background/80 p-2 rounded border divide-y text-[11px] space-y-1">
+                      <div className="flex justify-between items-center pb-1">
+                        <span className="text-muted-foreground">Limite Cadastrado:</span>
+                        <span className="font-mono font-bold">
+                          {hasCustomerCreditLimit ? formatCurrency(customerCreditLimit) : 'Sem Limite Fixado'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-muted-foreground">Dívida Atual em Aberto:</span>
+                        <span className="font-mono font-medium text-amber-600 dark:text-amber-400">
+                          {formatCurrency(customerPendingDebt)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 font-semibold">
+                        <span className="text-foreground">Saldo Disponível:</span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                          {hasCustomerCreditLimit ? formatCurrency(availableCredit) : 'Liberado'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Alerta de Limite Excedido */}
+                    {isCreditLimitExceeded && (
+                      <div className="p-2 bg-red-100 dark:bg-red-950/50 border border-red-300 dark:border-red-800 rounded text-red-800 dark:text-red-300 space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>Limite Excedido em {formatCurrency(creditExcess)}!</span>
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer pt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={crediarioLimitAuthorized}
+                            onChange={(e) => setCrediarioLimitAuthorized(e.target.checked)}
+                            className="rounded border-red-400 text-red-600 focus:ring-red-500 h-3.5 w-3.5"
+                          />
+                          <span className="text-[10.5px] font-medium leading-tight">
+                            Autorizar venda extraordinária pelo gerente
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Parcelamento e Vencimento */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">Parcelas</Label>
+                        <Select
+                          value={String(crediarioInstallments)}
+                          onValueChange={(v) => setCrediarioInstallments(Number(v))}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1x (À vista a prazo)</SelectItem>
+                            <SelectItem value="2">2x mensais</SelectItem>
+                            <SelectItem value="3">3x mensais</SelectItem>
+                            <SelectItem value="4">4x mensais</SelectItem>
+                            <SelectItem value="6">6x mensais</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">1º Vencimento</Label>
+                        <Input
+                          type="date"
+                          value={crediarioFirstDueDate}
+                          onChange={(e) => setCrediarioFirstDueDate(e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Simulação das parcelas */}
+                    {crediarioInstallments > 1 && (
+                      <div className="text-[10px] text-muted-foreground text-center bg-background/60 py-1 rounded">
+                        Simulação:{' '}
+                        <strong className="text-foreground">
+                          {crediarioInstallments}x de {formatCurrency(grandTotal / crediarioInstallments)}
+                        </strong>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Calculadora de Troco (se Dinheiro) */}
             {paymentMethod === 'cash' && (
@@ -1342,6 +1959,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                   })}
                 </div>
 
+                {/* Troco Calculado */}
                 {changeDue > 0 && (
                   <div className="flex justify-between items-center pt-1 border-t border-amber-500/20 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                     <span>TROCO:</span>
@@ -1485,6 +2103,8 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                 <span className="font-bold text-foreground capitalize mt-0.5 flex items-center gap-1.5">
                   {paymentMethod === 'pix' && <QrCode className="h-3.5 w-3.5 text-emerald-600" />}
                   {paymentMethod === 'cash' && <DollarSign className="h-3.5 w-3.5 text-emerald-600" />}
+                  {paymentMethod === 'card' && <CreditCard className="h-3.5 w-3.5 text-blue-600" />}
+                  {paymentMethod === 'crediario' && <BookOpen className="h-3.5 w-3.5 text-purple-600" />}
                   {paymentMethod === 'credit_card' && <CreditCard className="h-3.5 w-3.5 text-blue-600" />}
                   {paymentMethod === 'debit_card' && <CreditCard className="h-3.5 w-3.5 text-amber-600" />}
                   {paymentMethod === 'bank_slip' && <FileText className="h-3.5 w-3.5 text-purple-600" />}
@@ -1493,6 +2113,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                     ? 'PIX'
                     : paymentMethod === 'cash'
                     ? 'Dinheiro'
+                    : paymentMethod === 'card'
+                    ? 'Cartão'
+                    : paymentMethod === 'crediario'
+                    ? 'Crediário Próprio'
                     : paymentMethod === 'credit_card'
                     ? 'Cartão de Crédito'
                     : paymentMethod === 'debit_card'
@@ -1539,6 +2163,44 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                 </div>
               </div>
             )}
+
+            {/* DETALHES DO CREDIÁRIO NA CONFIRMAÇÃO */}
+            {paymentMethod === 'crediario' && (
+              <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center font-bold text-purple-900 dark:text-purple-300">
+                  <span>Condição de Pagamento:</span>
+                  <span>{crediarioInstallments}x de {formatCurrency(grandTotal / crediarioInstallments)}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                  <span>1º Vencimento:</span>
+                  <span className="font-medium text-foreground">
+                    {format(parseISO(crediarioFirstDueDate), 'dd/MM/yyyy')}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                  <span>Destino Financeiro:</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-semibold">Contas a Receber (Pendente)</span>
+                </div>
+
+                {isCreditLimitExceeded && (
+                  <div className="mt-1.5 p-2 bg-red-100 dark:bg-red-950/50 border border-red-300 rounded text-red-800 dark:text-red-300 text-[10.5px]">
+                    <div className="flex items-center gap-1 font-bold">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Limite Excedido (+{formatCurrency(creditExcess)})</span>
+                    </div>
+                    {crediarioLimitAuthorized ? (
+                      <p className="text-emerald-700 dark:text-emerald-400 font-semibold mt-0.5">
+                        ✓ Autorizado pelo gerente
+                      </p>
+                    ) : (
+                      <p className="text-red-700 dark:text-red-400 font-medium mt-0.5">
+                        ⚠️ Marque a autorização no cupom para liberar a venda.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1554,7 +2216,13 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
             <Button
               type="button"
               onClick={handleFinalizeOrder}
-              disabled={completing}
+              disabled={
+                completing ||
+                (paymentMethod === 'crediario' &&
+                  (!selectedCustomerId ||
+                    selectedCustomerId === 'none' ||
+                    (isCreditLimitExceeded && !crediarioLimitAuthorized)))
+              }
               className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
               autoFocus
             >

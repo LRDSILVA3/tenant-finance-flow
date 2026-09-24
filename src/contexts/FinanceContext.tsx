@@ -128,6 +128,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [userSettings, setUserSettings] = useState<UserSettings>({
     enablePaymentMethods: false,
     enableCommission: false,
+    enableWhatsappIA: false,
   });
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
 
@@ -648,7 +649,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const updateUserSettings = useCallback(async (settings: Partial<UserSettings>) => {
     if (!user) return;
     const newS = { ...userSettings, ...settings };
-    await supabase.from('user_settings').upsert({ user_id: user.id, enable_payment_methods: newS.enable_payment_methods, enable_commission: newS.enable_commission });
+    await supabase.from('user_settings').upsert({
+      user_id: user.id,
+      enable_payment_methods: newS.enablePaymentMethods,
+      enable_commission: newS.enableCommission,
+    });
     setUserSettings(newS);
   }, [user, userSettings]);
 

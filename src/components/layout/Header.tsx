@@ -45,7 +45,8 @@ import {
   CheckCheck, 
   X,
   Sun,
-  Moon
+  Moon,
+  Smartphone
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -103,6 +104,32 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        toast({ title: 'Aplicativo Instalado!', description: 'Previna foi instalado na sua área de trabalho/início.' });
+      }
+    } else {
+      toast({
+        title: 'Instalação do Aplicativo (PWA)',
+        description: 'No celular ou computador, acesse as opções do navegador e clique em "Instalar Aplicativo" ou "Adicionar à Tela de Início".',
+      });
+    }
+  };
 
   const canUseIA = userSettings.enableWhatsappIA || userProfile?.isAdmin;
 
@@ -375,6 +402,18 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Instalar PWA */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleInstallApp}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted"
+            title="Instalar Previna no dispositivo"
+          >
+            <Smartphone className="h-4 w-4 text-emerald-500" />
+            <span className="hidden md:inline">Instalar App</span>
+          </Button>
 
           {/* Tour do Sistema (Desktop) */}
           {onStartTour && (

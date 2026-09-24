@@ -38,7 +38,9 @@ import {
   Smartphone,
   Banknote,
   Percent,
+  MessageSquare
 } from 'lucide-react';
+import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 
 interface OrderReceiptDialogProps {
   order: Order | null;
@@ -54,6 +56,7 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
   companyName = 'Empresa',
 }) => {
   const [activeTab, setActiveTab] = useState<'items' | 'customer' | 'payment' | 'preview'>('items');
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
 
   if (!order) return null;
 
@@ -144,7 +147,8 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-none !top-0 !left-0 !right-0 !bottom-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-4xl sm:h-[90vh] sm:max-h-[90vh] sm:rounded-xl rounded-none !flex !flex-col !p-0 !gap-0 overflow-hidden bg-background">
         
         {/* Header Premium */}
@@ -617,6 +621,16 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
             <Button
               variant="outline"
               size="sm"
+              className="text-xs gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+              onClick={() => setWhatsappModalOpen(true)}
+              title="Enviar comprovante no WhatsApp do cliente"
+            >
+              <MessageSquare className="h-4 w-4 text-emerald-600" />
+              WhatsApp
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               className="text-xs gap-1.5"
               onClick={handleDownloadPdf}
             >
@@ -631,6 +645,26 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* WhatsApp Send Modal */}
+    <WhatsAppSendModal
+      open={whatsappModalOpen}
+      onOpenChange={setWhatsappModalOpen}
+      customerName={order.customer?.name}
+      customerPhone={order.customer?.phone}
+      category="order"
+      sourceModule="orders"
+      documentTitle={`Pedido #${order.orderNumber}`}
+      variablesContext={{
+        nome_cliente: order.customer?.name,
+        primeiro_nome: order.customer?.name ? order.customer.name.split(' ')[0] : 'Cliente',
+        codigo_pedido: `#PED-${order.orderNumber}`,
+        valor_total: order.totalAmount,
+        forma_pagamento: (order.paymentMethod || 'Dinheiro').toUpperCase(),
+        itens_resumo: (order.items || []).map(i => `${i.quantity}x ${i.productName || 'Item'}`).join(', ')
+      }}
+    />
+    </>
   );
 };
 

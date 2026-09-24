@@ -8,9 +8,10 @@ import { PlanManagement } from '@/components/admin/PlanManagement';
 import { ClientOverview } from '@/components/admin/ClientOverview';
 import { BillingDashboard } from '@/components/admin/BillingDashboard';
 import { AdminSupport } from '@/components/admin/AdminSupport';
+import { AsaasSettings } from '@/components/admin/AsaasSettings';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
-import { ShieldCheck, CreditCard, Users, Loader2, DollarSign, Headset } from 'lucide-react';
+import { ShieldCheck, CreditCard, Users, Loader2, DollarSign, Headset, Zap } from 'lucide-react';
 
 const Admin: React.FC = () => {
   const { userProfile, authLoading, isAuthenticated } = useFinance();
@@ -44,7 +45,7 @@ const Admin: React.FC = () => {
         </div>
 
         <Tabs defaultValue="billing" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 max-w-4xl h-auto p-1 gap-1">
             <TabsTrigger value="billing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Faturamento
@@ -56,6 +57,10 @@ const Admin: React.FC = () => {
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
               Planos
+            </TabsTrigger>
+            <TabsTrigger value="asaas" className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-blue-500" />
+              Asaas & Fiscal
             </TabsTrigger>
             <TabsTrigger value="support" className="flex items-center gap-2">
               <Headset className="h-4 w-4" />
@@ -75,6 +80,10 @@ const Admin: React.FC = () => {
             <PlanManagement />
           </TabsContent>
 
+          <TabsContent value="asaas" className="mt-6">
+            <AsaasSettings />
+          </TabsContent>
+
           <TabsContent value="support" className="mt-6">
             <AdminSupport />
           </TabsContent>
@@ -83,5 +92,6 @@ const Admin: React.FC = () => {
     </div>
   );
 };
+
 
 export default Admin;

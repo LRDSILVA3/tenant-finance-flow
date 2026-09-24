@@ -45,7 +45,10 @@ import {
   ShoppingBag,
   Eye,
   Download,
-  Lock
+  Lock,
+  Paperclip,
+  Upload,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -124,6 +127,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
+  const [previewAttachmentOpen, setPreviewAttachmentOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     type: defaultType,
@@ -133,6 +137,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     date: new Date(),
     reference: '',
     notes: '',
+    attachmentUrl: '',
     paymentMethod: '',
     status: defaultStatus,
     collaboratorId: '',
@@ -160,6 +165,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           date: new Date(editingTransaction.date),
           reference: editingTransaction.reference || '',
           notes: editingTransaction.notes || '',
+          attachmentUrl: editingTransaction.attachmentUrl || '',
           paymentMethod: editingTransaction.paymentMethod || '',
           status: editingTransaction.status || 'paid',
           collaboratorId: editingTransaction.collaboratorId || '',
@@ -185,6 +191,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           date: new Date(),
           reference: '',
           notes: '',
+          attachmentUrl: '',
           paymentMethod: '',
           status: defaultStatus,
           collaboratorId: '',
@@ -308,6 +315,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           date: formData.date,
           reference: formData.reference || undefined,
           notes: formData.notes || undefined,
+          attachmentUrl: formData.attachmentUrl || '',
           paymentMethod,
           status,
           commissions,
@@ -334,6 +342,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           date: formData.date,
           reference: formData.reference || undefined,
           notes: formData.notes || undefined,
+          attachmentUrl: formData.attachmentUrl || undefined,
           paymentMethod,
           status,
           commissions,
@@ -773,6 +782,100 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             />
           </div>
 
+          {/* Comprovante / Anexo */}
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                Comprovante / Anexo (Recibo, Boleto ou Nota)
+              </Label>
+              {formData.attachmentUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2"
+                  onClick={() => updateFormField('attachmentUrl', '')}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Remover
+                </Button>
+              )}
+            </div>
+
+            {formData.attachmentUrl ? (
+              <div className="flex items-center justify-between p-2.5 bg-background rounded-md border text-xs">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  {formData.attachmentUrl.startsWith('data:image/') || formData.attachmentUrl.match(/\.(jpeg|jpg|png|webp|gif)/i) ? (
+                    <img
+                      src={formData.attachmentUrl}
+                      alt="Miniatura do Anexo"
+                      className="h-10 w-10 object-cover rounded border shrink-0"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                  )}
+                  <div className="truncate">
+                    <p className="font-medium truncate">Documento Anexado</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {formData.attachmentUrl.startsWith('data:image/') ? 'Imagem do Recibo/Nota' : formData.attachmentUrl.startsWith('data:application/pdf') ? 'PDF do Recibo/Nota' : 'Arquivo Anexado'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs px-2 gap-1"
+                    onClick={() => setPreviewAttachmentOpen(true)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <input
+                  type="file"
+                  id="transaction-attachment-input"
+                  className="hidden"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast({
+                        title: "Arquivo muito grande",
+                        description: "O tamanho máximo permitido para comprovantes é de 5MB.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === 'string') {
+                        updateFormField('attachmentUrl', reader.result);
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <label
+                  htmlFor="transaction-attachment-input"
+                  className="flex items-center justify-center gap-2 border border-dashed rounded-md p-3 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground hover:text-foreground font-medium"
+                >
+                  <Upload className="h-4 w-4" />
+                  Clique para anexar foto ou PDF do comprovante (máx. 5MB)
+                </label>
+              </div>
+            )}
+          </div>
+
           {(userSettings.enableCommission || isCommissionsLocked) && formData.type === 'income' && (
             <div className="space-y-4 border-t pt-4">
               <div className="flex items-center justify-between">
@@ -878,6 +981,50 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             ) : (
               'Salvar Lançamento'
             )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Modal de Pré-visualização do Anexo */}
+    <Dialog open={previewAttachmentOpen} onOpenChange={setPreviewAttachmentOpen}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-4">
+        <DialogHeader>
+          <DialogTitle className="text-base flex items-center gap-2">
+            <Paperclip className="h-4 w-4 text-primary" />
+            Comprovante Anexado
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto flex items-center justify-center py-2 min-h-[250px]">
+          {formData.attachmentUrl?.startsWith('data:image/') || formData.attachmentUrl?.match(/\.(jpeg|jpg|png|webp|gif)/i) ? (
+            <img
+              src={formData.attachmentUrl}
+              alt="Comprovante"
+              className="max-h-[60vh] max-w-full rounded object-contain border"
+            />
+          ) : (
+            <iframe
+              src={formData.attachmentUrl}
+              title="Comprovante PDF"
+              className="w-full h-[60vh] rounded border"
+            />
+          )}
+        </div>
+        <DialogFooter className="flex justify-between items-center sm:justify-between">
+          {formData.attachmentUrl && (
+            <a
+              href={formData.attachmentUrl}
+              download="comprovante"
+              className="inline-flex items-center text-xs text-primary hover:underline gap-1"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Baixar / Abrir original
+            </a>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setPreviewAttachmentOpen(false)}>
+            Fechar
           </Button>
         </DialogFooter>
       </DialogContent>

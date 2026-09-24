@@ -39,7 +39,9 @@ import {
   Wrench,
   User,
   Coffee,
+  MessageSquare
 } from 'lucide-react';
+import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 
 interface AppointmentDialogProps {
   open: boolean;
@@ -85,6 +87,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [notes, setNotes] = useState('');
 
   const [allowOverlap, setAllowOverlap] = useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -97,9 +100,10 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setCustomerId(appointment.customerId ?? '');
       setServiceTypeId(appointment.serviceTypeId ?? '');
       setCollaboratorId(appointment.collaboratorId ?? '');
-      setTitle(appointment.title || '');
-      setScheduledDate(appointment.scheduledAt);
-      setScheduledTime(format(appointment.scheduledAt, 'HH:mm'));
+      const parsedDate = appointment.scheduledAt ? (appointment.scheduledAt instanceof Date ? appointment.scheduledAt : new Date(appointment.scheduledAt)) : new Date();
+      const safeDate = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+      setScheduledDate(safeDate);
+      setScheduledTime(format(safeDate, 'HH:mm'));
       setDurationMinutes(appointment.durationMinutes || 60);
       setPrice(appointment.price || 0);
       setNotes(appointment.notes ?? '');
@@ -545,23 +549,41 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             )}
           </div>
 
-          <DialogFooter className="p-4 border-t bg-muted/20 flex flex-row items-center justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving} className="gap-2">
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
-                </>
-              ) : appointment ? (
-                'Salvar Alterações'
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" /> Criar Agendamento
-                </>
+          <DialogFooter className="p-4 border-t bg-muted/20 flex flex-row items-center justify-between gap-2">
+            <div>
+              {appointment && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWhatsappModalOpen(true)}
+                  className="gap-1.5 text-xs border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                  title="Enviar lembrete / confirmação de agendamento no WhatsApp"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                  WhatsApp
+                </Button>
               )}
-            </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="gap-2">
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
+                  </>
+                ) : appointment ? (
+                  'Salvar Alterações'
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" /> Criar Agendamento
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -572,6 +594,35 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         onOpenChange={setIsCustomerModalOpen}
         onSuccess={handleCustomerCreated}
       />
+
+      {/* Modal de Disparo WhatsApp */}
+      {(() => {
+        const selectedCust = customers.find(c => c.id === customerId);
+        const selectedCollab = collaborators.find(c => c.id === collaboratorId);
+        const selectedService = serviceTypes.find(s => s.id === serviceTypeId);
+        const formattedScheduleDate = `${format(scheduledDate, 'dd/MM/yyyy')} às ${scheduledTime}`;
+
+        return (
+          <WhatsAppSendModal
+            open={whatsappModalOpen}
+            onOpenChange={setWhatsappModalOpen}
+            customerName={selectedCust?.name}
+            customerPhone={selectedCust?.phone}
+            category="schedule"
+            sourceModule="schedule"
+            documentTitle={`Agendamento - ${title || selectedService?.name || 'Serviço'}`}
+            variablesContext={{
+              nome_cliente: selectedCust?.name,
+              primeiro_nome: selectedCust?.name ? selectedCust.name.split(' ')[0] : 'Cliente',
+              data_agendamento: formattedScheduleDate,
+              servico_agendado: title || selectedService?.name || 'Atendimento',
+              profissional: selectedCollab?.name || 'Nossa Equipe',
+              valor_total: price,
+              endereco_empresa: currentClient?.name ? `${currentClient.name}` : 'Nosso estabelecimento'
+            }}
+          />
+        );
+      })()}
     </>
   );
 };

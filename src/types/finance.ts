@@ -94,6 +94,7 @@ export interface Transaction {
   supplierId?: string;
   orderId?: string;
   recurringId?: string;
+  attachmentUrl?: string;
   createdAt: Date;
 }
 

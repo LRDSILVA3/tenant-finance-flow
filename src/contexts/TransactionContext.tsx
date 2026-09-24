@@ -98,26 +98,34 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const loadTransactions = useCallback(async (clientId: string) => {
     const { data, error } = await supabase.from('transactions').select('*, transaction_commissions(*)').eq('client_id', clientId).order('date', { ascending: true });
-    if (!error && data) setTransactions(data.map((t: any) => ({
-      id: t.id, clientId: t.client_id, categoryId: t.category_id, type: t.type as TransactionType,
-      amount: Number(t.amount), description: t.description, date: new Date(`${t.date}T00:00:00`),
-      reference: t.reference || undefined, notes: t.notes || undefined,
-      paymentMethod: t.payment_method as PaymentMethod,
-      status: (t.status || 'paid') as TransactionStatus,
-      collaboratorId: t.transaction_commissions?.[0]?.collaborator_id || undefined,
-      commissionAmount: t.transaction_commissions?.[0]?.commission_amount ? Number(t.transaction_commissions[0].commission_amount) : undefined,
-      commissions: t.transaction_commissions ? t.transaction_commissions.map((tc: any) => ({
-        id: tc.id,
-        transactionId: tc.transaction_id,
-        collaboratorId: tc.collaborator_id,
-        commissionAmount: Number(tc.commission_amount)
-      })) : [],
-      customerId: t.customer_id || undefined,
-      supplierId: t.supplier_id || undefined,
-      orderId: t.order_id || undefined,
-      recurringId: t.recurring_id || undefined,
-      createdAt: new Date(t.created_at)
-    })));
+    if (!error && data) setTransactions(data.map((t: any) => {
+      const rawNotes = t.notes || '';
+      const attachmentMatch = rawNotes.match(/\[ANEXO:(.*?)\]/);
+      const cleanNotes = attachmentMatch ? rawNotes.replace(/\[ANEXO:.*?\]/, '').trim() : rawNotes;
+      const attachmentUrl = attachmentMatch ? attachmentMatch[1] : undefined;
+
+      return {
+        id: t.id, clientId: t.client_id, categoryId: t.category_id, type: t.type as TransactionType,
+        amount: Number(t.amount), description: t.description, date: new Date(`${t.date}T00:00:00`),
+        reference: t.reference || undefined, notes: cleanNotes || undefined,
+        paymentMethod: t.payment_method as PaymentMethod,
+        status: (t.status || 'paid') as TransactionStatus,
+        collaboratorId: t.transaction_commissions?.[0]?.collaborator_id || undefined,
+        commissionAmount: t.transaction_commissions?.[0]?.commission_amount ? Number(t.transaction_commissions[0].commission_amount) : undefined,
+        commissions: t.transaction_commissions ? t.transaction_commissions.map((tc: any) => ({
+          id: tc.id,
+          transactionId: tc.transaction_id,
+          collaboratorId: tc.collaborator_id,
+          commissionAmount: Number(tc.commission_amount)
+        })) : [],
+        customerId: t.customer_id || undefined,
+        supplierId: t.supplier_id || undefined,
+        orderId: t.order_id || undefined,
+        recurringId: t.recurring_id || undefined,
+        attachmentUrl,
+        createdAt: new Date(t.created_at)
+      };
+    }));
   }, []);
 
   const loadCollaborators = useCallback(async (clientId: string) => {
@@ -231,7 +239,9 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
       description: transaction.description,
       date: transaction.date.toISOString().split('T')[0],
       reference: transaction.reference || null,
-      notes: transaction.notes || null,
+      notes: transaction.attachmentUrl
+        ? ((transaction.notes || '').replace(/\s*\[ANEXO:.*?\]\s*/g, ' ').trim() ? `${(transaction.notes || '').replace(/\s*\[ANEXO:.*?\]\s*/g, ' ').trim()} [ANEXO:${transaction.attachmentUrl}]` : `[ANEXO:${transaction.attachmentUrl}]`)
+        : (transaction.notes || null),
       payment_method: transaction.paymentMethod || null,
       status: transaction.status || 'paid',
       customer_id: transaction.customerId || null,
@@ -291,8 +301,19 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (updates.description) updateData.description = updates.description;
     if (updates.date) updateData.date = updates.date.toISOString().split('T')[0];
     if (updates.reference !== undefined) updateData.reference = updates.reference || null;
-    if (updates.notes !== undefined) updateData.notes = updates.notes || null;
     if (updates.paymentMethod !== undefined) updateData.payment_method = updates.paymentMethod || null;
+    if (updates.notes !== undefined || updates.attachmentUrl !== undefined) {
+      let cleanNotes = (updates.notes !== undefined ? updates.notes : '') || '';
+      cleanNotes = cleanNotes.replace(/\s*\[ANEXO:.*?\]\s*/g, ' ').trim();
+      const attachment = updates.attachmentUrl;
+      if (attachment) {
+        updateData.notes = cleanNotes ? `${cleanNotes} [ANEXO:${attachment}]` : `[ANEXO:${attachment}]`;
+      } else if (updates.attachmentUrl === '') {
+        updateData.notes = cleanNotes || null;
+      } else {
+        updateData.notes = updates.notes || null;
+      }
+    }
     if (updates.status !== undefined) updateData.status = updates.status;
     if (updates.customerId !== undefined) updateData.customer_id = updates.customerId || null;
     if (updates.supplierId !== undefined) updateData.supplier_id = updates.supplierId || null;

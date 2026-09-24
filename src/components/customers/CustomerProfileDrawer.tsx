@@ -25,6 +25,7 @@ import {
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
 import { generateCustomerStatementPdf } from '@/components/customers/CustomerStatementPdf';
+import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -55,6 +56,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences'>('history');
   const [loading, setLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -420,11 +422,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   // ─── Métricas RFM & Comerciais ──────────────────────────────────────────────
   const metrics = useMemo(() => {
     const totalOrdersAmount = orders
-      .filter((o) => o.status !== 'cancelled')
+      .filter((o) => o.status !== 'cancelled' && o.status !== 'draft')
       .reduce((sum, o) => sum + o.totalAmount, 0);
 
     const totalSOAmount = serviceOrders
-      .filter((s) => s.status !== 'cancelled')
+      .filter((s) => s.status !== 'cancelled' && s.status !== 'draft')
       .reduce((sum, s) => sum + s.totalAmount, 0);
 
     const standaloneTransactions = transactions.filter(
@@ -438,14 +440,14 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
     const totalSpentLTV = totalOrdersAmount + totalSOAmount + totalTransactionsAmount;
     const totalTransactionsCount =
-      orders.filter((o) => o.status !== 'cancelled').length +
-      serviceOrders.filter((s) => s.status !== 'cancelled').length +
+      orders.filter((o) => o.status !== 'cancelled' && o.status !== 'draft').length +
+      serviceOrders.filter((s) => s.status !== 'cancelled' && s.status !== 'draft').length +
       standaloneTransactions.length;
     const avgTicket = totalTransactionsCount > 0 ? totalSpentLTV / totalTransactionsCount : 0;
 
     // Última compra (data mais recente entre pedidos, OS e lançamentos)
-    const orderDates = orders.map((o) => o.createdAt.getTime());
-    const soDates = serviceOrders.map((s) => s.createdAt.getTime());
+    const orderDates = orders.filter((o) => o.status !== 'cancelled' && o.status !== 'draft').map((o) => o.createdAt.getTime());
+    const soDates = serviceOrders.filter((s) => s.status !== 'cancelled' && s.status !== 'draft').map((s) => s.createdAt.getTime());
     const transDates = standaloneTransactions.map((t) => new Date(t.date).getTime());
     const allDates = [...orderDates, ...soDates, ...transDates];
     const lastPurchaseTimestamp = allDates.length > 0 ? Math.max(...allDates) : null;
@@ -472,7 +474,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
     // 1. Itens de Pedidos de Venda / PDV
     orders.forEach((o) => {
-      if (o.status === 'cancelled') return;
+      if (o.status === 'cancelled' || o.status === 'draft') return;
       (o.items || []).forEach((item) => {
         const key = item.productId || item.productName || item.id;
         const name = item.productName || 'Produto';
@@ -497,7 +499,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
     // 2. Peças & Produtos aplicados em Ordens de Serviço
     serviceOrders.forEach((s) => {
-      if (s.status === 'cancelled') return;
+      if (s.status === 'cancelled' || s.status === 'draft') return;
       (s.products || []).forEach((item) => {
         const key = item.productId || item.productName || item.id;
         const name = item.productName || 'Peça / Material';
@@ -803,8 +805,19 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Ações de Cabeçalho: Exportar Ficha e Editar */}
+              {/* Ações de Cabeçalho: WhatsApp, Exportar Ficha e Editar */}
               <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setWhatsappModalOpen(true)}
+                  className="h-8 text-xs gap-1.5 font-medium border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                  title="Enviar mensagem ou extrato no WhatsApp do cliente"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -1037,7 +1050,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                           )}
                         >
                           <CheckCircle2 className="h-3 w-3" />
-                          Pagas / Quitadas ({paidCount})
+                          Recebidas ({paidCount})
                         </button>
                         <button
                           type="button"
@@ -1060,7 +1073,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                         <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-40" />
                         <p className="text-xs font-semibold">
                           {historyFilter === 'paid'
-                            ? 'Nenhuma compra ou pagamento quitado encontrado'
+                            ? 'Nenhuma compra ou pagamento recebido encontrado'
                             : historyFilter === 'pending'
                             ? 'Nenhum débito ou lançamento pendente'
                             : 'Nenhuma compra ou serviço registrado'}
@@ -1454,6 +1467,23 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         open={isReceiptOpen}
         onOpenChange={setIsReceiptOpen}
         order={selectedOrderForReceipt}
+      />
+
+      {/* MODAL DE DISPARO WHATSAPP */}
+      <WhatsAppSendModal
+        open={whatsappModalOpen}
+        onOpenChange={setWhatsappModalOpen}
+        customerName={customer.name}
+        customerPhone={customer.phone}
+        category={pendingDebt > 0 ? 'customer' : 'custom'}
+        sourceModule="customers"
+        variablesContext={{
+          nome_cliente: customer.name,
+          primeiro_nome: customer.name.split(' ')[0],
+          valor_total: pendingDebt,
+          chave_pix: currentClient?.pixKey || '(Chave PIX a combinar)',
+          link_documento: `https://previna.app/cliente/${customer.id}`
+        }}
       />
     </>
   );

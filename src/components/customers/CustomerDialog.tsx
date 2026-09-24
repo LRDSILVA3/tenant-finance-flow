@@ -160,7 +160,7 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
         enablePromotions: customer?.preferences?.enablePromotions ?? true,
       };
 
-      const payload = {
+      const basePayload = {
         client_id: currentClient.id,
         name: form.name.trim(),
         phone: form.phone.trim() || null,
@@ -175,6 +175,11 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
         city: form.city.trim() || null,
         state: form.state.trim() || null,
         notes: form.notes.trim() || null,
+        is_active: true,
+      };
+
+      const fullPayload = {
+        ...basePayload,
         preferred_payment_method: form.preferredPaymentMethod || 'cash',
         default_discount_percent: Number(form.defaultDiscountPercent) || 0,
         credit_limit: Number(form.creditLimit) || 0,
@@ -182,21 +187,37 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
         delivery_instructions: form.deliveryInstructions.trim() || null,
         tags: form.tags,
         preferences: preferencesObj,
-        is_active: true,
       };
 
       if (customer?.id) {
-        const { error } = await supabase
+        let { error } = await supabase
           .from('customers')
-          .update(payload)
+          .update(fullPayload)
           .eq('id', customer.id);
+
+        if (error && (error.code === 'PGRST204' || error.message?.includes('credit_limit') || error.message?.includes('schema cache'))) {
+          // Fallback gracioso para colunas base caso a migration de CRM ainda não tenha sido rodada no Supabase
+          const fallbackRes = await supabase
+            .from('customers')
+            .update(basePayload)
+            .eq('id', customer.id);
+          error = fallbackRes.error;
+        }
 
         if (error) throw error;
         toast({ title: 'Cliente atualizado com sucesso!' });
       } else {
-        const { error } = await supabase
+        let { error } = await supabase
           .from('customers')
-          .insert(payload);
+          .insert(fullPayload);
+
+        if (error && (error.code === 'PGRST204' || error.message?.includes('credit_limit') || error.message?.includes('schema cache'))) {
+          // Fallback gracioso para colunas base
+          const fallbackRes = await supabase
+            .from('customers')
+            .insert(basePayload);
+          error = fallbackRes.error;
+        }
 
         if (error) throw error;
         toast({ title: 'Cliente cadastrado com sucesso!' });

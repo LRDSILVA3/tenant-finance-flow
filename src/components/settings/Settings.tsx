@@ -8,6 +8,7 @@ import { Collaborators } from '@/components/settings/Collaborators';
 import { Team } from '@/components/settings/Team';
 import { SubscriptionTab } from '@/components/settings/SubscriptionTab';
 import { PdfCustomizationTab } from '@/components/settings/PdfCustomizationTab';
+import { WhatsAppTab } from '@/components/settings/WhatsAppTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette } from 'lucide-react';
+import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette, MessageSquare } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -141,6 +142,10 @@ export const Settings: React.FC = () => {
           <TabsTrigger value="pdf-customization" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
             <Palette className="h-4 w-4" />
             Documentos & PDFs
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+            <MessageSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            WhatsApp & Modelos
           </TabsTrigger>
           {isOwner && (
             <TabsTrigger value="team" className="flex items-center gap-2 shrink-0 whitespace-nowrap text-xs sm:text-sm">
@@ -439,6 +444,9 @@ export const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="pdf-customization">
           <PdfCustomizationTab />
+        </TabsContent>
+        <TabsContent value="whatsapp">
+          <WhatsAppTab />
         </TabsContent>
         {userSettings.enableCommission && (
           <TabsContent value="collaborators">

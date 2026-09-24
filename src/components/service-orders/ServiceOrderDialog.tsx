@@ -57,7 +57,9 @@ import {
   WifiOff,
   RefreshCw,
   Camera,
+  MessageSquare
 } from 'lucide-react';
+import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 import { generateServiceOrderPdf } from './ServiceOrderPdf';
 
@@ -107,6 +109,7 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
 
   const [activeTab, setActiveTab] = useState<'general' | 'services' | 'products' | 'totals'>('general');
   const [saving, setSaving] = useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
 
   // Dados auxiliares carregados
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -1377,6 +1380,17 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
           </Button>
 
           <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setWhatsappModalOpen(true)}
+              className="gap-1.5 text-xs border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+              title="Enviar atualização de status ou orçamento no WhatsApp do cliente"
+            >
+              <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+              WhatsApp
+            </Button>
             <Button variant="outline" size="sm" onClick={handlePrintCurrent} className="gap-1 text-xs text-primary border-primary/30 hover:bg-primary/10">
               <Download className="h-3.5 w-3.5" />
               Baixar PDF
@@ -1597,6 +1611,42 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* WhatsApp Send Modal */}
+    {(() => {
+      const selectedCustomer = customers.find(c => c.id === customerId);
+      const osCode = serviceOrder?.osNumber ? `#OS-${serviceOrder.osNumber}` : (title ? `#OS-${title}` : '#OS');
+      const statusMap: Record<string, string> = {
+        draft: 'Orçamento / Rascunho',
+        open: 'Aberta / Em Análise',
+        in_progress: 'Em Execução',
+        waiting_parts: 'Aguardando Peças',
+        completed: 'Concluída / Pronta para Retirada',
+        delivered: 'Entregue / Finalizada',
+        cancelled: 'Cancelada'
+      };
+
+      return (
+        <WhatsAppSendModal
+          open={whatsappModalOpen}
+          onOpenChange={setWhatsappModalOpen}
+          customerName={selectedCustomer?.name}
+          customerPhone={selectedCustomer?.phone}
+          category="service_order"
+          sourceModule="service_orders"
+          documentTitle={`Ordem de Serviço ${osCode}`}
+          variablesContext={{
+            nome_cliente: selectedCustomer?.name,
+            primeiro_nome: selectedCustomer?.name ? selectedCustomer.name.split(' ')[0] : 'Cliente',
+            codigo_os: osCode,
+            status_os: statusMap[status] || status,
+            valor_total: grandTotal,
+            chave_pix: currentClient?.pixKey || '(Chave PIX a combinar)',
+            link_documento: `https://previna.app/os/${serviceOrder?.id || ''}`
+          }}
+        />
+      );
+    })()}
     </>
   );
 };

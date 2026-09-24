@@ -75,12 +75,17 @@ vi.mock('@/integrations/supabase/client', () => ({
           }),
         } as any;
       }
+      const createChain = () => {
+        const chain: any = {
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+        chain.eq = vi.fn().mockReturnValue(chain);
+        return chain;
+      };
+
       return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
+        select: vi.fn().mockReturnValue(createChain()),
       } as any;
     }),
   },

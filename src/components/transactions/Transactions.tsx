@@ -94,7 +94,8 @@ import {
   Search,
   SlidersHorizontal,
   ShoppingBag,
-  Eye
+  Eye,
+  Paperclip
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -245,6 +246,7 @@ export const Transactions: React.FC = () => {
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
   const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
+  const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -1090,6 +1092,21 @@ export const Transactions: React.FC = () => {
                                   </button>
                                 </div>
                               )}
+                              {transaction.attachmentUrl && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAttachment(transaction.attachmentUrl!);
+                                  }}
+                                  className="text-[9px] text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer w-fit mt-0.5"
+                                  title="Visualizar Comprovante / Anexo"
+                                >
+                                  <Paperclip className="h-2.5 w-2.5" />
+                                  <span>Anexo</span>
+                                  <Eye className="h-2 w-2 ml-0.5 opacity-70" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -1238,6 +1255,21 @@ export const Transactions: React.FC = () => {
                                   <Download className="h-2.5 w-2.5" />
                                 </button>
                               </div>
+                            )}
+                            {transaction.attachmentUrl && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAttachment(transaction.attachmentUrl!);
+                                }}
+                                className="text-[9px] text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer w-fit mt-0.5"
+                                title="Visualizar Comprovante / Anexo"
+                              >
+                                <Paperclip className="h-2.5 w-2.5" />
+                                <span>Anexo</span>
+                                <Eye className="h-2 w-2 ml-0.5 opacity-70" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1511,6 +1543,50 @@ export const Transactions: React.FC = () => {
         onOpenChange={(isOpen) => !isOpen && setSelectedOrderForView(null)}
         companyName={currentClient?.name}
       />
+
+      {/* Modal de Visualização de Anexo */}
+      <Dialog open={!!selectedAttachment} onOpenChange={(open) => !open && setSelectedAttachment(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-4">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Paperclip className="h-4 w-4 text-primary" />
+              Comprovante / Anexo do Lançamento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto flex items-center justify-center py-2 min-h-[250px]">
+            {selectedAttachment?.startsWith('data:image/') || selectedAttachment?.match(/\.(jpeg|jpg|png|webp|gif)/i) ? (
+              <img
+                src={selectedAttachment}
+                alt="Comprovante"
+                className="max-h-[60vh] max-w-full rounded object-contain border"
+              />
+            ) : (
+              <iframe
+                src={selectedAttachment || ''}
+                title="Comprovante PDF"
+                className="w-full h-[60vh] rounded border"
+              />
+            )}
+          </div>
+          <DialogFooter className="flex justify-between items-center sm:justify-between">
+            {selectedAttachment && (
+              <a
+                href={selectedAttachment}
+                download="comprovante"
+                className="inline-flex items-center text-xs text-primary hover:underline gap-1"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Baixar / Abrir original
+              </a>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setSelectedAttachment(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
