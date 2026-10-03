@@ -32,6 +32,7 @@ import {
 import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 import { OrderReceiptDialog } from './OrderReceiptDialog';
 import { generateOrderPdf } from './OrderPdf';
+import { getColorHex } from '@/utils/colorUtils';
 
 // Web Audio API Beep helper
 const playPcBeep = (freq = 880, duration = 0.12) => {
@@ -70,6 +71,9 @@ interface ProductItem {
   min_stock: number;
   sku?: string | null;
   unit?: string | null;
+  size_or_variant?: string | null;
+  color?: string | null;
+  image_url?: string | null;
   category?: string | null;
 }
 
@@ -201,7 +205,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
           .from('order_items')
           .select(`
             *,
-            product:products(name, sku)
+            product:products(name, sku, unit, size_or_variant, color, image_url)
           `)
           .in('order_id', orderIds);
 
@@ -218,6 +222,10 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
             totalPrice: Number(item.total_price),
             productName: item.product?.name,
             productSku: item.product?.sku,
+            productUnit: item.product?.unit,
+            productSize: item.size_or_variant || item.product?.size_or_variant,
+            productColor: item.color || item.product?.color,
+            productImageUrl: item.product?.image_url,
             createdAt: new Date(item.created_at),
           });
         });
@@ -680,6 +688,8 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
         cost_price: item.product.cost_price || 0,
         discount_amount: item.discountAmount,
         total_price: Math.max(0, item.quantity * item.unitPrice - item.discountAmount),
+        size_or_variant: item.product.size_or_variant || null,
+        color: item.product.color || null,
       }));
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
@@ -1087,15 +1097,49 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                     >
                       <CardContent className="p-4 space-y-2">
                         <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-sm leading-tight text-foreground truncate group-hover:text-primary transition-colors">
-                              {product.name}
-                            </h3>
-                            {product.category && (
-                              <Badge variant="outline" className="text-[10px] mt-1 px-1.5 py-0">
-                                {product.category}
-                              </Badge>
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            {product.image_url && (
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="w-11 h-11 rounded-lg object-cover border border-border/80 shrink-0 shadow-2xs group-hover:scale-105 transition-transform"
+                              />
                             )}
+                            <div className="min-w-0 flex-1">
+                              <h3
+                                className="font-semibold text-sm leading-snug text-foreground line-clamp-2 break-words group-hover:text-primary transition-colors min-h-[2.4rem]"
+                                title={product.name}
+                              >
+                                {product.name}
+                              </h3>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {product.category && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                    {product.category}
+                                  </Badge>
+                                )}
+                                {product.size_or_variant && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-bold px-1.5 py-0 bg-primary/10 text-primary border-primary/30"
+                                  >
+                                    Tam: {product.size_or_variant}
+                                  </Badge>
+                                )}
+                                {product.color && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-medium px-1.5 py-0 bg-muted/60 text-foreground border-border/80 flex items-center gap-1"
+                                  >
+                                    <span
+                                      className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                      style={{ backgroundColor: getColorHex(product.color) }}
+                                    />
+                                    <span>Cor: {product.color}</span>
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
                           </div>
 
                           <Badge
@@ -1108,7 +1152,7 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                                 : 'bg-emerald-100 text-emerald-800 border-emerald-200'
                             )}
                           >
-                            {isOutOfStock ? 'Esgotado' : `${product.current_stock} un`}
+                            {isOutOfStock ? 'Esgotado' : `${product.current_stock} ${product.unit || 'un'}`}
                           </Badge>
                         </div>
 
@@ -1231,12 +1275,42 @@ export const Orders: React.FC<{ onNavigateToStorePos?: () => void }> = ({ onNavi
                             key={item.product.id}
                             className="p-2.5 bg-card border rounded-lg space-y-2 text-xs transition-colors hover:border-border"
                           >
-                            <div className="flex items-start justify-between gap-1">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">{item.product.name}</p>
-                                <span className="text-[10px] text-muted-foreground">
-                                  Estoque: {item.product.current_stock}
-                                </span>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2 min-w-0 flex-1">
+                                {item.product.image_url ? (
+                                  <img
+                                    src={item.product.image_url}
+                                    alt={item.product.name}
+                                    className="w-8 h-8 rounded-md object-cover border shrink-0 mt-0.5 shadow-2xs"
+                                  />
+                                ) : null}
+                                <div className="min-w-0 flex-1">
+                                  <p
+                                    className="font-semibold text-foreground line-clamp-2 break-words leading-snug text-xs"
+                                    title={item.product.name}
+                                  >
+                                    {item.product.name}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    {item.product.size_or_variant && (
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1 py-0 bg-primary/10 text-primary border-primary/30">
+                                        Tam: {item.product.size_or_variant}
+                                      </Badge>
+                                    )}
+                                    {item.product.color && (
+                                      <Badge variant="outline" className="text-[9px] font-medium px-1 py-0 bg-muted/60 text-foreground border-border/80 flex items-center gap-1">
+                                        <span
+                                          className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                          style={{ backgroundColor: getColorHex(item.product.color) }}
+                                        />
+                                        <span>Cor: {item.product.color}</span>
+                                      </Badge>
+                                    )}
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Estoque: {item.product.current_stock} {item.product.unit || 'un'}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                               <Button
                                 variant="ghost"

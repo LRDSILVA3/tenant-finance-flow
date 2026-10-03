@@ -3,6 +3,7 @@
 ## 📋 Project Status & Tasks
 - **Current Board**: [.gemini/tasks/BOARD.md](.gemini/tasks/BOARD.md)
 - **Architecture Context**: [.gemini/context/ARCHITECTURE.md](.gemini/context/ARCHITECTURE.md)
+- **Active Handoff**: [.gemini/context/HANDOFF.md](.gemini/context/HANDOFF.md)
 
 ## 🛠️ Engineering Rules & Mandates
 - **Core Rules**: [.gemini/rules/ENGINEERING.md](.gemini/rules/ENGINEERING.md)

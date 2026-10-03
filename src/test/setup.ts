@@ -38,6 +38,14 @@ if (typeof window !== 'undefined' && window.HTMLElement) {
   window.HTMLElement.prototype.scrollIntoView = window.HTMLElement.prototype.scrollIntoView || vi.fn();
 }
 
+// Mock HTMLCanvasElement.prototype.getContext for JsBarcode text measurement
+if (typeof window !== 'undefined' && window.HTMLCanvasElement) {
+  window.HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+    font: '',
+    measureText: vi.fn().mockReturnValue({ width: 50 }),
+  }) as any;
+}
+
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';

@@ -124,12 +124,18 @@ export const generateOrderPdf = (
     : [['#', 'Descrição do Produto', 'Qtd', 'Preço Unit.', 'Desconto', 'Subtotal']];
 
   const tableBody = (order.items || []).map((item, idx) => {
+    const details = [];
+    if (item.productSize) details.push(`Tam: ${item.productSize}`);
+    if (item.productColor) details.push(`Cor: ${item.productColor}`);
+    const desc = `${item.productName || 'Produto / Item de Estoque'}${details.length > 0 ? ` (${details.join(', ')})` : ''}`;
+    const qtyStr = item.productUnit ? `${item.quantity} ${item.productUnit}` : item.quantity.toString();
+
     if (pdfSettings.showSku) {
       return [
         (idx + 1).toString(),
         item.productSku || '-',
-        item.productName || 'Produto / Item de Estoque',
-        item.quantity.toString(),
+        desc,
+        qtyStr,
         formatCurrency(item.unitPrice),
         item.discountAmount > 0 ? formatCurrency(item.discountAmount) : '-',
         formatCurrency(item.totalPrice)
@@ -137,8 +143,8 @@ export const generateOrderPdf = (
     }
     return [
       (idx + 1).toString(),
-      item.productName || 'Produto / Item de Estoque',
-      item.quantity.toString(),
+      desc,
+      qtyStr,
       formatCurrency(item.unitPrice),
       item.discountAmount > 0 ? formatCurrency(item.discountAmount) : '-',
       formatCurrency(item.totalPrice)

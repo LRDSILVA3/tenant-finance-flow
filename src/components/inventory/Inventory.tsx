@@ -5,7 +5,7 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useTransactionDescriptions } from '@/hooks/useTransactionDescriptions';
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ProductDialog, ProductDialogProduct } from './ProductDialog';
+import { BarcodePrintDialog } from './BarcodePrintDialog';
+import { getColorHex } from '@/utils/colorUtils';
 import { 
   Package, 
   Plus, 
@@ -143,6 +145,9 @@ interface Product {
   min_stock: number;
   category: string | null;
   unit: string;
+  size_or_variant?: string | null;
+  color?: string | null;
+  image_url?: string | null;
   location: string | null;
   description: string | null;
   expiration_date: string | null;
@@ -156,7 +161,6 @@ interface CartItem {
 export const Inventory: React.FC = () => {
   const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications, suppliers, loadSuppliers, customPaymentMethods = [], userSettings } = useFinance();
 
-  const { descriptionGroups } = useTransactionDescriptions(transactions, categories);
   const { referenceGroups } = useTransactionReferences(transactions);
 
   // Loading States
@@ -206,22 +210,6 @@ export const Inventory: React.FC = () => {
   const [saleDescription, setSaleDescription] = useState<string>('');
   const [saleReference, setSaleReference] = useState<string>('');
 
-  const filteredDescriptionOptions = useMemo(() => {
-    if (!saleCategoryId) {
-      return descriptionGroups.map(g => ({
-        label: `${g.categoryCode} - ${g.categoryName}`,
-        options: g.descriptions.map(d => d.description),
-      }));
-    }
-    const selectedGroup = descriptionGroups.find(g => g.categoryId === saleCategoryId);
-    if (selectedGroup) {
-      return [{
-        label: `${selectedGroup.categoryCode} - ${selectedGroup.categoryName}`,
-        options: selectedGroup.descriptions.map(d => d.description),
-      }];
-    }
-    return [];
-  }, [descriptionGroups, saleCategoryId]);
 
   const filteredReferenceOptions = useMemo(() => {
     if (!saleDescription) {
@@ -255,6 +243,15 @@ export const Inventory: React.FC = () => {
 
   // Selected Data for Edits / Adjustments
   const [selectedProduct, setSelectedProduct] = useState<Product | ProductDialogProduct | null>(null);
+
+  // Barcode Print Modal States
+  const [barcodePrintProduct, setBarcodePrintProduct] = useState<Product | null>(null);
+  const [isBarcodePrintOpen, setIsBarcodePrintOpen] = useState(false);
+
+  const openBarcodePrintModal = (prod: Product) => {
+    setBarcodePrintProduct(prod);
+    setIsBarcodePrintOpen(true);
+  };
 
   // History Modal States
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -299,6 +296,9 @@ export const Inventory: React.FC = () => {
         min_stock: p.min_stock,
         category: p.category || null,
         unit: p.unit || 'UN',
+        size_or_variant: p.size_or_variant || null,
+        color: p.color || null,
+        image_url: p.image_url || null,
         location: p.location || null,
         description: p.description || null,
         expiration_date: p.expiration_date || null,
@@ -1414,24 +1414,49 @@ export const Inventory: React.FC = () => {
                       return (
                         <TableRow key={p.id} className={cn("hover:bg-muted/30 transition-colors", expInfo?.isExpired && p.current_stock > 0 && "bg-red-50/20")}>
                           <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-sm text-foreground">{p.name}</span>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                {p.category && (
-                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-slate-600 font-medium">
-                                    {p.category}
-                                  </Badge>
-                                )}
-                                {p.location && (
-                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-amber-700 font-mono">
-                                    📍 {p.location}
-                                  </Badge>
-                                )}
-                                {expInfo && (
-                                  <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-mono", expInfo.badgeClass)}>
-                                    {expInfo.label}
-                                  </Badge>
-                                )}
+                            <div className="flex items-center gap-2.5">
+                              {p.image_url ? (
+                                <img
+                                  src={p.image_url}
+                                  alt={p.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-border/80 shrink-0 shadow-2xs"
+                                />
+                              ) : null}
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-semibold text-sm text-foreground line-clamp-2 break-words leading-tight" title={p.name}>
+                                  {p.name}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  {p.size_or_variant && (
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-primary/10 border-primary/30 text-primary font-bold">
+                                      Tam: {p.size_or_variant}
+                                    </Badge>
+                                  )}
+                                  {p.color && (
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-muted/60 border-border/80 text-foreground font-medium flex items-center gap-1">
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                        style={{ backgroundColor: getColorHex(p.color) }}
+                                      />
+                                      <span>Cor: {p.color}</span>
+                                    </Badge>
+                                  )}
+                                  {p.category && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-slate-600 font-medium">
+                                      {p.category}
+                                    </Badge>
+                                  )}
+                                  {p.location && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-slate-50 border-slate-200 text-amber-700 font-mono">
+                                      📍 {p.location}
+                                    </Badge>
+                                  )}
+                                  {expInfo && (
+                                    <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-mono", expInfo.badgeClass)}>
+                                      {expInfo.label}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -1481,6 +1506,16 @@ export const Inventory: React.FC = () => {
                                   <Flame className="h-4 w-4" />
                                 </Button>
                               )}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Imprimir etiqueta com código de barras"
+                                onClick={() => openBarcodePrintModal(p)}
+                                className="h-8 w-8 p-0 text-slate-700 hover:text-primary hover:bg-primary/10"
+                              >
+                                <Barcode className="h-4 w-4" />
+                              </Button>
 
                               <Button
                                 variant="outline"
@@ -2005,13 +2040,10 @@ export const Inventory: React.FC = () => {
 
             <div className="space-y-1">
               <Label htmlFor="sale-desc">Descrição *</Label>
-              <SearchableSelect
+              <AutoResizeTextarea
+                id="sale-desc"
                 value={saleDescription}
-                onChange={(val) => {
-                  setSaleDescription(val);
-                  setSaleReference('');
-                }}
-                groupedOptions={filteredDescriptionOptions}
+                onChange={(e) => setSaleDescription(e.target.value)}
                 placeholder="Descrição da venda..."
               />
             </div>
@@ -2285,6 +2317,30 @@ export const Inventory: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Barcode / Label Printing Dialog */}
+      {isBarcodePrintOpen && barcodePrintProduct && (
+        <BarcodePrintDialog
+          open={isBarcodePrintOpen}
+          onOpenChange={setIsBarcodePrintOpen}
+          product={{
+            id: barcodePrintProduct.id,
+            name: barcodePrintProduct.name,
+            sku: barcodePrintProduct.sku,
+            sale_price: barcodePrintProduct.sale_price,
+            size_or_variant: barcodePrintProduct.size_or_variant,
+            color: barcodePrintProduct.color,
+            unit: barcodePrintProduct.unit,
+            current_stock: barcodePrintProduct.current_stock,
+          }}
+          companyName={currentClient?.company_name || 'Finance Flow'}
+          onSaveSku={async (newSku) => {
+            await supabase.from('products').update({ sku: newSku }).eq('id', barcodePrintProduct.id);
+            setBarcodePrintProduct(prev => prev ? { ...prev, sku: newSku } : null);
+            loadProducts();
+          }}
+        />
+      )}
     </div>
   );
 };

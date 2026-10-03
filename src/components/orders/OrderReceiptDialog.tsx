@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Order } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { generateOrderPdf } from './OrderPdf';
+import { getColorHex } from '@/utils/colorUtils';
 import { toast } from '@/hooks/use-toast';
 import {
   ShoppingBag,
@@ -78,10 +79,12 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
 
   const handleCopyOrderSummary = () => {
     const itemsText = (order.items || [])
-      .map(
-        (it) =>
-          `• ${it.quantity}x ${it.productName || 'Item'} - ${formatCurrency(it.totalPrice)}`
-      )
+      .map((it) => {
+        const specs = [];
+        if (it.productSize) specs.push(`Tam: ${it.productSize}`);
+        if (it.productColor) specs.push(`Cor: ${it.productColor}`);
+        return `• ${it.quantity}x ${it.productName || 'Item'}${specs.length > 0 ? ` (${specs.join(', ')})` : ''} - ${formatCurrency(it.totalPrice)}`;
+      })
       .join('\n');
 
     const summary = `🧾 *PEDIDO #${order.orderNumber}* - ${companyName}\n` +
@@ -314,18 +317,45 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
                       {(order.items || []).map((item, idx) => (
                         <tr key={item.id || idx} className="hover:bg-muted/20 transition-colors">
                           <td className="p-3">
-                            <div className="font-semibold text-foreground">
-                              {item.productName || 'Produto / Item'}
+                            <div className="flex items-center gap-2.5">
+                              {item.productImageUrl && (
+                                <img
+                                  src={item.productImageUrl}
+                                  alt={item.productName || 'Item'}
+                                  className="w-9 h-9 rounded-md object-cover border shrink-0 shadow-2xs"
+                                />
+                              )}
+                              <div className="min-w-0">
+                                <div className="font-semibold text-foreground line-clamp-2 break-words leading-snug">
+                                  {item.productName || 'Produto / Item'}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {item.productSize && (
+                                    <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.2 rounded border border-primary/20">
+                                      Tam: {item.productSize}
+                                    </span>
+                                  )}
+                                  {item.productColor && (
+                                    <span className="text-[10px] font-medium bg-muted/60 text-foreground px-1.5 py-0.2 rounded border border-border/80 flex items-center gap-1">
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                        style={{ backgroundColor: getColorHex(item.productColor) }}
+                                      />
+                                      <span>Cor: {item.productColor}</span>
+                                    </span>
+                                  )}
+                                  {item.productSku && (
+                                    <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded inline-block">
+                                      SKU: {item.productSku}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            {item.productSku && (
-                              <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded mt-0.5 inline-block">
-                                SKU: {item.productSku}
-                              </span>
-                            )}
                           </td>
                           <td className="p-3 text-center">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold text-xs">
-                              {item.quantity} un
+                              {item.quantity} {item.productUnit || 'un'}
                             </span>
                           </td>
                           <td className="p-3 text-right text-muted-foreground">
@@ -573,7 +603,7 @@ export const OrderReceiptDialog: React.FC<OrderReceiptDialogProps> = ({
                   {(order.items || []).map((item, i) => (
                     <div key={i} className="flex justify-between leading-tight">
                       <span className="truncate pr-2">
-                        {item.quantity}x {item.productName || 'Item'}
+                        {item.quantity}x {item.productName || 'Item'}{item.productSize || item.productColor ? ` (${[item.productSize ? `Tam: ${item.productSize}` : '', item.productColor ? `Cor: ${item.productColor}` : ''].filter(Boolean).join(', ')})` : ''}
                       </span>
                       <span className="font-bold shrink-0">{formatCurrency(item.totalPrice)}</span>
                     </div>

@@ -12,9 +12,9 @@
       "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"]
     },
     "playwright": {
-      "command": "npx",
+      "command": "C:\\Users\\User\\AppData\\Roaming\\nvm\\v20.20.2\\node.exe",
       "args": [
-        "@playwright/mcp@latest"
+        "C:\\Users\\User\\AppData\\Roaming\\nvm\\v20.20.2\\node_modules\\@playwright\\mcp\\cli.js"
       ]
     },
      "supabase": {

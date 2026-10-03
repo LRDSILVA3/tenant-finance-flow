@@ -75,7 +75,7 @@ const Auth: React.FC = () => {
     if (!validateInputs()) return;
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -94,6 +94,15 @@ const Auth: React.FC = () => {
         description: message,
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (data?.session) {
+      toast({
+        title: 'Login realizado com sucesso',
+        description: 'Redirecionando...',
+      });
+      navigate('/app', { replace: true });
     }
   };
 

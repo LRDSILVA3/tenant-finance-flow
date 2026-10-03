@@ -337,6 +337,10 @@ export interface OrderItem {
   totalPrice: number;
   productName?: string;
   productSku?: string;
+  productUnit?: string;
+  productSize?: string;
+  productColor?: string;
+  productImageUrl?: string;
   createdAt: Date;
 }
 

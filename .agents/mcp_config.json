@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "C:\\Users\\User\\AppData\\Roaming\\nvm\\v20.20.2\\node.exe",
+      "args": [
+        "C:\\Users\\User\\AppData\\Roaming\\nvm\\v20.20.2\\node_modules\\@playwright\\mcp\\cli.js"
+      ]
+    },
+    "serena": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-f2409d9d-601f-4895-83d2-7ff1ec199327"
+      }
+    },
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=purclatywlgntjrxbvmf"
+    }
+  }
+}

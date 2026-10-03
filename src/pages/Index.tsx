@@ -50,17 +50,26 @@ const Index: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !loadingClients) {
-      if (!isAuthenticated) {
-        navigate('/auth', { replace: true });
-      } else if (clients.length === 0 && !userProfile?.isAdmin) {
-        navigate('/onboarding', { replace: true });
-      } else if (!loadingSubscription && !currentSubscription && !userProfile?.isAdmin) {
-        // If they have a client but no active subscription/plan
-        // Redirect back to onboarding to complete the process
-        // Admin doesn't need a plan
-        navigate('/onboarding', { replace: true });
-      }
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+
+    if (loadingClients) return;
+
+    if (userProfile?.isAdmin) return;
+
+    if (clients.length === 0) {
+      navigate('/onboarding', { replace: true });
+      return;
+    }
+
+    if (loadingSubscription) return;
+
+    if (!currentSubscription) {
+      navigate('/onboarding', { replace: true });
     }
   }, [isAuthenticated, authLoading, loadingClients, userProfile, clients, currentSubscription, loadingSubscription, navigate]);
 
@@ -74,12 +83,12 @@ const Index: React.FC = () => {
     }
   }, [isAuthenticated, authLoading, loadingClients, clients]);
 
-  if (authLoading) {
+  if (authLoading || (isAuthenticated && loadingClients)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-muted-foreground">{t?.common?.loading || 'Carregando...'}</p>
         </div>
       </div>
     );

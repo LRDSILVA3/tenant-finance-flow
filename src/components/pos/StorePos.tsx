@@ -17,6 +17,7 @@ import { ProductDialog } from '@/components/inventory/ProductDialog';
 import { ServiceTypeDialog } from '@/components/schedule/ServiceTypeDialog';
 import { CustomerPickerDialog } from '@/components/pos/CustomerPickerDialog';
 import { CollaboratorPickerDialog } from '@/components/pos/CollaboratorPickerDialog';
+import { getColorHex } from '@/utils/colorUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +108,10 @@ interface CartItem {
   isService?: boolean;
   name: string;
   sku?: string;
+  unit?: string;
+  sizeOrVariant?: string;
+  color?: string;
+  imageUrl?: string;
   quantity: number;
   unitPrice: number;
   costPrice: number;
@@ -550,9 +555,14 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       name: string;
       sku?: string;
       category?: string;
+      unit?: string;
+      sizeOrVariant?: string;
+      color?: string;
+      imageUrl?: string;
       salePrice: number;
       costPrice: number;
       currentStock?: number;
+      expirationDate?: string;
     }> = [];
 
     // Produtos Reais do Banco
@@ -565,6 +575,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           name: p.name,
           sku: p.sku || '',
           category: p.category || 'Geral',
+          unit: p.unit || 'UN',
+          sizeOrVariant: p.size_or_variant || '',
+          color: (p as any).color || '',
+          imageUrl: p.image_url || '',
           salePrice: Number(p.sale_price),
           costPrice: Number(p.cost_price || 0),
           currentStock: Number(p.current_stock || 0),
@@ -581,6 +595,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         name: s.name,
         sku: 'SRV',
         category: 'Serviços',
+        unit: 'UN',
+        sizeOrVariant: '',
+        color: '',
+        imageUrl: '',
         salePrice: Number(s.price),
         costPrice: 0,
       }));
@@ -599,7 +617,9 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         (i) =>
           i.name.toLowerCase().includes(q) ||
           (i.sku && i.sku.toLowerCase().includes(q)) ||
-          (i.category && i.category.toLowerCase().includes(q))
+          (i.category && i.category.toLowerCase().includes(q)) ||
+          (i.sizeOrVariant && i.sizeOrVariant.toLowerCase().includes(q)) ||
+          (i.color && i.color.toLowerCase().includes(q))
       );
     }
 
@@ -626,6 +646,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
     isService: boolean;
     name: string;
     sku?: string;
+    unit?: string;
+    sizeOrVariant?: string;
+    color?: string;
+    imageUrl?: string;
     salePrice: number;
     costPrice: number;
     currentStock?: number;
@@ -651,6 +675,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           isService: item.isService,
           name: item.name,
           sku: item.sku,
+          unit: item.unit || 'UN',
+          sizeOrVariant: item.sizeOrVariant,
+          color: item.color,
+          imageUrl: item.imageUrl,
           quantity: 1,
           unitPrice: item.salePrice,
           costPrice: item.costPrice || 0,
@@ -679,6 +707,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         isService: false,
         name: foundProduct.name,
         sku: foundProduct.sku,
+        unit: foundProduct.unit,
+        sizeOrVariant: foundProduct.size_or_variant || undefined,
+        color: (foundProduct as any).color || undefined,
+        imageUrl: foundProduct.image_url || undefined,
         salePrice: Number(foundProduct.sale_price) || 0,
         costPrice: Number(foundProduct.cost_price) || 0,
         currentStock: foundProduct.current_stock,
@@ -829,7 +861,14 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         }
 
         if (categoryId) {
-          const itemsSummary = cart.map((i) => `${i.quantity}x ${i.name}`).join(', ');
+          const itemsSummary = cart
+            .map((i) => {
+              const details = [];
+              if (i.sizeOrVariant) details.push(`Tam: ${i.sizeOrVariant}`);
+              if (i.color) details.push(`Cor: ${i.color}`);
+              return `${i.quantity}x ${i.name}${details.length > 0 ? ` (${details.join(', ')})` : ''}`;
+            })
+            .join(', ');
 
           if (paymentMethod === 'crediario' && crediarioInstallments > 1) {
             const baseInstAmount = Math.floor((grandTotal / crediarioInstallments) * 100) / 100;
@@ -920,6 +959,8 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           cost_price: item.costPrice || 0,
           discount_amount: item.discountAmount || 0,
           total_price: Math.max(0, item.quantity * item.unitPrice - item.discountAmount),
+          size_or_variant: item.sizeOrVariant || null,
+          color: item.color || null,
         }));
 
       if (orderItemsPayload.length > 0) {
@@ -975,6 +1016,10 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
           productId: i.productId || '',
           productName: i.name,
           productSku: i.sku,
+          productUnit: i.unit,
+          productSize: i.sizeOrVariant,
+          productColor: i.color,
+          productImageUrl: i.imageUrl,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           costPrice: i.costPrice,
@@ -1417,7 +1462,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                     type="button"
                     onClick={() => handleAddToCart(item)}
                     className={cn(
-                      'group p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between h-28 sm:h-32 select-none shadow-xs',
+                      'group p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between min-h-[7.8rem] sm:min-h-[8.5rem] h-auto select-none shadow-xs',
                       'hover:scale-[1.02] active:scale-[0.98] hover:shadow-md',
                       item.isService
                         ? 'bg-gradient-to-b from-indigo-50/50 to-card dark:from-indigo-950/20 hover:border-indigo-500/60'
@@ -1425,24 +1470,48 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                       isOutOfStock ? 'opacity-60 grayscale' : ''
                     )}
                   >
-                    <div>
-                      {/* Topo do Card: Categoria / Tipo */}
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span
-                          className={cn(
-                            'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-sm',
-                            item.isService
-                              ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    <div className="w-full">
+                      {/* Topo do Card: Categoria / Tipo + Tamanho + Estoque */}
+                      <div className="flex items-center justify-between gap-1 mb-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span
+                            className={cn(
+                              'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-sm shrink-0',
+                              item.isService
+                                ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            )}
+                          >
+                            {item.isService ? 'Serviço' : item.category || 'Produto'}
+                          </span>
+
+                          {item.sizeOrVariant && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] font-bold px-1 py-0 bg-primary/10 text-primary border-primary/30 shrink-0"
+                            >
+                              Tam: {item.sizeOrVariant}
+                            </Badge>
                           )}
-                        >
-                          {item.isService ? 'Serviço' : item.category || 'Produto'}
-                        </span>
+
+                          {item.color && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] font-bold px-1 py-0 bg-muted/60 text-foreground border-border/80 shrink-0 flex items-center gap-1"
+                            >
+                              <span
+                                className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: getColorHex(item.color) }}
+                              />
+                              <span>{item.color}</span>
+                            </Badge>
+                          )}
+                        </div>
 
                         {!item.isService && item.currentStock !== undefined && (
                           <span
                             className={cn(
-                              'text-[9.5px] font-semibold',
+                              'text-[9.5px] font-semibold shrink-0',
                               item.currentStock <= 0
                                 ? 'text-destructive font-bold'
                                 : item.currentStock < 5
@@ -1450,18 +1519,30 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                                 : 'text-muted-foreground'
                             )}
                           >
-                            {item.currentStock <= 0 ? 'Esgotado' : `${item.currentStock} un`}
+                            {item.currentStock <= 0 ? 'Esgotado' : `${item.currentStock} ${item.unit || 'un'}`}
                           </span>
                         )}
                       </div>
 
-                      {/* Nome do Item */}
-                      <h4 className="font-semibold text-xs text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-                        {item.name}
-                      </h4>
+                      {/* Foto e Nome do Item (2 Linhas com Reticências) */}
+                      <div className="flex items-start gap-2">
+                        {item.imageUrl && (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-10 h-10 rounded-lg object-cover border border-border/80 shrink-0 shadow-2xs group-hover:scale-105 transition-transform"
+                          />
+                        )}
+                        <h4
+                          className="font-semibold text-xs text-foreground line-clamp-2 break-words leading-tight group-hover:text-primary transition-colors min-h-[2.1rem] flex-1"
+                          title={item.name}
+                        >
+                          {item.name}
+                        </h4>
+                      </div>
 
                       {item.expirationDate && (
-                        <div className="text-[9px] text-muted-foreground font-medium mt-0.5 flex items-center gap-0.5 truncate">
+                        <div className="text-[9px] text-muted-foreground font-medium mt-1 flex items-center gap-0.5 truncate">
                           <span>📅 Val:</span>
                           <span className="font-semibold">{new Date(item.expirationDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
                         </div>
@@ -1469,7 +1550,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                     </div>
 
                     {/* Rodapé do Card: Preço e Botão de Adição */}
-                    <div className="flex items-end justify-between pt-1.5 border-t border-border/40 mt-1">
+                    <div className="flex items-end justify-between pt-1.5 border-t border-border/40 mt-1.5 w-full">
                       <div>
                         <span className="text-[9.5px] text-muted-foreground block leading-none">Preço</span>
                         <span className="text-xs sm:text-sm font-extrabold text-foreground tracking-tight">
@@ -1660,13 +1741,41 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                       className="p-2 bg-card border rounded-lg text-xs space-y-1 shadow-2xs hover:border-primary/40 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <span className="font-semibold text-foreground truncate block text-[11.5px]">
-                            {item.name}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {formatCurrency(item.unitPrice)} un
-                          </span>
+                        <div className="flex items-start gap-2 min-w-0 flex-1">
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-8 h-8 rounded-md object-cover border shrink-0 mt-0.5 shadow-2xs"
+                            />
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className="font-semibold text-foreground line-clamp-2 break-words leading-snug block text-[11.5px]"
+                              title={item.name}
+                            >
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              {item.sizeOrVariant && (
+                                <Badge variant="outline" className="text-[9px] font-bold px-1 py-0 bg-primary/10 text-primary border-primary/30">
+                                  Tam: {item.sizeOrVariant}
+                                </Badge>
+                              )}
+                              {item.color && (
+                                <Badge variant="outline" className="text-[9px] font-bold px-1 py-0 bg-muted/60 text-foreground border-border/80 flex items-center gap-1">
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full border border-black/20 shrink-0"
+                                    style={{ backgroundColor: getColorHex(item.color) }}
+                                  />
+                                  <span>{item.color}</span>
+                                </Badge>
+                              )}
+                              <span className="text-[10px] text-muted-foreground">
+                                {formatCurrency(item.unitPrice)} / {item.unit || 'un'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
                         <span className="font-bold text-foreground text-xs shrink-0">
