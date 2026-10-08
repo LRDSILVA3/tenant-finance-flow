@@ -29,9 +29,27 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Trata erros de chunks antigos após deploys do Vite
+      window.addEventListener('vite:preloadError', (event) => {
+        console.warn('[Vite] Preload error detected, reloading page...', event);
+        window.location.reload();
+      });
+
       if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            reg.onupdatefound = () => {
+              const installingWorker = reg.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Novo service worker ativo, recarrega para pegar a versão atualizada
+                    window.location.reload();
+                  }
+                };
+              }
+            };
+          }).catch(() => {});
         });
       }
     </script>

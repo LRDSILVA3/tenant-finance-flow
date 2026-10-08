@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Sparkles, Loader2, Upload, ImageIcon, X, Link as LinkIcon, Palette, Printer } from 'lucide-react';
+import { Sparkles, Loader2, Upload, ImageIcon, X, Link as LinkIcon, Palette, Printer, Package } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { uploadProductImage } from '@/utils/imageUpload';
 import { cn } from '@/lib/utils';
@@ -210,8 +210,9 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
       } else {
         toast({ title: 'Erro ao anexar foto', description: error || 'Tente novamente.', variant: 'destructive' });
       }
-    } catch (err: any) {
-      toast({ title: 'Erro no envio da imagem', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha no envio da imagem.';
+      toast({ title: 'Erro no envio da imagem', description: msg, variant: 'destructive' });
     } finally {
       setIsUploadingImage(false);
       if (fileInputRef.current) {
@@ -229,7 +230,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
 
     setSaving(true);
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         client_id: currentClient.id,
         name: form.name.trim(),
         sku: form.sku.trim() || null,
@@ -280,11 +281,12 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
 
       onOpenChange(false);
       onSuccess?.();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido ao salvar produto.';
       toast({
         title: 'Erro ao salvar produto',
-        description: err.message || 'Erro desconhecido ao salvar produto.',
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -313,18 +315,31 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <form onSubmit={handleSave} className="flex flex-col h-full overflow-hidden">
-          <DialogHeader className="p-6 pb-3 pr-12 border-b shrink-0">
-            <DialogTitle>{product?.id ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
-            <DialogDescription>Insira as informações do produto contábil e seus valores.</DialogDescription>
+          <DialogHeader className="p-5 pb-4 border-b shrink-0 pr-12 bg-muted/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/20">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold">
+                  {product?.id ? 'Editar Produto' : 'Novo Produto'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  {product?.id
+                    ? 'Atualize as informações do produto, variações, precificação e regras de estoque.'
+                    : 'Insira as informações do produto, variações, valores e estoque inicial.'}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 max-h-[62vh]">
             {/* Foto do Produto & Nome Principal */}
-            <div className="flex items-start gap-3.5 bg-muted/20 p-3 rounded-xl border border-border/60">
+            <div className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl border bg-muted/20">
               {/* Widget de Foto do Produto */}
-              <div className="shrink-0 flex flex-col items-center">
+              <div className="shrink-0 flex flex-col items-center self-center sm:self-start">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -333,32 +348,32 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                   className="hidden"
                 />
                 {form.imageUrl ? (
-                  <div className="relative group w-20 h-20 rounded-xl border border-border overflow-hidden bg-muted/40 shadow-xs flex items-center justify-center">
+                  <div className="relative group w-20 h-20 rounded-xl border border-border overflow-hidden bg-background shadow-xs flex items-center justify-center">
                     <img
                       src={form.imageUrl}
                       alt={form.name || 'Foto do Produto'}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[1px]">
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[1px]">
                       <Button
                         type="button"
                         size="icon"
                         variant="secondary"
-                        className="h-6 w-6 rounded-full text-xs shadow-xs"
+                        className="h-7 w-7 rounded-full text-xs shadow-xs"
                         onClick={() => fileInputRef.current?.click()}
                         title="Trocar Foto"
                       >
-                        <Upload className="h-3 w-3" />
+                        <Upload className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         type="button"
                         size="icon"
                         variant="destructive"
-                        className="h-6 w-6 rounded-full text-xs shadow-xs"
+                        className="h-7 w-7 rounded-full text-xs shadow-xs"
                         onClick={() => setForm((p) => ({ ...p, imageUrl: '' }))}
                         title="Remover Foto"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -367,15 +382,15 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                     type="button"
                     disabled={isUploadingImage}
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-20 h-20 rounded-xl border-2 border-dashed border-muted-foreground/30 hover:border-primary/60 bg-muted/30 hover:bg-primary/5 transition-all flex flex-col items-center justify-center text-center p-1 text-muted-foreground hover:text-primary group shadow-2xs"
+                    className="w-20 h-20 rounded-xl border-2 border-dashed border-muted-foreground/30 hover:border-emerald-500/60 bg-background hover:bg-emerald-500/5 transition-all flex flex-col items-center justify-center text-center p-1 text-muted-foreground hover:text-emerald-600 group shadow-2xs"
                     title="Clique para enviar foto do produto"
                   >
                     {isUploadingImage ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
                     ) : (
                       <>
                         <ImageIcon className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] font-medium mt-1 leading-tight">+ Foto</span>
+                        <span className="text-[10px] font-semibold mt-1 leading-tight">+ Foto</span>
                       </>
                     )}
                   </button>
@@ -385,24 +400,25 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowUrlInput(!showUrlInput)}
-                  className="text-[9.5px] text-muted-foreground hover:text-primary mt-1.5 flex items-center gap-0.5 underline-offset-2 hover:underline"
+                  className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5 flex items-center gap-1 underline-offset-2 hover:underline font-medium"
                 >
                   <LinkIcon className="h-2.5 w-2.5" />
                   {showUrlInput ? 'Ocultar Link' : 'Colar Link'}
                 </button>
               </div>
 
-              <div className="flex-1 space-y-1 min-w-0">
-                <Label htmlFor="prod-name">Nome do Produto *</Label>
+              <div className="flex-1 space-y-1.5 min-w-0 w-full">
+                <Label htmlFor="prod-name" className="text-xs font-semibold">Nome do Produto *</Label>
                 <Input
                   id="prod-name"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Ex: Camiseta Básica Algodão, Calça Jeans..."
+                  placeholder="Ex: Babydoll com Alça Rolotê, Camisa Polo..."
+                  className="font-medium text-sm"
                   required
                   autoFocus
                 />
-                <p className="text-[11px] text-muted-foreground leading-tight">
+                <p className="text-[11px] text-muted-foreground leading-snug">
                   Defina o nome principal. Tamanho/grade e unidade podem ser configurados abaixo para evitar repetição no título.
                 </p>
               </div>
@@ -410,8 +426,8 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
 
             {/* Input Opcional de Link Direto de Imagem */}
             {showUrlInput && (
-              <div className="p-2.5 bg-muted/40 border rounded-lg space-y-1 animate-in fade-in-50">
-                <Label htmlFor="prod-img-url" className="text-xs flex items-center justify-between">
+              <div className="p-3 bg-muted/30 border rounded-xl space-y-1.5 animate-in fade-in-50">
+                <Label htmlFor="prod-img-url" className="text-xs font-semibold flex items-center justify-between">
                   <span>Link Direto da Imagem (URL Web / CDN)</span>
                   <span className="text-[10px] text-muted-foreground font-normal">Hospedada na internet</span>
                 </Label>
@@ -420,8 +436,8 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                     id="prod-img-url"
                     value={form.imageUrl}
                     onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))}
-                    placeholder="https://exemplo.com/fotos/camiseta.jpg"
-                    className="text-xs h-8"
+                    placeholder="https://exemplo.com/fotos/produto.jpg"
+                    className="text-xs h-9"
                   />
                   {form.imageUrl && (
                     <Button
@@ -429,7 +445,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => setForm((p) => ({ ...p, imageUrl: '' }))}
-                      className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      className="h-9 px-3 text-xs text-muted-foreground hover:text-destructive"
                     >
                       Limpar
                     </Button>
@@ -438,24 +454,42 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
               </div>
             )}
 
-            {/* Identificação: Categoria, Unidade de Medida, Tamanho/Grade e Cor */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-cat">Categoria</Label>
-                </div>
+            {/* Classificação: Categoria & Fornecedor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-cat" className="text-xs font-semibold">Categoria</Label>
                 <Input
                   id="prod-cat"
                   value={form.category}
                   onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                  placeholder="Ex: Roupas, Calçados..."
+                  placeholder="Ex: Moda Íntima, Cosméticos, Calçados..."
                 />
               </div>
 
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-unit">Unidade</Label>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-supplier" className="text-xs font-semibold">Fornecedor</Label>
+                <Select
+                  value={form.supplierId}
+                  onValueChange={(v) => setForm((p) => ({ ...p, supplierId: v }))}
+                >
+                  <SelectTrigger id="prod-supplier">
+                    <SelectValue placeholder="Selecione o fornecedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(suppliers || []).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Variações & Medidas: Unidade, Tamanho e Cor */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-unit" className="text-xs font-semibold">Unidade</Label>
                 <Select
                   value={form.unit}
                   onValueChange={(v) => setForm((p) => ({ ...p, unit: v }))}
@@ -478,14 +512,14 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <div className="h-5 flex items-center justify-between">
-                  <Label htmlFor="prod-size">Tamanho</Label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
+                  <Label htmlFor="prod-size" className="text-xs font-semibold">Tamanho</Label>
                   {form.sizeOrVariant && (
                     <button
                       type="button"
                       onClick={() => setForm((p) => ({ ...p, sizeOrVariant: '' }))}
-                      className="text-[10px] text-muted-foreground hover:text-destructive"
+                      className="text-[10px] text-muted-foreground hover:text-destructive font-medium"
                     >
                       Limpar
                     </button>
@@ -495,12 +529,12 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                   id="prod-size"
                   value={form.sizeOrVariant}
                   onChange={(e) => setForm((p) => ({ ...p, sizeOrVariant: e.target.value }))}
-                  placeholder="Ex: P, M, 40..."
+                  placeholder="Ex: P, M, 42, 50ml..."
                 />
               </div>
 
-              <div className="space-y-1">
-                <div className="h-5 flex items-center justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {form.color && (
                       <span
@@ -508,13 +542,13 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                         style={{ backgroundColor: getColorHex(form.color) }}
                       />
                     )}
-                    <Label htmlFor="prod-color" className="truncate">Cor</Label>
+                    <Label htmlFor="prod-color" className="text-xs font-semibold truncate">Cor</Label>
                   </div>
                   {form.color && (
                     <button
                       type="button"
                       onClick={() => setForm((p) => ({ ...p, color: '' }))}
-                      className="text-[10px] text-muted-foreground hover:text-destructive shrink-0"
+                      className="text-[10px] text-muted-foreground hover:text-destructive font-medium shrink-0"
                     >
                       Limpar
                     </button>
@@ -526,7 +560,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                     value={form.color}
                     onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
                     placeholder="Ex: Preto, Azul..."
-                    className="pr-8"
+                    className="pr-9"
                   />
                   <Popover>
                     <PopoverTrigger asChild>
@@ -569,22 +603,23 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <div className="h-5 flex items-center justify-between">
-                  <Label htmlFor="prod-sku">Código / SKU</Label>
-                  <div className="flex items-center gap-1.5">
+            {/* Código de Barras & Localização Física no Estoque */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 h-5">
+                  <Label htmlFor="prod-sku" className="text-xs font-semibold shrink-0">Código / SKU</Label>
+                  <div className="flex items-center gap-2 shrink-0">
                     {form.sku && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         disabled={fetchingEan}
-                        className="h-4 p-0 text-[10px] text-amber-600 hover:text-amber-700 gap-1 font-normal leading-none"
+                        className="h-5 px-1.5 text-[11px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 gap-1 font-medium"
                         title="Buscar nome do produto online por código de barras"
                         onClick={handleFetchEan}
                       >
-                        <Sparkles className="h-2.5 w-2.5" />
+                        <Sparkles className="h-3 w-3" />
                         {fetchingEan ? 'Buscando...' : 'Buscar'}
                       </Button>
                     )}
@@ -592,11 +627,11 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-4 p-0 text-[10px] text-primary hover:text-primary/80 gap-1 font-normal leading-none"
+                      className="h-5 px-1.5 text-[11px] text-primary hover:text-primary/90 hover:bg-primary/10 gap-1 font-medium"
                       title="Imprimir Etiqueta / Código de Barras"
                       onClick={() => setBarcodePrintOpen(true)}
                     >
-                      <Printer className="h-2.5 w-2.5" />
+                      <Printer className="h-3 w-3" />
                       Etiqueta
                     </Button>
                   </div>
@@ -608,79 +643,58 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                   placeholder="Código de barras"
                 />
               </div>
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-loc">Localização Física</Label>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center h-5">
+                  <Label htmlFor="prod-loc" className="text-xs font-semibold">Localização Física</Label>
                 </div>
                 <Input
                   id="prod-loc"
                   value={form.location}
                   onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-                  placeholder="Ex: Prateleira A1"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-supplier">Fornecedor</Label>
-                </div>
-                <Select
-                  value={form.supplierId}
-                  onValueChange={(v) => setForm((p) => ({ ...p, supplierId: v }))}
-                >
-                  <SelectTrigger id="prod-supplier">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(suppliers || []).map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-cost">Preço de Custo (Valor Pago) *</Label>
-                </div>
-                <MoneyInput
-                  id="prod-cost"
-                  value={form.costPrice}
-                  onChange={(val) => setForm((p) => ({ ...p, costPrice: val }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-sale">Preço de Venda *</Label>
-                </div>
-                <MoneyInput
-                  id="prod-sale"
-                  value={form.salePrice}
-                  onChange={(val) => setForm((p) => ({ ...p, salePrice: val }))}
+                  placeholder="Ex: Prateleira A1, Gaveta 3..."
                 />
               </div>
             </div>
 
-            {/* Indicador de Margem de Lucro / Markup */}
-            {form.costPrice > 0 && (
-              <div className="p-3 border rounded-lg bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-xs flex justify-between items-center font-medium animate-in fade-in slide-in-from-top-1">
-                <span className="flex items-center gap-1">
-                  💰 Lucro Estimado: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{formatCurrency(form.salePrice - form.costPrice)}</strong>
-                </span>
-                <span>
-                  📈 Markup / Margem: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">+{(((form.salePrice - form.costPrice) / form.costPrice) * 100).toFixed(1)}%</strong>
-                </span>
-              </div>
-            )}
-
-            <div className={cn("grid gap-3", !product?.id ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2")}>
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-min">Estoque Mínimo</Label>
+            {/* Precificação & Margem de Lucro */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="prod-cost" className="text-xs font-semibold">Preço de Custo (Valor Pago) *</Label>
+                  <MoneyInput
+                    id="prod-cost"
+                    value={form.costPrice}
+                    onChange={(val) => setForm((p) => ({ ...p, costPrice: val }))}
+                  />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prod-sale" className="text-xs font-semibold">Preço de Venda *</Label>
+                  <MoneyInput
+                    id="prod-sale"
+                    value={form.salePrice}
+                    onChange={(val) => setForm((p) => ({ ...p, salePrice: val }))}
+                  />
+                </div>
+              </div>
+
+              {/* Indicador de Margem de Lucro / Markup */}
+              {form.costPrice > 0 && (
+                <div className="p-3 border rounded-xl bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs flex justify-between items-center font-medium animate-in fade-in slide-in-from-top-1">
+                  <span className="flex items-center gap-1.5">
+                    💰 Lucro Estimado: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{formatCurrency(form.salePrice - form.costPrice)}</strong>
+                  </span>
+                  <span>
+                    📈 Markup / Margem: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">+{(((form.salePrice - form.costPrice) / form.costPrice) * 100).toFixed(1)}%</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Controle de Estoque & Validade */}
+            <div className={cn("grid gap-4 pt-2 border-t", !product?.id ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2")}>
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-min" className="text-xs font-semibold">Estoque Mínimo</Label>
                 <Input
                   id="prod-min"
                   type="number"
@@ -690,10 +704,8 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                 />
               </div>
               {!product?.id && (
-                <div className="space-y-1">
-                  <div className="h-5 flex items-center">
-                    <Label htmlFor="prod-initial">Estoque Inicial</Label>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prod-initial" className="text-xs font-semibold">Estoque Inicial</Label>
                   <Input
                     id="prod-initial"
                     type="number"
@@ -703,10 +715,8 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                   />
                 </div>
               )}
-              <div className="space-y-1">
-                <div className="h-5 flex items-center">
-                  <Label htmlFor="prod-expiration">Data de Validade (Opcional)</Label>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-expiration" className="text-xs font-semibold">Data de Validade (Opcional)</Label>
                 <Input
                   id="prod-expiration"
                   type="date"
@@ -717,12 +727,22 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
             </div>
           </div>
 
-          <DialogFooter className="p-4 border-t bg-muted/20 shrink-0">
+          <DialogFooter className="p-4 px-6 border-t bg-muted/20 shrink-0 flex items-center justify-end gap-2.5">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={saving || !form.name.trim()} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</> : (product?.id ? 'Salvar Alterações' : 'Cadastrar Produto')}
+            <Button
+              type="submit"
+              disabled={saving || !form.name.trim()}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
+                </>
+              ) : (
+                product?.id ? 'Salvar Alterações' : 'Cadastrar Produto'
+              )}
             </Button>
           </DialogFooter>
         </form>

@@ -22,10 +22,12 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ProductDialog, ProductDialogProduct } from './ProductDialog';
 import { BarcodePrintDialog } from './BarcodePrintDialog';
+import { ProductImportDialog } from './ProductImportDialog';
 import { getColorHex } from '@/utils/colorUtils';
 import { 
   Package, 
   Plus, 
+  FileSpreadsheet,
   Search, 
   AlertTriangle, 
   Truck, 
@@ -190,6 +192,7 @@ export const Inventory: React.FC = () => {
   // Modals States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Realtime Scanner States
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -1080,12 +1083,17 @@ export const Inventory: React.FC = () => {
             <span className="hidden sm:inline">Leitor de Código / Celular / USB</span>
             <span className="sm:hidden">Scanner / Código</span>
           </Button>
+          <Button onClick={() => setIsImportModalOpen(true)} variant="outline" className="flex-1 sm:flex-initial gap-2 text-xs">
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            Importar CSV
+          </Button>
           <Button onClick={openCreateProduct} className="flex-1 sm:flex-initial gap-2 text-xs">
             <Plus className="h-4 w-4" />
             Novo Produto
           </Button>
         </div>
       </div>
+
 
       {/* Expiration & Critical Risk Hub */}
       {showExpirationBanner && (expirationStats.totalAtRisk > 0 || criticalItemsCount > 0) && (
@@ -2341,9 +2349,18 @@ export const Inventory: React.FC = () => {
           }}
         />
       )}
+
+      {/* Product CSV Import & Stock Update Dialog */}
+      <ProductImportDialog
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={loadProducts}
+        existingProducts={products}
+      />
     </div>
   );
 };
+
 
 // Simple Icon fallback helper
 const BarcodeIcon: React.FC<{ className?: string }> = ({ className }) => (

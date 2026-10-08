@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Language, UserProfile, Client, UserRole, Address, CustomPaymentMethod, ClientAsaasConfig, Invoice } from '@/types/finance';
+import { Language, UserProfile, Client, UserRole, Address, CustomPaymentMethod, ClientAsaasConfig, Invoice, BusinessSegment } from '@/types/finance';
 import { translations, Translations } from '@/i18n/translations';
 import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
@@ -47,6 +47,10 @@ interface FinanceContextType {
   // User Settings
   userSettings: UserSettings;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
+
+  // Business Segment / Mode
+  businessSegment: BusinessSegment;
+  updateBusinessSegment: (segment: BusinessSegment) => Promise<void>;
 
   // Proxy to SubscriptionContext
   plans: Plan[];
@@ -594,12 +598,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Filter: user must be the owner (user_id === user.id) OR must be a collaborator (joinedClientIds.has(id))
       const filtered = clientsData.filter((c: any) => c.user_id === user.id || joinedClientIds.has(c.id));
 
-      const mapped = filtered.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        taxId: c.tax_id,
-        createdAt: new Date(c.created_at)
-      }));
+      const mapped = filtered.map((c: any) => {
+        const storedSegment = localStorage.getItem(`tf_business_segment_${c.id}`);
+        return {
+          id: c.id,
+          name: c.name,
+          taxId: c.tax_id,
+          createdAt: new Date(c.created_at),
+          businessSegment: (storedSegment as BusinessSegment) || (c.business_segment as BusinessSegment) || 'full'
+        };
+      });
 
       setClients(mapped);
       if (mapped.length > 0 && !currentClient) setCurrentClient(mapped[0]);
@@ -657,6 +665,26 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setUserSettings(newS);
   }, [user, userSettings]);
 
+  const businessSegment: BusinessSegment = React.useMemo(() => {
+    if (!currentClient) return 'full';
+    const stored = localStorage.getItem(`tf_business_segment_${currentClient.id}`);
+    return (stored as BusinessSegment) || currentClient.businessSegment || 'full';
+  }, [currentClient]);
+
+  const updateBusinessSegment = useCallback(async (segment: BusinessSegment) => {
+    if (!currentClient) return;
+    try {
+      localStorage.setItem(`tf_business_segment_${currentClient.id}`, segment);
+      setCurrentClient(prev => prev ? { ...prev, businessSegment: segment } : null);
+      setClients(prev => prev.map(c => c.id === currentClient.id ? { ...c, businessSegment: segment } : c));
+      
+      // Update in database with silent fallback
+      await (supabase.from('clients') as any).update({ business_segment: segment }).eq('id', currentClient.id);
+    } catch (err) {
+      console.warn("Could not persist business_segment to clients table:", err);
+    }
+  }, [currentClient]);
+
   // Wrapper robusto para mutações (Add, Update, Delete)
   const withSubscriptionCheck = useCallback((fn: (...args: any[]) => Promise<any>) => {
     return async (...args: any[]) => {
@@ -677,6 +705,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     clients, currentClient, setCurrentClient, addClient, loadingClients,
     currentAddress, loadAddress, saveAddress,
     userSettings, updateUserSettings,
+    businessSegment, updateBusinessSegment,
     ...sub, ...tx,
     // Overrides para garantir modo leitura se expirado
     addTransaction: withSubscriptionCheck(tx.addTransaction),

@@ -34,12 +34,15 @@ export interface ClientMember {
   createdAt: Date;
 }
 
+export type BusinessSegment = 'retail' | 'services' | 'repair' | 'full';
+
 export interface Client {
   id: string;
   name: string;
   taxId?: string;
   userId: string;
   createdAt: Date;
+  businessSegment?: BusinessSegment;
 }
 
 export interface Address {

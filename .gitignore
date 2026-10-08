@@ -25,3 +25,4 @@ dist-ssr
 scratch/
 supabase/.temp/
 Ficha_Cliente_*.pdf
+.playwright-mcp/

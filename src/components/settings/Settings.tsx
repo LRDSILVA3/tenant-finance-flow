@@ -17,9 +17,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette, MessageSquare } from 'lucide-react';
+import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette, MessageSquare, Store, CalendarDays, Wrench, LayoutGrid, ShoppingBag, Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { BusinessSegment } from '@/types/finance';
 
 export const Settings: React.FC = () => {
   const { 
@@ -31,9 +33,26 @@ export const Settings: React.FC = () => {
     currentClient,
     customPaymentMethods = [],
     addCustomPaymentMethod,
-    deleteCustomPaymentMethod
+    deleteCustomPaymentMethod,
+    businessSegment = 'full',
+    updateBusinessSegment
   } = useFinance();
   const isOwner = userRole === 'owner' || userProfile?.isAdmin;
+
+  const handleSelectSegment = async (segment: BusinessSegment) => {
+    if (segment === businessSegment) return;
+    await updateBusinessSegment(segment);
+    const names: Record<BusinessSegment, string> = {
+      retail: 'Loja de Roupas & Varejo (Modo Simplificado)',
+      services: 'Prestador de Serviços & Agendamentos',
+      repair: 'Oficina & Assistência Técnica',
+      full: 'Modo Completo (Avançado)'
+    };
+    toast({
+      title: "Perfil Atualizado!",
+      description: `O sistema foi adaptado para ${names[segment]}. Menus e atalhos foram ajustados.`,
+    });
+  };
 
   const [newMethodName, setNewMethodName] = React.useState('');
   const [newMethodType, setNewMethodType] = React.useState<'cash' | 'card' | 'pix' | 'boleto' | 'other'>('card');
@@ -161,7 +180,173 @@ export const Settings: React.FC = () => {
           )}
         </TabsList>
 
-        <TabsContent value="general">
+        <TabsContent value="general" className="space-y-6">
+          {/* Perfil do Negócio & Modo de Operação */}
+          <Card className="border-primary/20 shadow-sm overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/10 to-transparent pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Store className="h-5 w-5 text-primary" />
+                    Perfil do Negócio & Modo de Operação
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm mt-1">
+                    Personalize os menus e a complexidade do sistema conforme a rotina diária da sua empresa.
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="self-start sm:self-auto bg-background/80 text-primary border-primary/30 text-xs px-2.5 py-0.5 font-semibold">
+                  {businessSegment === 'retail' && '👗 Varejo & Loja de Roupas'}
+                  {businessSegment === 'services' && '✂️ Serviços & Agenda'}
+                  {businessSegment === 'repair' && '🔧 Oficina & Reparos'}
+                  {businessSegment === 'full' && '🏢 Modo Completo'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Loja de Roupas & Varejo */}
+                <div
+                  onClick={() => handleSelectSegment('retail')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'retail'
+                      ? "border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20 ring-2 ring-emerald-600/20 shadow-sm"
+                      : "border-border hover:border-emerald-300 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'retail' ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <ShoppingBag className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'retail' ? (
+                        <Badge className="bg-emerald-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px]">Recomendado p/ Roupas</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Loja de Roupas & Varejo</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Modo simplificado. Foco em frente de caixa (PDV), estoque com grade P/M/G e cores, compras e contas a pagar por fornecedor.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">PDV Touch</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Estoque P/M/G</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Por Fornecedor</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium">Oculta OS e Agenda</span>
+                  </div>
+                </div>
+
+                {/* 2. Serviços & Agenda */}
+                <div
+                  onClick={() => handleSelectSegment('services')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'services'
+                      ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20 ring-2 ring-blue-600/20 shadow-sm"
+                      : "border-border hover:border-blue-300 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'services' ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <CalendarDays className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'services' && (
+                        <Badge className="bg-blue-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Serviços & Agenda</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Foco em grade horária de atendimentos, escalas de colaboradores, comissões e clientes.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Grade Horária</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Escalas</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Comissões</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">Oculta OS</span>
+                  </div>
+                </div>
+
+                {/* 3. Oficina & Reparos */}
+                <div
+                  onClick={() => handleSelectSegment('repair')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'repair'
+                      ? "border-amber-600 bg-amber-50/30 dark:bg-amber-950/20 ring-2 ring-amber-600/20 shadow-sm"
+                      : "border-border hover:border-amber-300 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'repair' ? "bg-amber-600 text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <Wrench className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'repair' && (
+                        <Badge className="bg-amber-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Oficina & Assistência</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Foco em ordens de serviço (peças e mão de obra), estoque de peças e finanças de reparos.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Ordens de Serviço</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Peças & Estoque</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-medium">Oculta Agenda</span>
+                  </div>
+                </div>
+
+                {/* 4. Modo Completo */}
+                <div
+                  onClick={() => handleSelectSegment('full')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'full'
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
+                      : "border-border hover:border-primary/40 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'full' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        <LayoutGrid className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'full' && (
+                        <Badge className="bg-primary text-primary-foreground text-[10px] font-bold">Ativo</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Modo Completo (Avançado)</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Acesso irrestrito a todos os módulos, relatórios contábeis, agendas e ordens de serviço.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Todos os Módulos</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">DRE Contábil</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Sem Ocultações</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className={cn(!userSettings.enablePaymentMethods && "opacity-60")}>
               <CardHeader>

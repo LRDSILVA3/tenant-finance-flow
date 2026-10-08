@@ -62,9 +62,13 @@ export const Navigation: React.FC<NavigationProps> = ({
   currentReportTab,
   onReportTabChange
 }) => {
-  const { t, userProfile, currentSubscription, unreadNotificationsCount, userSettings } = useFinance();
+  const { t, userProfile, currentSubscription, unreadNotificationsCount, userSettings, businessSegment = 'full' } = useFinance();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isRetail = businessSegment === 'retail';
+  const showServiceOrders = businessSegment === 'full' || businessSegment === 'repair';
+  const showSchedule = businessSegment === 'full' || businessSegment === 'services';
 
   const isAdminView = location.pathname === '/admin';
   const activeId = isAdminView ? 'admin' : currentView;
@@ -267,19 +271,21 @@ export const Navigation: React.FC<NavigationProps> = ({
                     <p className="text-[10px] text-muted-foreground mt-0.5">Catálogo e histórico de pedidos</p>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleNavClick('service_orders')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
-                    activeId === 'service_orders' && "bg-accent text-accent-foreground font-semibold"
-                  )}
-                >
-                  <ClipboardList className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="font-medium text-xs leading-none">Ordem de Serviço</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Mão de obra e peças</p>
-                  </div>
-                </DropdownMenuItem>
+                {showServiceOrders && (
+                  <DropdownMenuItem
+                    onClick={() => handleNavClick('service_orders')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                      activeId === 'service_orders' && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="font-medium text-xs leading-none">Ordem de Serviço</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Mão de obra e peças</p>
+                    </div>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -319,16 +325,18 @@ export const Navigation: React.FC<NavigationProps> = ({
                   <Truck className="h-4 w-4 text-muted-foreground" />
                   Fornecedores
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleNavClick('schedule')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
-                    activeId === 'schedule' && "bg-accent text-accent-foreground font-semibold"
-                  )}
-                >
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  Agenda
-                </DropdownMenuItem>
+                {showSchedule && (
+                  <DropdownMenuItem
+                    onClick={() => handleNavClick('schedule')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                      activeId === 'schedule' && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    Agenda
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => handleNavClick('inventory')}
                   className={cn(
@@ -545,17 +553,30 @@ export const Navigation: React.FC<NavigationProps> = ({
           <span className="mt-0.5">PDV</span>
         </button>
 
-        {/* Vendas */}
-        <button
-          onClick={() => handleNavClick('orders')}
-          className={cn(
-            "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
-            activeId === 'orders' ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ShoppingCart className="h-4 w-4 mb-0.5" />
-          <span>Vendas</span>
-        </button>
+        {/* Vendas ou Estoque direto no Modo Varejo */}
+        {isRetail ? (
+          <button
+            onClick={() => handleNavClick('inventory')}
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+              activeId === 'inventory' ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Package className="h-4 w-4 mb-0.5" />
+            <span>Estoque</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleNavClick('orders')}
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors",
+              activeId === 'orders' ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ShoppingCart className="h-4 w-4 mb-0.5" />
+            <span>Vendas</span>
+          </button>
+        )}
 
         {/* Menu Completo (Sheet) */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
@@ -644,16 +665,18 @@ export const Navigation: React.FC<NavigationProps> = ({
                     <ShoppingCart className="h-5 w-5 text-primary" />
                     <span className="text-xs">Pedidos</span>
                   </button>
-                  <button
-                    onClick={() => { handleNavClick('service_orders'); setIsMobileMenuOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
-                      activeId === 'service_orders' && "border-primary bg-primary/5 text-primary font-bold"
-                    )}
-                  >
-                    <ClipboardList className="h-5 w-5 text-indigo-600" />
-                    <span className="text-xs">Ordens Serv.</span>
-                  </button>
+                  {showServiceOrders && (
+                    <button
+                      onClick={() => { handleNavClick('service_orders'); setIsMobileMenuOpen(false); }}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                        activeId === 'service_orders' && "border-primary bg-primary/5 text-primary font-bold"
+                      )}
+                    >
+                      <ClipboardList className="h-5 w-5 text-indigo-600" />
+                      <span className="text-xs">Ordens Serv.</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -683,16 +706,18 @@ export const Navigation: React.FC<NavigationProps> = ({
                     <Truck className="h-5 w-5 text-amber-600" />
                     <span className="text-[11px]">Fornec.</span>
                   </button>
-                  <button
-                    onClick={() => { handleNavClick('schedule'); setIsMobileMenuOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
-                      activeId === 'schedule' && "border-primary bg-primary/5 text-primary font-bold"
-                    )}
-                  >
-                    <CalendarDays className="h-5 w-5 text-teal-600" />
-                    <span className="text-[11px]">Agenda</span>
-                  </button>
+                  {showSchedule && (
+                    <button
+                      onClick={() => { handleNavClick('schedule'); setIsMobileMenuOpen(false); }}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-2.5 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                        activeId === 'schedule' && "border-primary bg-primary/5 text-primary font-bold"
+                      )}
+                    >
+                      <CalendarDays className="h-5 w-5 text-teal-600" />
+                      <span className="text-[11px]">Agenda</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => { handleNavClick('inventory'); setIsMobileMenuOpen(false); }}
                     className={cn(

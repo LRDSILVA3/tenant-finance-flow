@@ -107,6 +107,7 @@ const Index: React.FC = () => {
           <Dashboard
             onNavigateToTransactions={() => setCurrentView('transactions')}
             onNavigateToSchedule={() => setCurrentView('schedule')}
+            onNavigateToView={(view) => setCurrentView(view)}
           />
         );
       case 'inventory':

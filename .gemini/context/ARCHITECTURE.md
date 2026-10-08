@@ -51,5 +51,11 @@ A financial management multi-tenant system where each 'Client' represents a tena
 - **Date Parsing**: Supabase `date` columns must be parsed using `new Date(`${t.date}T00:00:00`)` to prevent UTC shifts that change the day by -1.
 - **Collaborator Integration**: New collaborators must be returned as objects from the creation function to allow immediate UI selection.
 - **Mobile Ergonomics & Multi-Viewport Layouts**: Layouts use a mobile-first responsive approach (`< md` for smartphones, `>= md` / `lg` for desktop). Bottom navigation (`Navigation.tsx`) is rendered on mobile with sticky elevation, with higher-level module categories accessed via a modern drawer (`Sheet`). Dense tabular views (Orders, OS, Inventory, Reports) utilize `overflow-x-auto` with min-width safety to preserve columnar layout without crushing cells on small viewports.
+- **Business Segments & Simplified Profile Mode (`business_segment`)**:
+  - *Modes*: Configurable per tenant: `'retail'` (Varejo & Loja de Roupas / Modo Simplificado), `'services'` (Prestador de Serviços & Agendamentos), `'repair'` (Oficina & Assistência Técnica) and `'full'` (Modo Completo / Avançado).
+  - *Persistence*: Persisted in `clients.business_segment` with instant optimistic fallback in `localStorage` (`tf_business_segment_${clientId}`) for seamless multi-device persistence.
+  - *Adaptive Navigation* ([Navigation.tsx](file:///c:/Users/User/Documents/Projects/tenant-finance-flow/src/components/layout/Navigation.tsx)): Hides irrelevant modules depending on the business segment (e.g. hides Ordem de Serviço and Agenda for clothing retail), while surfacing key shortcuts directly (e.g. Estoque in mobile bottom navigation bar).
+  - *Dashboard Quick Actions Hub* ([Dashboard.tsx](file:///c:/Users/User/Documents/Projects/tenant-finance-flow/src/components/dashboard/Dashboard.tsx)): 6 Bento Grid cards providing instant 1-click access to Store POS, Stock with sizes/colors, Record Purchases/Expenses with suppliers, New Incomes, Customers/Credit Limit, and Suppliers.
+  - *Supplier Payables Summary Widget*: Direct dashboard widget calculating pending vs paid supplier bills and breakdown per supplier with quick links to Accounts Payable.
 
 
