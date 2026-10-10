@@ -109,7 +109,7 @@ export const WhatsAppRechargeModal: React.FC<WhatsAppRechargeModalProps> = ({
             <div>
               <DialogTitle className="text-xl">
                 {step === 'packages' && 'Recarregar Saldo & Franquias'}
-                {step === 'pix_payment' && 'Pagamento via PIX (Asaas)'}
+                {step === 'pix_payment' && 'Pagamento via PIX'}
                 {step === 'success' && 'Recarga Concluída com Sucesso!'}
               </DialogTitle>
               <DialogDescription>
@@ -242,7 +242,7 @@ export const WhatsAppRechargeModal: React.FC<WhatsAppRechargeModalProps> = ({
             <div className="p-3 bg-muted/40 rounded-lg border text-xs text-muted-foreground flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>
-                Pagamento processado com segurança pelo <strong>Asaas</strong> com emissão automática de Nota Fiscal de Serviço (NFS-e).
+                Pagamento processado com segurança via <strong>PIX</strong> com liberação instantânea dos créditos.
               </span>
             </div>
           </div>
@@ -349,7 +349,7 @@ export const WhatsAppRechargeModal: React.FC<WhatsAppRechargeModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-foreground">Pagamento Confirmado pelo Asaas!</h3>
+              <h3 className="text-lg font-bold text-foreground">Pagamento Confirmado!</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 <strong>+{selectedPackage.credits} {selectedPackage.type === 'whatsapp' ? 'créditos de WhatsApp' : 'notas fiscais'}</strong> foram adicionados instantaneamente à sua carteira.
               </p>

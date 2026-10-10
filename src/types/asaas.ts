@@ -1,6 +1,7 @@
 export type AsaasEnvironment = 'sandbox' | 'production';
 
 export interface AsaasConfig {
+  enabled: boolean;
   environment: AsaasEnvironment;
   apiKey: string;
   webhookSecret: string;
