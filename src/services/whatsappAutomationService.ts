@@ -31,10 +31,10 @@ export const whatsappAutomationService = {
   getConfig(clientId: string): WhatsAppAutomationConfig {
     if (!clientId) {
       return {
-        enableDMinus3: true,
-        enableDZero: true,
-        enableDPlus2: true,
-        enableSchedule24h: true,
+        enableDMinus3: false,
+        enableDZero: false,
+        enableDPlus2: false,
+        enableSchedule24h: false,
       };
     }
     try {
@@ -42,10 +42,10 @@ export const whatsappAutomationService = {
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      enableDMinus3: true,
-      enableDZero: true,
-      enableDPlus2: true,
-      enableSchedule24h: true,
+      enableDMinus3: false,
+      enableDZero: false,
+      enableDPlus2: false,
+      enableSchedule24h: false,
     };
   },
 

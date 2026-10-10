@@ -25,12 +25,14 @@ import {
   Save,
   CheckCircle2,
   RefreshCw,
-  Lock
+  Lock,
+  Power
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const DEFAULT_CONFIG: AsaasConfig = {
+  enabled: false,
   environment: 'sandbox',
   apiKey: '',
   webhookSecret: '',
@@ -232,6 +234,40 @@ export const AsaasSettings: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Master On/Off Switch Card */}
+      <Card className={`border-2 transition-all ${config.enabled ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-slate-300 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60'}`}>
+        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className={`p-2.5 rounded-xl transition-colors ${config.enabled ? 'bg-emerald-600 text-white' : 'bg-slate-400 dark:bg-slate-700 text-white'}`}>
+              <Power className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base">Status da Integração Asaas</span>
+                <Badge className={config.enabled ? 'bg-emerald-600 font-bold' : 'bg-slate-500 font-bold'}>
+                  {config.enabled ? 'ATIVO NO SISTEMA' : 'DESATIVADO (OCULTO PARA CLIENTES)'}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+                {config.enabled 
+                  ? 'A integração Asaas está ativa. Os clientes têm acesso a recargas PIX automáticas e visualizam notas fiscais (NFS-e).' 
+                  : 'A integração está desligada. Todas as opções, botões de recarga Asaas e recursos fiscais ficam ocultos para os clientes, mantendo os envios gratuitos via WhatsApp Web (Click-to-Chat).'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 self-end sm:self-center bg-card px-4 py-2 rounded-lg border shadow-xs">
+            <Label htmlFor="master-asaas-toggle" className="text-xs sm:text-sm font-bold cursor-pointer">
+              {config.enabled ? 'Integração Ativada' : 'Integração Desativada'}
+            </Label>
+            <Switch
+              id="master-asaas-toggle"
+              checked={config.enabled}
+              onCheckedChange={(checked) => setConfig({ ...config, enabled: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Live Connection Test Result Alert */}
       {testResult && (

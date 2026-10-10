@@ -70,6 +70,7 @@ export const WhatsAppSendModal: React.FC<WhatsAppSendModalProps> = ({
     walletCredits,
     deductCredit,
     addRecharge,
+    isAsaasActive,
     galleryTemplates,
     importGalleryTemplate
   } = useWhatsAppTemplates();
@@ -397,39 +398,54 @@ export const WhatsAppSendModal: React.FC<WhatsAppSendModalProps> = ({
               Cancelar
             </Button>
 
-            {/* Action 1: Free Manual Click-to-Chat (wa.me) */}
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleOpenWhatsAppWeb}
-              disabled={sending || !(phone || '').trim() || !(editableText || '').trim()}
-              className="flex items-center gap-2 border"
-              title="Abrir WhatsApp Web gratuitamente sem gastar créditos"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span>Abrir no WhatsApp Web</span>
-            </Button>
-
-            {/* Action 2: Official Send (Consumes 1 Credit) */}
-            {walletCredits > 0 ? (
+            {!isAsaasActive ? (
+              /* When Asaas is inactive: 1-click Free WhatsApp Web is the primary action */
               <Button
                 type="button"
-                onClick={handleSendOfficial}
+                onClick={handleOpenWhatsAppWeb}
                 disabled={sending || !(phone || '').trim() || !(editableText || '').trim()}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-2"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 shadow-sm"
+                title="Abrir WhatsApp Web gratuitamente sem gastar créditos"
               >
-                <Send className="h-4 w-4" />
-                <span>{sending ? 'Enviando...' : 'Disparo Oficial (1 crédito)'}</span>
+                <ExternalLink className="h-4 w-4" />
+                <span>Enviar no WhatsApp (Grátis)</span>
               </Button>
             ) : (
-              <Button
-                type="button"
-                onClick={() => setRechargeModalOpen(true)}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-2"
-              >
-                <Zap className="h-4 w-4" />
-                <span>Recarregar Saldo PIX</span>
-              </Button>
+              /* When Asaas is active: Show Free WhatsApp Web fallback and Official API option */
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleOpenWhatsAppWeb}
+                  disabled={sending || !(phone || '').trim() || !(editableText || '').trim()}
+                  className="flex items-center gap-2 border"
+                  title="Abrir WhatsApp Web gratuitamente sem gastar créditos"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>Abrir no WhatsApp Web</span>
+                </Button>
+
+                {walletCredits > 0 ? (
+                  <Button
+                    type="button"
+                    onClick={handleSendOfficial}
+                    disabled={sending || !(phone || '').trim() || !(editableText || '').trim()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span>{sending ? 'Enviando...' : 'Disparo Oficial (1 crédito)'}</span>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => setRechargeModalOpen(true)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-2"
+                  >
+                    <Zap className="h-4 w-4" />
+                    <span>Recarregar Saldo PIX</span>
+                  </Button>
+                )}
+              </>
             )}
           </DialogFooter>
         </DialogContent>

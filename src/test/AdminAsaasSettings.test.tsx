@@ -47,7 +47,7 @@ describe('Admin Asaas Settings Suite', () => {
     render(<AsaasSettings />);
 
     expect(screen.getByText(/Integração Asaas & Emissão Fiscal/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ambiente Sandbox \(Testes\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Status da Integração Asaas/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Testar Conexão/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Salvar Alterações/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Chave de API \/ Access Token/i)).toBeInTheDocument();

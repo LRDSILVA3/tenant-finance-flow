@@ -47,7 +47,8 @@ export const useWhatsAppTemplates = () => {
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [usageLogs, setUsageLogs] = useState<WhatsAppUsageLog[]>([]);
   const [rechargeOrders, setRechargeOrders] = useState<WhatsAppRechargeOrder[]>([]);
-  const [walletCredits, setWalletCredits] = useState<number>(50); // 50 initial welcome credits
+  const [walletCredits, setWalletCredits] = useState<number>(0); // Starts with 0 credits
+  const [isAsaasActive, setIsAsaasActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -66,6 +67,31 @@ export const useWhatsAppTemplates = () => {
     ? (currentPlan as any).whatsapp_extra_cost 
     : 0.15;
 
+  // Load Asaas active status
+  const loadAsaasStatus = useCallback(async () => {
+    try {
+      const { data, error } = await (supabase as any).rpc('is_asaas_enabled');
+      if (!error && typeof data === 'boolean') {
+        if (isMountedRef.current) setIsAsaasActive(data);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const saved = safeGetItem('previna_asaas_admin_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (isMountedRef.current) setIsAsaasActive(Boolean(parsed.enabled));
+        return;
+      } catch {
+        // ignore
+      }
+    }
+    if (isMountedRef.current) setIsAsaasActive(false);
+  }, []);
+
   // Load wallet credits and recharges
   const loadWallet = useCallback(async () => {
     try {
@@ -74,8 +100,8 @@ export const useWhatsAppTemplates = () => {
         if (query?.maybeSingle) {
           const { data, error } = await query.maybeSingle();
           if (!error && data) {
-            if (isMountedRef.current) setWalletCredits(data.balance_credits);
-            safeSetItem(`${LOCAL_STORAGE_KEY_WALLET}_${tenantId}`, String(data.balance_credits));
+            if (isMountedRef.current) setWalletCredits(data.balance_credits ?? 0);
+            safeSetItem(`${LOCAL_STORAGE_KEY_WALLET}_${tenantId}`, String(data.balance_credits ?? 0));
             return;
           }
         }
@@ -85,7 +111,7 @@ export const useWhatsAppTemplates = () => {
       if (saved) {
         if (isMountedRef.current) setWalletCredits(Number(saved));
       } else {
-        if (isMountedRef.current) setWalletCredits(50);
+        if (isMountedRef.current) setWalletCredits(0);
       }
     } catch (err) {
       console.warn('Could not load wallet from Supabase, using local fallback:', err);
@@ -189,7 +215,8 @@ export const useWhatsAppTemplates = () => {
     loadUsageLogs();
     loadWallet();
     loadRecharges();
-  }, [loadTemplates, loadUsageLogs, loadWallet, loadRecharges]);
+    loadAsaasStatus();
+  }, [loadTemplates, loadUsageLogs, loadWallet, loadRecharges, loadAsaasStatus]);
 
   // Deduct 1 credit from wallet
   const deductCredit = async (): Promise<boolean> => {
@@ -478,6 +505,7 @@ export const useWhatsAppTemplates = () => {
     usageLogs,
     walletCredits,
     rechargeOrders,
+    isAsaasActive,
     galleryTemplates: SYSTEM_GALLERY_TEMPLATES,
     usageSummary: {
       used: usedCount,

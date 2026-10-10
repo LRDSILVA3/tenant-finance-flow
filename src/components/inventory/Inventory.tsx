@@ -4,9 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useFinance } from '@/contexts/FinanceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
-import { SearchableSelect } from '@/components/ui/searchable-select';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
-import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -163,8 +161,6 @@ interface CartItem {
 export const Inventory: React.FC = () => {
   const { currentClient, customers, categories, addTransaction, transactions, t, refreshNotifications, suppliers, loadSuppliers, customPaymentMethods = [], userSettings } = useFinance();
 
-  const { referenceGroups } = useTransactionReferences(transactions);
-
   // Loading States
   const [loading, setLoading] = useState(false);
   const [savingSale, setSavingSale] = useState(false);
@@ -212,27 +208,6 @@ export const Inventory: React.FC = () => {
   const [saleCustomTotal, setSaleCustomTotal] = useState<number>(0);
   const [saleDescription, setSaleDescription] = useState<string>('');
   const [saleReference, setSaleReference] = useState<string>('');
-
-
-  const filteredReferenceOptions = useMemo(() => {
-    if (!saleDescription) {
-      return referenceGroups.map(g => ({
-        label: g.description,
-        options: g.references.map(r => r.reference),
-      }));
-    }
-    const selectedGroup = referenceGroups.find(g => g.description === saleDescription);
-    if (selectedGroup) {
-      return [{
-        label: selectedGroup.description,
-        options: selectedGroup.references.map(r => r.reference),
-      }];
-    }
-    return referenceGroups.map(g => ({
-      label: g.description,
-      options: g.references.map(r => r.reference),
-    }));
-  }, [referenceGroups, saleDescription]);
 
   // Scanner Mode: In / Adjustment selected product
   const [scannedProductForAction, setScannedProductForAction] = useState<Product | null>(null);
@@ -977,7 +952,10 @@ export const Inventory: React.FC = () => {
   const handleOpenCheckout = () => {
     if (cartItems.length === 0) return;
     setSaleCustomTotal(cartSubtotal);
-    setSaleDescription('');
+    const defaultDesc = cartItems.length === 1 
+      ? `Venda: ${cartItems[0].product.name}` 
+      : `Venda de Estoque (${cartItems.length} itens)`;
+    setSaleDescription(defaultDesc);
     setSaleReference('');
     setSalePaymentMethod('cash');
     setSaleStatus('paid');
@@ -2052,17 +2030,18 @@ export const Inventory: React.FC = () => {
                 id="sale-desc"
                 value={saleDescription}
                 onChange={(e) => setSaleDescription(e.target.value)}
-                placeholder="Descrição da venda..."
+                placeholder="Ex: Venda no Balcão, Pedido..."
               />
             </div>
 
             <div className="space-y-1">
               <Label htmlFor="sale-ref">Referência (Opcional)</Label>
-              <SearchableSelect
+              <Input
+                id="sale-ref"
                 value={saleReference}
-                onChange={(val) => setSaleReference(val)}
-                groupedOptions={filteredReferenceOptions}
-                placeholder="Ex: Venda #102..."
+                onChange={(e) => setSaleReference(e.target.value)}
+                placeholder="Ex: Venda #102, NF, Cupom..."
+                className="w-full"
               />
             </div>
 

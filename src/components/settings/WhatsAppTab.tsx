@@ -59,6 +59,7 @@ export const WhatsAppTab: React.FC = () => {
     usageLogs,
     walletCredits,
     rechargeOrders,
+    isAsaasActive,
     saveTemplate,
     toggleTemplateActive,
     deleteTemplate,
@@ -82,7 +83,6 @@ export const WhatsAppTab: React.FC = () => {
   };
 
   const handleOpenNewTemplate = () => {
-
     setEditingTemplate(null);
     setTemplateDialogOpen(true);
   };
@@ -110,7 +110,7 @@ export const WhatsAppTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* 1. Prepaid Wallet & Asaas Invoices Overview Card */}
+      {/* 1. WhatsApp Notifications Overview Card */}
       <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -129,18 +129,20 @@ export const WhatsAppTab: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handleOpenRecharge('whatsapp')}
-                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-bold flex items-center gap-1.5 shrink-0"
-              >
-                <Zap className="h-4 w-4 text-emerald-600" />
-                <span>Recarregar Saldo PIX</span>
-              </Button>
+              {isAsaasActive && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleOpenRecharge('whatsapp')}
+                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-bold flex items-center gap-1.5 shrink-0"
+                >
+                  <Zap className="h-4 w-4 text-emerald-600" />
+                  <span>Recarregar Saldo PIX</span>
+                </Button>
+              )}
 
               <Button
                 onClick={handleOpenNewTemplate}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shrink-0"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shrink-0 shadow-sm"
               >
                 <Plus className="h-4 w-4" />
                 <span>Novo Modelo</span>
@@ -150,84 +152,150 @@ export const WhatsAppTab: React.FC = () => {
         </CardHeader>
 
         <CardContent className="pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Wallet Balance Card */}
-            <div className="p-4 rounded-xl bg-card border border-emerald-500/20 flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                    <Wallet className="h-4 w-4" />
+          {isAsaasActive ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Wallet Balance Card */}
+              <div className="p-4 rounded-xl bg-card border border-emerald-500/20 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                      <Wallet className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Carteira de WhatsApp
+                    </span>
                   </div>
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Carteira de WhatsApp
+                  <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 font-semibold text-[11px]">
+                    Pré-Pago
+                  </Badge>
+                </div>
+
+                <div>
+                  <span className="text-2xl font-black text-foreground font-mono">
+                    {walletCredits}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-1.5 font-medium">
+                    créditos de envio disponíveis
                   </span>
                 </div>
-                <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 font-semibold text-[11px]">
-                  Pré-Pago
-                </Badge>
-              </div>
 
-              <div>
-                <span className="text-2xl font-black text-foreground font-mono">
-                  {walletCredits}
-                </span>
-                <span className="text-xs text-muted-foreground ml-1.5 font-medium">
-                  créditos de envio disponíveis
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between pt-1 border-t text-xs text-muted-foreground">
-                <span>Consumo: 1 crédito por disparo oficial</span>
-                <button
-                  type="button"
-                  onClick={() => handleOpenRecharge('whatsapp')}
-                  className="text-emerald-600 font-bold hover:underline flex items-center gap-1"
-                >
-                  <Zap className="h-3 w-3" /> Adicionar Créditos
-                </button>
-              </div>
-            </div>
-
-            {/* Asaas NFS-e Emission Info */}
-            <div className="p-4 rounded-xl bg-card border border-blue-500/20 flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                    <Receipt className="h-4 w-4" />
-                  </div>
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Emissão de NFS-e (Asaas)
-                  </span>
+                <div className="flex items-center justify-between pt-1 border-t text-xs text-muted-foreground">
+                  <span>Consumo: 1 crédito por disparo oficial</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRecharge('whatsapp')}
+                    className="text-emerald-600 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Zap className="h-3 w-3" /> Adicionar Créditos
+                  </button>
                 </div>
-                <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 font-semibold text-[11px]">
-                  Fiscal Automático
-                </Badge>
               </div>
 
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  As Notas Fiscais de Serviço das suas recargas são emitidas automaticamente e disponibilizadas no histórico.
-                </p>
-              </div>
+              {/* Asaas NFS-e Emission Info */}
+              <div className="p-4 rounded-xl bg-card border border-blue-500/20 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      <Receipt className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Emissão de NFS-e (Asaas)
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 font-semibold text-[11px]">
+                    Fiscal Automático
+                  </Badge>
+                </div>
 
-              <div className="flex items-center justify-between pt-1 border-t text-xs text-muted-foreground">
-                <span>Franquia inclusa no seu plano</span>
-                <button
-                  type="button"
-                  onClick={() => handleOpenRecharge('invoices')}
-                  className="text-blue-600 font-bold hover:underline flex items-center gap-1"
-                >
-                  <FileText className="h-3 w-3" /> Pacotes de NFS-e
-                </button>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    As Notas Fiscais de Serviço das suas recargas são emitidas automaticamente e disponibilizadas no histórico.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t text-xs text-muted-foreground">
+                  <span>Franquia inclusa no seu plano</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRecharge('invoices')}
+                    className="text-blue-600 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <FileText className="h-3 w-3" /> Pacotes de NFS-e
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Direct WhatsApp Web Card */}
+              <div className="p-4 rounded-xl bg-card border border-emerald-500/20 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                      <Smartphone className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Envio Direto Gratuito
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 font-bold text-[11px]">
+                    100% Gratuito & Ilimitado
+                  </Badge>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Dispare mensagens formatadas com 1 clique direto para o WhatsApp Web ou aplicativo oficial no celular, com preenchimento automático das tags do cliente.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                  <span>Sem custos por mensagem</span>
+                  <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5 text-emerald-600" /> Click-to-Chat Ativo</span>
+                </div>
+              </div>
+
+              {/* Ready Templates & Automation Card */}
+              <div className="p-4 rounded-xl bg-card border border-blue-500/20 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Modelos & Variáveis Inteligentes
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 font-semibold text-[11px]">
+                    {templates.length} Modelos Ativos
+                  </Badge>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Personalize seus modelos com tags como <code className="text-[11px] font-mono bg-muted px-1 rounded">{'{{primeiro_nome}}'}</code>, <code className="text-[11px] font-mono bg-muted px-1 rounded">{'{{valor_total}}'}</code> e <code className="text-[11px] font-mono bg-muted px-1 rounded">{'{{chave_pix}}'}</code>.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t text-xs text-muted-foreground">
+                  <span>Explore a Galeria de Modelos</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab('gallery')}
+                    className="text-blue-600 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Sparkles className="h-3 w-3" /> Ver Sugestões
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* 2. Sub-Tabs */}
-      <Tabs defaultValue="my_templates" value={activeSubTab} onValueChange={(val: any) => setActiveSubTab(val)} className="w-full">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+      <Tabs defaultValue="my_templates" value={activeSubTab === 'recharges' && !isAsaasActive ? 'my_templates' : activeSubTab} onValueChange={(val: any) => setActiveSubTab(val)} className="w-full">
+        <TabsList className={`grid ${isAsaasActive ? 'grid-cols-5 max-w-2xl' : 'grid-cols-4 max-w-xl'} w-full`}>
           <TabsTrigger value="my_templates" className="flex items-center gap-1 text-xs sm:text-sm">
             <Layers className="h-4 w-4" />
             <span>Meus Modelos ({templates.length})</span>
@@ -244,10 +312,12 @@ export const WhatsAppTab: React.FC = () => {
             <History className="h-4 w-4" />
             <span>Envios</span>
           </TabsTrigger>
-          <TabsTrigger value="recharges" className="flex items-center gap-1 text-xs sm:text-sm">
-            <Receipt className="h-4 w-4 text-blue-500" />
-            <span>Recargas & Notas</span>
-          </TabsTrigger>
+          {isAsaasActive && (
+            <TabsTrigger value="recharges" className="flex items-center gap-1 text-xs sm:text-sm">
+              <Receipt className="h-4 w-4 text-blue-500" />
+              <span>Recargas & Notas</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab 1: My Templates */}

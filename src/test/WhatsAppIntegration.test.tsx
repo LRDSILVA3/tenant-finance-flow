@@ -149,8 +149,7 @@ describe('WhatsApp Integration & Template Engine Suite', () => {
       render(<WhatsAppTab />);
 
       expect(screen.getByText(/Notificações & Mensagens via WhatsApp/i)).toBeInTheDocument();
-      expect(screen.getByText(/Carteira de WhatsApp/i)).toBeInTheDocument();
-      expect(screen.getByText(/Emissão de NFS-e \(Asaas\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Envio Direto Gratuito/i)).toBeInTheDocument();
       expect(screen.getByText(/Novo Modelo/i)).toBeInTheDocument();
     });
 
@@ -256,7 +255,7 @@ describe('WhatsApp Integration & Template Engine Suite', () => {
       fireEvent.click(starterBtn);
 
       await waitFor(() => {
-        expect(screen.getByText(/Pagamento via PIX \(Asaas\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/Pagamento via PIX/i)).toBeInTheDocument();
         expect(screen.getByText(/Copiar Código PIX/i)).toBeInTheDocument();
         expect(screen.getByText(/Aguardando Pagamento PIX/i)).toBeInTheDocument();
       });
@@ -273,7 +272,7 @@ describe('WhatsApp Integration & Template Engine Suite', () => {
           onOpenChange={vi.fn()}
           customerName="Mariana Duarte"
           customerPhone="(11) 98888-7777"
-          category="BILLING"
+          category="billing"
           sourceModule="receivables"
           variablesContext={{
             nome_cliente: 'Mariana Duarte',
@@ -287,8 +286,7 @@ describe('WhatsApp Integration & Template Engine Suite', () => {
 
       expect(screen.getByText(/Enviar Mensagem via WhatsApp/i)).toBeInTheDocument();
       expect(screen.getByText(/Destinatário: Mariana Duarte/i)).toBeInTheDocument();
-      expect(screen.getByText(/Abrir no WhatsApp Web/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Disparo Oficial/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Enviar no WhatsApp \(Grátis\)/i })).toBeInTheDocument();
     });
 
     it('não deve quebrar ao receber customerPhone ou customerName nulos', async () => {
@@ -310,7 +308,7 @@ describe('WhatsApp Integration & Template Engine Suite', () => {
       );
 
       expect(screen.getByText(/Enviar Mensagem via WhatsApp/i)).toBeInTheDocument();
-      expect(screen.getByText(/Abrir no WhatsApp Web/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Enviar no WhatsApp \(Grátis\)/i })).toBeInTheDocument();
     });
   });
 
