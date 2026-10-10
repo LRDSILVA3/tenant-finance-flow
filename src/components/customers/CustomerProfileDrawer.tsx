@@ -20,7 +20,7 @@ import {
   CreditCard, Tag, Sparkles, Receipt, Download, TrendingUp, Clock,
   MapPin, ShieldAlert, ArrowUpRight, CheckCircle2, AlertCircle, Loader2,
   ExternalLink, MessageSquare, ChevronRight, Package, Percent, FileDown,
-  Printer
+  Printer, XCircle, Trash2, AlertTriangle
 } from 'lucide-react';
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
@@ -380,10 +380,16 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
         if (activeCustomerIdRef.current === targetCustomerId) {
           setTransactions(mappedTrans);
-          const debt = mappedTrans
+          const transDebt = mappedTrans
             .filter((t) => t.status === 'pending')
             .reduce((acc, t) => acc + t.amount, 0);
-          setPendingDebt(debt);
+
+          // Considera pedidos pendentes que não possuem lançamento correspondente em mappedTrans
+          const ordersPendingDebt = orderList
+            .filter((o: any) => o.status !== 'cancelled' && o.payment_status === 'pending' && (!o.transaction_id || !mappedTrans.some(t => t.id === o.transaction_id)))
+            .reduce((acc: number, o: any) => acc + (Number(o.total_amount) || 0), 0);
+
+          setPendingDebt(transDebt + ordersPendingDebt);
         }
       }
     } catch (err) {
@@ -665,11 +671,13 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   const isEventPaid = (event: { type: string; data: any }) => {
     if (event.type === 'order') {
       const o = event.data as Order;
-      return o.paymentStatus === 'paid' || o.status === 'completed';
+      if (o.status === 'cancelled') return false;
+      return o.paymentStatus === 'paid';
     }
     if (event.type === 'service_order') {
       const s = event.data as ServiceOrder;
-      return s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
+      if (s.status === 'cancelled') return false;
+      return s.paymentStatus === 'paid';
     }
     if (event.type === 'transaction') {
       const t = event.data as Transaction;
@@ -678,20 +686,35 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     return true;
   };
 
+  const isEventPending = (event: { type: string; data: any }) => {
+    if (event.type === 'order') {
+      const o = event.data as Order;
+      return o.status !== 'cancelled' && o.paymentStatus === 'pending';
+    }
+    if (event.type === 'service_order') {
+      const s = event.data as ServiceOrder;
+      return s.status !== 'cancelled' && s.paymentStatus === 'pending';
+    }
+    if (event.type === 'transaction') {
+      const t = event.data as Transaction;
+      return t.status === 'pending';
+    }
+    return false;
+  };
+
   const paidCount = useMemo(() => {
     return unifiedTimeline.filter((e) => e.type !== 'appointment' && isEventPaid(e)).length;
   }, [unifiedTimeline]);
 
   const pendingCount = useMemo(() => {
-    return unifiedTimeline.filter((e) => e.type !== 'appointment' && !isEventPaid(e)).length;
+    return unifiedTimeline.filter((e) => e.type !== 'appointment' && isEventPending(e)).length;
   }, [unifiedTimeline]);
 
   const filteredTimeline = useMemo(() => {
     if (historyFilter === 'all') return unifiedTimeline;
     return unifiedTimeline.filter((event) => {
-      if (event.type === 'appointment') return historyFilter === 'all';
-      const isPaid = isEventPaid(event);
-      return historyFilter === 'paid' ? isPaid : !isPaid;
+      if (event.type === 'appointment') return false;
+      return historyFilter === 'paid' ? isEventPaid(event) : isEventPending(event);
     });
   }, [unifiedTimeline, historyFilter]);
 
@@ -703,6 +726,99 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       toast({
         title: 'Erro ao gerar PDF',
         description: e.message || 'Não foi possível renderizar o PDF.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (!confirm(`Deseja realmente cancelar o Pedido #${order.orderNumber}? Os itens retornarão ao estoque automaticamente.`)) return;
+    try {
+      // 1. Estorna estoque caso estivesse concluído
+      if (order.status === 'completed' && order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          if (item.productId) {
+            await supabase.from('stock_movements').insert({
+              client_id: order.clientId || currentClient?.id,
+              product_id: item.productId,
+              type: 'in',
+              quantity: item.quantity,
+              cost_price: item.costPrice || 0,
+              notes: `Estorno por Cancelamento do Pedido #${order.orderNumber} via Histórico 360`,
+            });
+
+            const { data: prod } = await supabase
+              .from('products')
+              .select('current_stock')
+              .eq('id', item.productId)
+              .single();
+
+            if (prod) {
+              const newStock = Number(prod.current_stock || 0) + item.quantity;
+              await supabase.from('products').update({ current_stock: newStock }).eq('id', item.productId);
+            }
+          }
+        }
+      }
+
+      // 2. Se houver transação financeira vinculada, exclui
+      if (order.transactionId) {
+        await supabase.from('transactions').delete().eq('id', order.transactionId);
+      }
+
+      // 3. Atualiza pedido para 'cancelled'
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled', transaction_id: null })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pedido cancelado com sucesso!',
+        description: `O Pedido #${order.orderNumber} foi cancelado e os produtos estornados ao estoque.`,
+      });
+
+      if (customer) {
+        loadCustomerData(customer.id, customer.name);
+      }
+    } catch (err: any) {
+      console.error('Erro ao cancelar pedido:', err);
+      toast({
+        title: 'Erro ao cancelar pedido',
+        description: err.message || 'Não foi possível cancelar o pedido.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteOrder = async (order: Order) => {
+    if (!confirm(`Deseja realmente remover o registro do Pedido #${order.orderNumber}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      if (order.transactionId) {
+        await supabase.from('transactions').delete().eq('id', order.transactionId);
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pedido excluído',
+        description: `O registro do Pedido #${order.orderNumber} foi removido com sucesso.`,
+      });
+
+      if (customer) {
+        loadCustomerData(customer.id, customer.name);
+      }
+    } catch (err: any) {
+      console.error('Erro ao excluir pedido:', err);
+      toast({
+        title: 'Erro ao excluir pedido',
+        description: err.message || 'Não foi possível excluir o pedido.',
         variant: 'destructive',
       });
     }
@@ -1088,7 +1204,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                       filteredTimeline.map((event) => {
                         if (event.type === 'order') {
                           const o = event.data as Order;
-                          const isPaid = o.paymentStatus === 'paid' || o.status === 'completed';
+                          const isPaid = isEventPaid(event);
                           return (
                             <div
                               key={o.id}
@@ -1104,20 +1220,26 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                       <span className="text-xs font-bold text-foreground">
                                         Pedido #{o.orderNumber}
                                       </span>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          'text-[9px] px-1.5 py-0 font-bold',
-                                          isPaid
-                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
-                                        )}
-                                      >
-                                        {isPaid ? '✓ PAGO' : '⚠️ PENDENTE'}
-                                      </Badge>
-                                      {o.status === 'cancelled' && (
-                                        <Badge variant="destructive" className="text-[9px] px-1 py-0">
-                                          Cancelado
+                                      {o.status === 'cancelled' ? (
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-destructive/15 text-destructive border-destructive/30"
+                                        >
+                                          ✕ CANCELADO
+                                        </Badge>
+                                      ) : isPaid ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                        >
+                                          ✓ PAGO
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
+                                        >
+                                          ⚠️ PENDENTE
                                         </Badge>
                                       )}
                                     </div>
@@ -1161,7 +1283,28 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                               )}
 
                               {/* Ações Rápidas do Pedido */}
-                              <div className="flex items-center justify-end gap-1.5 pt-1">
+                              <div className="flex items-center justify-end gap-1.5 pt-1 flex-wrap">
+                                {o.status !== 'cancelled' ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleCancelOrder(o)}
+                                    className="h-7 text-[11px] px-2 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Cancelar Pedido e Estornar Estoque"
+                                  >
+                                    <XCircle className="h-3 w-3" /> Cancelar Pedido
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteOrder(o)}
+                                    className="h-7 text-[11px] px-2 gap-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    title="Excluir Permanentemente"
+                                  >
+                                    <Trash2 className="h-3 w-3" /> Excluir Registro
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1188,7 +1331,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
                         if (event.type === 'service_order') {
                           const s = event.data as ServiceOrder;
-                          const isPaid = s.paymentStatus === 'paid' || s.status === 'completed' || s.status === 'invoiced';
+                          const isPaid = isEventPaid(event);
                           return (
                             <div
                               key={s.id}
@@ -1204,17 +1347,28 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                       <span className="text-xs font-bold text-foreground">
                                         OS #{s.osNumber} — {s.title}
                                       </span>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          'text-[9px] px-1.5 py-0 font-bold',
-                                          isPaid
-                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
-                                        )}
-                                      >
-                                        {isPaid ? '✓ PAGO' : '⚠️ PENDENTE'}
-                                      </Badge>
+                                      {s.status === 'cancelled' ? (
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-destructive/15 text-destructive border-destructive/30"
+                                        >
+                                          ✕ CANCELADO
+                                        </Badge>
+                                      ) : isPaid ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                        >
+                                          ✓ PAGO
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] px-1.5 py-0 font-bold bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
+                                        >
+                                          ⚠️ PENDENTE
+                                        </Badge>
+                                      )}
                                     </div>
                                     <p className="text-[10.5px] text-muted-foreground mt-0.5">
                                       {formatDate(s.createdAt)} {s.equipmentInfo && `• ${s.equipmentInfo}`}

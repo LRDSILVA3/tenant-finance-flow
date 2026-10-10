@@ -843,6 +843,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
       // 2. Cria Lançamento Financeiro se faturado
       let transactionId: string | undefined = undefined;
+      const createdTxIds: string[] = [];
       if (grandTotal > 0) {
         const incomeCats = (financeCategories || []).filter((c) => c.type === 'income');
         const vendaCat = incomeCats.find((c) => c.name.toLowerCase().includes('venda')) || incomeCats[0];
@@ -893,6 +894,9 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
                 collaboratorId: selectedCollaboratorId !== 'none' ? selectedCollaboratorId : undefined,
               });
 
+              if (createdTx && (createdTx as any).id) {
+                createdTxIds.push((createdTx as any).id);
+              }
               if (i === 1 && createdTx && (createdTx as any).id) {
                 transactionId = (createdTx as any).id;
               }
@@ -921,6 +925,7 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
 
             if (createdTx && (createdTx as any).id) {
               transactionId = (createdTx as any).id;
+              createdTxIds.push((createdTx as any).id);
             }
           }
         }
@@ -947,6 +952,18 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
         .single();
 
       if (orderError) throw orderError;
+
+      // Vincula o ID do pedido aos lançamentos financeiros gerados
+      if (createdTxIds.length > 0 && orderData?.id) {
+        try {
+          await supabase
+            .from('transactions')
+            .update({ order_id: orderData.id })
+            .in('id', createdTxIds);
+        } catch (txLinkErr) {
+          console.warn('Aviso ao vincular order_id nas transações:', txLinkErr);
+        }
+      }
 
       // 4. Insere os itens em order_items e dá baixa no estoque
       const orderItemsPayload = cart

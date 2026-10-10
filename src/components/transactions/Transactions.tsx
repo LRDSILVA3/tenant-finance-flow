@@ -23,6 +23,7 @@ import { useTransactionReferences } from '@/hooks/useTransactionReferences';
 import { useTransactionPdfExport } from '@/hooks/useTransactionPdfExport';
 import { useTransactionCsvExport } from '@/hooks/useTransactionCsvExport';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
+import { PaymentSettlementDialog } from '@/components/transactions/PaymentSettlementDialog';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { UpgradeBadge } from '@/components/ui/upgrade-badge';
 import { Badge } from '@/components/ui/badge';
@@ -95,7 +96,8 @@ import {
   SlidersHorizontal,
   ShoppingBag,
   Eye,
-  Paperclip
+  Paperclip,
+  AlertTriangle
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ptBR, enUS, es } from 'date-fns/locale';
@@ -244,6 +246,7 @@ export const Transactions: React.FC = () => {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [settlingTransaction, setSettlingTransaction] = useState<Transaction | null>(null);
   const [recurringDeleteOption, setRecurringDeleteOption] = useState<'single' | 'future' | 'all'>('single');
   const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null);
@@ -1037,9 +1040,20 @@ export const Transactions: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{transaction.description}</span>
                                 {transaction.status === 'pending' ? (
-                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-amber-500/5 text-amber-700 border-amber-500/30 font-medium h-4 shrink-0">
-                                    Pendente
-                                  </Badge>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSettlingTransaction(transaction)}
+                                    className="inline-flex items-center"
+                                    title="Clique para dar baixa (integral ou parcial)"
+                                  >
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] py-0 px-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium h-4 shrink-0 cursor-pointer transition-colors flex items-center gap-1"
+                                    >
+                                      <Clock className="h-2.5 w-2.5" />
+                                      Pendente
+                                    </Badge>
+                                  </button>
                                 ) : (
                                   <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-500/5 text-emerald-700 border-emerald-500/30 font-medium h-4 shrink-0">
                                     {transaction.type === 'income' ? 'Recebido' : 'Pago'}
@@ -1149,11 +1163,24 @@ export const Transactions: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 justify-end">
+                            {transaction.status === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSettlingTransaction(transaction)}
+                                className="h-8 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 text-xs font-semibold"
+                                title={transaction.type === 'income' ? 'Dar baixa / Receber' : 'Dar baixa / Pagar'}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span className="hidden xl:inline">Baixar</span>
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleOpenEdit(transaction)}
                               className="h-8 w-8 p-0"
+                              title="Editar"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -1165,6 +1192,7 @@ export const Transactions: React.FC = () => {
                                 setIsDeleteDialogOpenState(true);
                               }}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              title="Excluir"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1210,6 +1238,29 @@ export const Transactions: React.FC = () => {
                           <span className="font-semibold text-sm block truncate">{transaction.description}</span>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5">
                             <span className="text-xs text-muted-foreground font-mono">{formatDate(transaction.date)}</span>
+                            {transaction.status === 'pending' ? (
+                              <button
+                                type="button"
+                                onClick={() => setSettlingTransaction(transaction)}
+                                className="inline-flex items-center"
+                                title="Clique para dar baixa"
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] py-0 px-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium h-4 shrink-0 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Clock className="h-2 w-2" />
+                                  Pendente
+                                </Badge>
+                              </button>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] py-0 px-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-medium h-4 shrink-0"
+                              >
+                                {transaction.type === 'income' ? 'Recebido' : 'Pago'}
+                              </Badge>
+                            )}
                             {transaction.customerId && (
                               <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium">
                                 Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
@@ -1322,6 +1373,17 @@ export const Transactions: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                      {transaction.status === 'pending' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSettlingTransaction(transaction)}
+                          className="h-8 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-semibold text-xs"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Dar Baixa
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1450,7 +1512,7 @@ export const Transactions: React.FC = () => {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <p
                             className={cn(
                               'text-sm font-semibold money-font',
@@ -1460,6 +1522,17 @@ export const Transactions: React.FC = () => {
                             {transaction.type === 'income' ? '+' : '-'}
                             {formatCurrency(transaction.amount)}
                           </p>
+                          {transaction.status === 'pending' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSettlingTransaction(transaction)}
+                              className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                              title={transaction.type === 'income' ? 'Dar baixa / Receber' : 'Dar baixa / Pagar'}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1495,31 +1568,53 @@ export const Transactions: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>{t.deleteTransaction}</AlertDialogTitle>
             <AlertDialogDescription>
-              {deletingTransaction?.recurringId ? (
-                <div className="space-y-4">
-                  <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
-                  <RadioGroup
-                    value={recurringDeleteOption}
-                    onValueChange={(val) => setRecurringDeleteOption(val as 'single' | 'future' | 'all')}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="single" id="del-single" />
-                      <Label htmlFor="del-single" className="cursor-pointer">Excluir somente este lançamento</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="future" id="del-future" />
-                      <Label htmlFor="del-future" className="cursor-pointer">Excluir este e todos os próximos</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="all" id="del-all" />
-                      <Label htmlFor="del-all" className="cursor-pointer">Excluir todos os lançamentos desta série</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              ) : (
-                t.confirmDelete
-              )}
+              {(() => {
+                const linkedOrder = orders.find(
+                  (o) => o.transactionId === deletingTransaction?.id || o.id === deletingTransaction?.orderId
+                );
+
+                return (
+                  <div className="space-y-3">
+                    {linkedOrder && linkedOrder.status !== 'cancelled' && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs space-y-1 text-amber-800 dark:text-amber-300">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                          Lançamento vinculado ao Pedido #{linkedOrder.orderNumber}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Ao excluir este lançamento, o <strong>Pedido #{linkedOrder.orderNumber}</strong> será marcado como <strong>Cancelado</strong> e os produtos retornarão ao estoque automaticamente.
+                        </p>
+                      </div>
+                    )}
+
+                    {deletingTransaction?.recurringId ? (
+                      <div className="space-y-4">
+                        <p>Este lançamento faz parte de uma recorrência. Como deseja prosseguir com a exclusão?</p>
+                        <RadioGroup
+                          value={recurringDeleteOption}
+                          onValueChange={(val) => setRecurringDeleteOption(val as 'single' | 'future' | 'all')}
+                          className="space-y-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="single" id="del-single" />
+                            <Label htmlFor="del-single" className="cursor-pointer">Excluir somente este lançamento</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="future" id="del-future" />
+                            <Label htmlFor="del-future" className="cursor-pointer">Excluir este e todos os próximos</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="all" id="del-all" />
+                            <Label htmlFor="del-all" className="cursor-pointer">Excluir todos os lançamentos desta série</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    ) : (
+                      <span>{t.confirmDelete}</span>
+                    )}
+                  </div>
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1587,6 +1682,12 @@ export const Transactions: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PaymentSettlementDialog
+        transaction={settlingTransaction}
+        open={settlingTransaction !== null}
+        onOpenChange={(open) => !open && setSettlingTransaction(null)}
+      />
     </div>
   );
 };

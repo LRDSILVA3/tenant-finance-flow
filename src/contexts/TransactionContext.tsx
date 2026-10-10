@@ -386,6 +386,43 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     const transactionToDelete = transactions.find(t => t.id === id);
     if (!transactionToDelete) return;
 
+    // Verificar se há pedido vinculado a este lançamento
+    const linkedOrder = orders.find(o => o.transactionId === id || o.id === transactionToDelete.orderId);
+    if (linkedOrder && linkedOrder.status !== 'cancelled') {
+      // 1. Estorna estoque caso o pedido estivesse concluído
+      if (linkedOrder.status === 'completed' && linkedOrder.items && linkedOrder.items.length > 0) {
+        for (const item of linkedOrder.items) {
+          if (item.productId) {
+            await supabase.from('stock_movements').insert({
+              client_id: transactionToDelete.clientId,
+              product_id: item.productId,
+              type: 'in',
+              quantity: item.quantity,
+              cost_price: item.costPrice || 0,
+              notes: `Estorno por Exclusão de Lançamento Financeiro do Pedido #${linkedOrder.orderNumber}`,
+            });
+
+            const { data: prod } = await supabase
+              .from('products')
+              .select('current_stock')
+              .eq('id', item.productId)
+              .single();
+
+            if (prod) {
+              const newStock = Number(prod.current_stock || 0) + item.quantity;
+              await supabase.from('products').update({ current_stock: newStock }).eq('id', item.productId);
+            }
+          }
+        }
+      }
+
+      // 2. Atualiza o status do pedido para 'cancelled' e desvincula a transação
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled', transaction_id: null })
+        .eq('id', linkedOrder.id);
+    }
+
     let query = supabase.from('transactions').delete();
     if (recurringOption === 'single' || !transactionToDelete.recurringId) {
       query = query.eq('id', id);
@@ -399,9 +436,9 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (!error) {
       await loadTransactions(transactionToDelete.clientId);
       await loadOrders(transactionToDelete.clientId);
-      toast({ title: "Lançamento excluído" });
+      toast({ title: "Lançamento excluído" + (linkedOrder ? " e pedido cancelado" : "") });
     }
-  }, [transactions, loadTransactions, loadOrders]);
+  }, [transactions, orders, loadTransactions, loadOrders]);
 
   const addCategory = useCallback(async (category: Omit<Category, 'id' | 'createdAt'>) => {
     if (!user) return null;

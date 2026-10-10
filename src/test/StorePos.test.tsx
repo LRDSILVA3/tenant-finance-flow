@@ -143,6 +143,9 @@ describe('StorePos Component (Modo Loja / Frente de Caixa Touch)', () => {
       if (table === 'stock_movements') {
         return { insert: mockStockMovementInsert };
       }
+      if (table === 'transactions') {
+        return { update: vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) }) };
+      }
       if (table === 'service_types') {
         return {
           select: vi.fn().mockReturnValue({

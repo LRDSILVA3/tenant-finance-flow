@@ -239,23 +239,77 @@ export const ProductImportDialog: React.FC<ProductImportDialogProps> = ({
 
       if (!rawName && !rawSku) continue;
 
-      // Smart Matching with Existing Products
       let matched: ProductImportDialogProduct | undefined;
 
-      // 1. Check match by SKU if available
+      // Helper to check if an existing product candidate is a plausible match
+      const isPlausibleMatch = (candidate: ProductImportDialogProduct): boolean => {
+        const candidateSupplier = candidate.supplier_id
+          ? suppliers.find((s) => s.id === candidate.supplier_id)?.name
+          : undefined;
+
+        // 1. Conflict of Brand: if both have brands and they are distinct
+        if (rawBrand && candidateSupplier) {
+          const b1 = rawBrand.toLowerCase().trim();
+          const b2 = candidateSupplier.toLowerCase().trim();
+          if (b1 !== b2 && !b1.includes(b2) && !b2.includes(b1)) {
+            return false;
+          }
+        }
+
+        // 2. Conflict of Category: e.g. cosmetico vs Moda Íntima
+        if (rawCategory && candidate.category) {
+          const c1 = rawCategory.toLowerCase().trim();
+          const c2 = candidate.category.toLowerCase().trim();
+          if (c1 !== c2) {
+            const isFashion1 = /moda|intima|roupa|calcado|vestuario|lingerie/i.test(c1);
+            const isFashion2 = /moda|intima|roupa|calcado|vestuario|lingerie/i.test(c2);
+            const isCosmetic1 = /cosmet|beleza|perfum|cabelo|shampoo/i.test(c1);
+            const isCosmetic2 = /cosmet|beleza|perfum|cabelo|shampoo/i.test(c2);
+            if ((isFashion1 && isCosmetic2) || (isCosmetic1 && isFashion2)) {
+              return false;
+            }
+          }
+        }
+
+        // 3. Name Discrepancy: if code is a short catalog ref (< 8 digits, not EAN) and names have 0 similarity
+        const isEanGlobal = rawSku && /^\d{8,14}$/.test(rawSku.trim());
+        if (!isEanGlobal && rawName && candidate.name) {
+          const cleanWords = (str: string) =>
+            str
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9\s]/g, ' ')
+              .split(/\s+/)
+              .filter((w) => w.length > 2);
+
+          const w1 = cleanWords(rawName);
+          const w2 = cleanWords(candidate.name);
+          const common = w1.filter((w) => w2.includes(w));
+          if (common.length === 0 && w1.length >= 2 && w2.length >= 2) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      // 1. Check match by SKU if available, filtering out cross-brand / cross-category collisions
       if (rawSku) {
         const bySkuMatches = existingProducts.filter(
           (p) => p.sku && p.sku.trim().toLowerCase() === rawSku.trim().toLowerCase()
         );
-        if (bySkuMatches.length === 1) {
-          matched = bySkuMatches[0];
-        } else if (bySkuMatches.length > 1) {
+        const plausibleMatches = bySkuMatches.filter(isPlausibleMatch);
+
+        if (plausibleMatches.length === 1) {
+          matched = plausibleMatches[0];
+        } else if (plausibleMatches.length > 1) {
           // If multiple variants have same SKU, differentiate by size and color
-          matched = bySkuMatches.find(
+          matched = plausibleMatches.find(
             (p) =>
               (!rawSize || (p.size_or_variant || '').trim().toLowerCase() === rawSize.trim().toLowerCase()) &&
               (!rawColor || (p.color || '').trim().toLowerCase() === rawColor.trim().toLowerCase())
-          ) || bySkuMatches[0];
+          ) || plausibleMatches[0];
         }
       }
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -82,5 +83,63 @@ describe('ProductImportDialog', () => {
 
     expect(createObjectURLSpy).toHaveBeenCalled();
     expect(revokeObjectURLSpy).toHaveBeenCalled();
+  });
+
+  it('diferencia produtos com mesmo SKU de marcas/categorias distintas sem sobrescrever', async () => {
+    const existingWithLingerie: ProductImportDialogProduct[] = [
+      {
+        id: 'prod-lingerie-2617',
+        name: 'CONJUNTO RENDADO CROPPED COM DETALHES NAS ALÇAS',
+        sku: '2617',
+        size_or_variant: 'M',
+        color: 'Preto',
+        current_stock: 1,
+        sale_price: 114,
+        cost_price: 50,
+        supplier_id: 'supp-1', // DMELLOS
+        category: 'Moda Íntima',
+        unit: 'UN',
+      },
+    ];
+
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={existingWithLingerie}
+      />
+    );
+
+    const csvContent =
+      'Codigo;Nome;Marca;Tamanho_Medida;Cor;Unidade;Categoria;Quantidade;Preco_Venda;Preco_Custo\r\n' +
+      '2617;CAPI HAIR SHAMPOO OLEO DE GIRASSOL 300ML;Abelha Rainha;;;;cosmetico;1;19,99;13,99\r\n';
+
+    const originalFileReader = window.FileReader;
+    class MockFileReader {
+      onload: any;
+      readAsText() {
+        setTimeout(() => {
+          if (this.onload) {
+            this.onload({ target: { result: csvContent } });
+          }
+        }, 10);
+      }
+    }
+    window.FileReader = MockFileReader as any;
+
+    try {
+      const file = new File([csvContent], 'produtos.csv', { type: 'text/csv' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(fileInput, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/1 Novos/i)).toBeInTheDocument();
+        expect(screen.getByText(/0 Atualizações/i)).toBeInTheDocument();
+        expect(screen.getByText('CAPI HAIR SHAMPOO OLEO DE GIRASSOL 300ML')).toBeInTheDocument();
+      });
+    } finally {
+      window.FileReader = originalFileReader;
+    }
   });
 });

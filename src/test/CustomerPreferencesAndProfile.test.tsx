@@ -57,6 +57,48 @@ vi.mock('@/integrations/supabase/client', () => ({
                   },
                 ],
               },
+              {
+                id: 'ord-2',
+                client_id: 'client-123',
+                order_number: '1002',
+                customer_id: 'cust-1',
+                status: 'completed',
+                subtotal_amount: 200,
+                discount_amount: 0,
+                total_amount: 200,
+                payment_method: 'crediario',
+                payment_status: 'pending',
+                created_at: new Date('2026-09-11T12:00:00Z').toISOString(),
+                updated_at: new Date('2026-09-11T12:00:00Z').toISOString(),
+                order_items: [
+                  {
+                    id: 'item-2',
+                    order_id: 'ord-2',
+                    product_id: 'prod-2',
+                    quantity: 1,
+                    unit_price: 200,
+                    discount_amount: 0,
+                    total_price: 200,
+                    created_at: new Date().toISOString(),
+                    product: { name: 'Vestido Floral', sku: 'VEST-1' },
+                  },
+                ],
+              },
+              {
+                id: 'ord-3',
+                client_id: 'client-123',
+                order_number: '1003',
+                customer_id: 'cust-1',
+                status: 'cancelled',
+                subtotal_amount: 80,
+                discount_amount: 0,
+                total_amount: 80,
+                payment_method: 'cash',
+                payment_status: 'pending',
+                created_at: new Date('2026-09-12T12:00:00Z').toISOString(),
+                updated_at: new Date('2026-09-12T12:00:00Z').toISOString(),
+                order_items: [],
+              },
             ],
             error: null,
           }),
@@ -250,5 +292,31 @@ describe('Customer 360 Profile and Preferences', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Exportar Ficha/i })).toBeInTheDocument();
     });
+  });
+
+  it('deve exibir status PENDENTE para pedido concluído operacionalmente mas com pagamento pendente, e CANCELADO para pedido cancelado', async () => {
+    render(
+      <CustomerProfileDrawer
+        open={true}
+        onOpenChange={vi.fn()}
+        customer={mockCustomer}
+      />
+    );
+
+    // Deve exibir Pedido #1001 como PAGO
+    await waitFor(() => {
+      expect(screen.getByText(/Pedido #1001/i)).toBeInTheDocument();
+      expect(screen.getByText(/Pedido #1002/i)).toBeInTheDocument();
+      expect(screen.getByText(/Pedido #1003/i)).toBeInTheDocument();
+    });
+
+    // Deve haver badges de ✓ PAGO para os itens pagos (Pedido 1001 e Transação avulsa)
+    expect(screen.getAllByText('✓ PAGO').length).toBeGreaterThanOrEqual(1);
+
+    // Pedido 1002 tem payment_status: 'pending' -> deve ter badge "⚠️ PENDENTE"
+    expect(screen.getByText('⚠️ PENDENTE')).toBeInTheDocument();
+
+    // Pedido 1003 tem status: 'cancelled' -> deve ter badge "✕ CANCELADO"
+    expect(screen.getByText('✕ CANCELADO')).toBeInTheDocument();
   });
 });
