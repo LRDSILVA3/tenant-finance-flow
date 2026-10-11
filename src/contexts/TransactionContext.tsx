@@ -387,7 +387,47 @@ export const TransactionProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (!transactionToDelete) return;
 
     // Verificar se há pedido vinculado a este lançamento
-    const linkedOrder = orders.find(o => o.transactionId === id || o.id === transactionToDelete.orderId);
+    let linkedOrder = orders.find(o => o.transactionId === id || (transactionToDelete.orderId && o.id === transactionToDelete.orderId) || (transactionToDelete.reference && o.orderNumber === transactionToDelete.reference));
+
+    // Fallback: busca diretamente no Supabase caso o pedido não esteja no cache de memória
+    if (!linkedOrder) {
+      try {
+        const orConditions = [`transaction_id.eq.${id}`];
+        if (transactionToDelete.orderId) {
+          orConditions.push(`id.eq.${transactionToDelete.orderId}`);
+        }
+        if (transactionToDelete.reference && transactionToDelete.reference.startsWith('PED-')) {
+          orConditions.push(`order_number.eq.${transactionToDelete.reference}`);
+        }
+        const descMatch = transactionToDelete.description?.match(/#(PED-\d+)/i);
+        if (descMatch && descMatch[1]) {
+          orConditions.push(`order_number.eq.${descMatch[1]}`);
+        }
+
+        const { data: dbOrders } = await supabase
+          .from('orders')
+          .select('id, client_id, order_number, status, transaction_id, items:order_items(id, product_id, quantity, cost_price)')
+          .or(orConditions.join(','));
+
+        if (dbOrders && dbOrders.length > 0) {
+          const found = dbOrders[0];
+          linkedOrder = {
+            id: found.id,
+            clientId: found.client_id,
+            orderNumber: found.order_number,
+            status: found.status,
+            items: ((found as any).items || []).map((it: any) => ({
+              id: it.id,
+              productId: it.product_id,
+              quantity: Number(it.quantity) || 1,
+              costPrice: Number(it.cost_price) || 0,
+            })),
+          } as any;
+        }
+      } catch (err) {
+        console.warn('Erro ao verificar pedido vinculado no banco:', err);
+      }
+    }
     if (linkedOrder && linkedOrder.status !== 'cancelled') {
       // 1. Estorna estoque caso o pedido estivesse concluído
       if (linkedOrder.status === 'completed' && linkedOrder.items && linkedOrder.items.length > 0) {

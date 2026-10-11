@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Financial Management System - Main Page
 
 import React, { useState, useEffect } from 'react';
@@ -165,7 +166,7 @@ const Index: React.FC = () => {
         "flex-1 container px-3 sm:px-6",
         currentView === 'store_pos'
           ? "py-1.5 px-2 sm:px-6 pb-16 md:pb-2 overflow-hidden flex flex-col min-h-0 h-full max-w-full"
-          : "py-4 sm:py-6 pb-20 md:pb-6 overflow-y-auto"
+          : "py-4 sm:py-6 pb-24 md:pb-20 overflow-y-auto"
       )}>
         {renderView()}
       </main>

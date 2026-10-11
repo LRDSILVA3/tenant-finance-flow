@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Customer, Order, ServiceOrder, Appointment, Transaction } from '@/types/finance';
@@ -20,8 +21,9 @@ import {
   CreditCard, Tag, Sparkles, Receipt, Download, TrendingUp, Clock,
   MapPin, ShieldAlert, ArrowUpRight, CheckCircle2, AlertCircle, Loader2,
   ExternalLink, MessageSquare, ChevronRight, Package, Percent, FileDown,
-  Printer, XCircle, Trash2, AlertTriangle
+  Printer, XCircle, Trash2, AlertTriangle, Banknote
 } from 'lucide-react';
+import { PaymentSettlementDialog } from '@/components/transactions/PaymentSettlementDialog';
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
 import { generateCustomerStatementPdf } from '@/components/customers/CustomerStatementPdf';
@@ -52,7 +54,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   onEditCustomer,
   onNavigateToSchedule,
 }) => {
-  const { currentClient } = useFinance();
+  const { currentClient, addTransaction, loadTransactions, loadOrders } = useFinance();
   const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences'>('history');
   const [loading, setLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -69,6 +71,10 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   // Modal de Comprovante de Pedido (Reuso do Componente Oficial)
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<Order | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+
+  // Modal de Baixa e Quitação Financeira (Reuso do Componente Oficial)
+  const [settlementTransaction, setSettlementTransaction] = useState<Transaction | null>(null);
+  const [isSettlementOpen, setIsSettlementOpen] = useState(false);
 
   const loadCustomerData = useCallback(async (targetCustomerId: string, targetCustomerName?: string) => {
     setLoading(true);
@@ -852,6 +858,121 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     }
   };
 
+  const handleOpenSettlementForTransaction = (t: Transaction) => {
+    setSettlementTransaction(t);
+    setIsSettlementOpen(true);
+  };
+
+  const handleOpenSettlementForOrder = async (order: Order) => {
+    // 1. Procura transação vinculada já carregada
+    let tx = transactions.find(t => 
+      (order.transactionId && t.id === order.transactionId) || 
+      (t.orderId && t.orderId === order.id) ||
+      (t.reference && t.reference === order.orderNumber)
+    );
+
+    // 2. Se não encontrou em memória, busca no Supabase por transaction_id ou order_id
+    if (!tx) {
+      const orConds = [`order_id.eq.${order.id}`];
+      if (order.transactionId) orConds.push(`id.eq.${order.transactionId}`);
+      if (order.orderNumber) orConds.push(`reference.eq.${order.orderNumber}`);
+
+      const { data: dbTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(orConds.join(','));
+
+      if (dbTxs && dbTxs.length > 0) {
+        const found = dbTxs[0];
+        tx = {
+          id: found.id,
+          clientId: found.client_id,
+          categoryId: found.category_id,
+          type: found.type,
+          amount: Number(found.amount),
+          description: found.description,
+          date: new Date(found.date),
+          dueDate: found.due_date ? new Date(found.due_date) : undefined,
+          status: found.status,
+          paymentMethod: found.payment_method,
+          customerId: found.customer_id,
+          orderId: found.order_id,
+          notes: found.notes,
+          createdAt: new Date(found.created_at),
+        } as any;
+      }
+    }
+
+    // 3. Se ainda assim não existir transação (ex: pedido que perdeu lançamento), cria pendente para baixar
+    if (!tx && addTransaction) {
+      try {
+        const newTx = await addTransaction({
+          clientId: currentClient?.id || order.clientId,
+          type: 'income',
+          amount: order.totalAmount,
+          description: `Venda Pedido #${order.orderNumber} - ${customer?.name || 'Cliente'}`,
+          date: new Date(),
+          dueDate: order.dueDate || new Date(),
+          paymentMethod: (order.paymentMethod as any) || 'dinheiro',
+          status: 'pending',
+          customerId: order.customerId,
+          orderId: order.id,
+          reference: order.orderNumber,
+          notes: order.notes,
+        });
+        if (newTx) {
+          tx = newTx as any;
+          await supabase.from('orders').update({ transaction_id: (newTx as any).id }).eq('id', order.id);
+        }
+      } catch (err) {
+        console.error('Erro ao preparar lançamento para o pedido:', err);
+      }
+    }
+
+    if (!tx) {
+      tx = {
+        id: order.transactionId || order.id,
+        clientId: order.clientId,
+        amount: order.totalAmount,
+        description: `Venda Pedido #${order.orderNumber} - ${customer?.name || 'Cliente'}`,
+        date: new Date(),
+        dueDate: order.dueDate || new Date(),
+        paymentMethod: (order.paymentMethod as any) || 'dinheiro',
+        status: 'pending',
+        type: 'income',
+        customerId: order.customerId,
+        orderId: order.id,
+        reference: order.orderNumber,
+        notes: order.notes,
+        createdAt: new Date(),
+      } as any;
+    }
+
+    if (tx) {
+      setSettlementTransaction(tx);
+      setIsSettlementOpen(true);
+    }
+  };
+
+  const handleOpenSettlementForDebt = async () => {
+    const pendingTx = transactions.find(t => t.status === 'pending');
+    if (pendingTx) {
+      handleOpenSettlementForTransaction(pendingTx);
+      return;
+    }
+
+    const pendingOrder = orders.find(o => o.status !== 'cancelled' && o.paymentStatus === 'pending');
+    if (pendingOrder) {
+      await handleOpenSettlementForOrder(pendingOrder);
+      return;
+    }
+
+    toast({
+      title: "Nenhum débito pendente para baixar",
+      description: "Este cliente não possui lançamentos em aberto no momento.",
+    });
+  };
+
   const cleanWhatsappNumber = customer?.phone?.replace(/\D/g, '') || '';
   const whatsappUrl = cleanWhatsappNumber
     ? `https://wa.me/55${cleanWhatsappNumber}`
@@ -1127,16 +1248,28 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                           </div>
                         </div>
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleExportStatementPdf}
-                          disabled={exportingPdf || loading}
-                          className="h-7 text-xs font-semibold border-amber-400 bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 gap-1.5 shrink-0 self-end sm:self-auto shadow-xs"
-                        >
-                          <FileDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
-                          Extrato da Dívida (PDF)
-                        </Button>
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto flex-wrap">
+                          <Button
+                            size="sm"
+                            onClick={handleOpenSettlementForDebt}
+                            className="h-7 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
+                            title="Dar baixa ou quitar débito do cliente"
+                          >
+                            <Banknote className="h-3.5 w-3.5" />
+                            Dar Baixa / Quitar
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleExportStatementPdf}
+                            disabled={exportingPdf || loading}
+                            className="h-7 text-xs font-semibold border-amber-400 bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 gap-1.5 shadow-xs"
+                          >
+                            <FileDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                            Extrato da Dívida (PDF)
+                          </Button>
+                        </div>
                       </div>
                     )}
 
@@ -1284,6 +1417,16 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
 
                               {/* Ações Rápidas do Pedido */}
                               <div className="flex items-center justify-end gap-1.5 pt-1 flex-wrap">
+                                {!isPaid && o.status !== 'cancelled' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenSettlementForOrder(o)}
+                                    className="h-7 text-[11px] px-2.5 gap-1 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                                    title="Dar baixa no pagamento deste pedido"
+                                  >
+                                    <Banknote className="h-3 w-3" /> Dar Baixa
+                                  </Button>
+                                )}
                                 {o.status !== 'cancelled' ? (
                                   <Button
                                     size="sm"
@@ -1459,6 +1602,19 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                   </p>
                                 </div>
                               </div>
+
+                              {!isPaid && (
+                                <div className="flex items-center justify-end pt-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenSettlementForTransaction(t)}
+                                    className="h-7 text-[11px] px-2.5 gap-1 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                                    title="Dar baixa neste lançamento"
+                                  >
+                                    <Banknote className="h-3 w-3" /> Dar Baixa
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           );
                         }
@@ -1637,6 +1793,24 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
           valor_total: pendingDebt,
           chave_pix: currentClient?.pixKey || '(Chave PIX a combinar)',
           link_documento: `https://previna.app/cliente/${customer.id}`
+        }}
+      />
+
+      {/* MODAL OFICIAL DE BAIXA E QUITAÇÃO (Reuso do PaymentSettlementDialog) */}
+      <PaymentSettlementDialog
+        transaction={settlementTransaction}
+        open={isSettlementOpen}
+        onOpenChange={setIsSettlementOpen}
+        onSuccess={() => {
+          if (customer?.id) {
+            loadCustomerData(customer.id, customer.name);
+          }
+          if (currentClient?.id && loadTransactions) {
+            loadTransactions(currentClient.id);
+          }
+          if (currentClient?.id && loadOrders) {
+            loadOrders(currentClient.id);
+          }
         }}
       />
     </>

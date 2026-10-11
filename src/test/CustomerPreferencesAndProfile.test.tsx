@@ -224,6 +224,10 @@ describe('Customer 360 Profile and Preferences', () => {
       currentClient: { id: 'client-123', name: 'Empresa Teste' },
       customPaymentMethods: [],
       loadCustomers: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      getCustomerById: vi.fn(),
+      getSupplierById: vi.fn(),
     } as any);
   });
 
@@ -318,5 +322,30 @@ describe('Customer 360 Profile and Preferences', () => {
 
     // Pedido 1003 tem status: 'cancelled' -> deve ter badge "✕ CANCELADO"
     expect(screen.getByText('✕ CANCELADO')).toBeInTheDocument();
+  });
+
+  it('deve exibir botões de Dar Baixa para pedidos/lançamentos pendentes e abrir o modal de quitação', async () => {
+    render(
+      <CustomerProfileDrawer
+        open={true}
+        onOpenChange={vi.fn()}
+        customer={mockCustomer}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pedido #1002/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Dar Baixa \/ Quitar/i })).toBeInTheDocument();
+    });
+
+    const settleButtons = screen.getAllByRole('button', { name: /Dar Baixa/i });
+    expect(settleButtons.length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(settleButtons[0]);
+
+    // O modal oficial de baixa e quitação deve ser aberto sobre o perfil do cliente
+    await waitFor(() => {
+      expect(screen.getByText(/Confirmar Recebimento/i)).toBeInTheDocument();
+    });
   });
 });

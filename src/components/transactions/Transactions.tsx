@@ -1,4 +1,5 @@
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Transactions Component with Filters and Calendar View
 
 import React, { useState, useMemo } from 'react';
@@ -975,235 +976,251 @@ export const Transactions: React.FC = () => {
         <>
           {/* Desktop Table View */}
           <div className="hidden md:block finance-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">{t.date}</TableHead>
-                  <TableHead>{t.description}</TableHead>
-                  <TableHead>{t.reference}</TableHead>
-                  <TableHead>{t.category}</TableHead>
-                  {userSettings.enablePaymentMethods && (
-                    <TableHead>{t.paymentMethod}</TableHead>
-                  )}
-                  {userSettings.enableCommission && (
-                    <>
-                      <TableHead>Colaborador</TableHead>
-                      <TableHead>Comissão</TableHead>
-                    </>
-                  )}
-                  <TableHead className="text-right">{t.amount}</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedTransactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={userSettings.enablePaymentMethods ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                      {t.noTransactions}
-                    </TableCell>
+            <div className="overflow-x-auto scrollbar-thin">
+              <Table className="w-full min-w-[880px] lg:min-w-full">
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-10 px-3 text-xs w-[95px] whitespace-nowrap">{t.date}</TableHead>
+                    <TableHead className="h-10 px-3 text-xs min-w-[200px]">{t.description}</TableHead>
+                    <TableHead className="h-10 px-3 text-xs w-[110px] whitespace-nowrap">{t.reference}</TableHead>
+                    <TableHead className="h-10 px-3 text-xs w-[130px] whitespace-nowrap">{t.category}</TableHead>
+                    {userSettings.enablePaymentMethods && (
+                      <TableHead className="h-10 px-3 text-xs w-[130px] whitespace-nowrap">{t.paymentMethod}</TableHead>
+                    )}
+                    {userSettings.enableCommission && (
+                      <>
+                        <TableHead className="h-10 px-3 text-xs w-[130px] whitespace-nowrap">Colaborador</TableHead>
+                        <TableHead className="h-10 px-3 text-xs w-[100px] text-right whitespace-nowrap">Comissão</TableHead>
+                      </>
+                    )}
+                    <TableHead className="h-10 px-4 text-xs font-semibold text-right whitespace-nowrap w-[130px]">{t.amount}</TableHead>
+                    <TableHead className="h-10 px-3 text-xs font-semibold text-center whitespace-nowrap w-[120px]">
+                      Ações
+                    </TableHead>
                   </TableRow>
-                ) : (
-                  sortedTransactions.map((transaction) => {
-                    const category = getCategoryById(transaction.categoryId);
-                    const commissionsList = transaction.commissions || [];
-                    const totalCommission = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
-                    const collaboratorsNames = commissionsList
-                      .map(c => getCollaboratorById(c.collaboratorId)?.name)
-                      .filter(Boolean)
-                      .join(', ');
-                    const commissionTooltip = commissionsList
-                      .map(c => `${getCollaboratorById(c.collaboratorId)?.name || '?'}: ${formatCurrency(c.commissionAmount)}`)
-                      .join(' | ');
+                </TableHeader>
+                <TableBody>
+                  {sortedTransactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={
+                          4 +
+                          (userSettings.enablePaymentMethods ? 1 : 0) +
+                          (userSettings.enableCommission ? 2 : 0) +
+                          2
+                        }
+                        className="text-center py-10 text-muted-foreground"
+                      >
+                        {t.noTransactions}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedTransactions.map((transaction) => {
+                      const category = getCategoryById(transaction.categoryId);
+                      const commissionsList = transaction.commissions || [];
+                      const totalCommission = commissionsList.reduce((sum, c) => sum + c.commissionAmount, 0);
+                      const collaboratorsNames = commissionsList
+                        .map(c => getCollaboratorById(c.collaboratorId)?.name)
+                        .filter(Boolean)
+                        .join(', ');
+                      const commissionTooltip = commissionsList
+                        .map(c => `${getCollaboratorById(c.collaboratorId)?.name || '?'}: ${formatCurrency(c.commissionAmount)}`)
+                        .join(' | ');
 
-                    return (
-                      <TableRow key={transaction.id}>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {formatDate(transaction.date)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={cn(
-                                'p-1.5 rounded-full shrink-0',
-                                transaction.type === 'income'
-                                  ? 'bg-income-muted text-income'
-                                  : 'bg-expense-muted text-expense'
-                              )}
-                            >
-                              {transaction.type === 'income' ? (
-                                <ArrowUpRight className="h-3 w-3" />
-                              ) : (
-                                <ArrowDownRight className="h-3 w-3" />
-                              )}
-                            </div>
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{transaction.description}</span>
-                                {transaction.status === 'pending' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSettlingTransaction(transaction)}
-                                    className="inline-flex items-center"
-                                    title="Clique para dar baixa (integral ou parcial)"
-                                  >
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] py-0 px-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium h-4 shrink-0 cursor-pointer transition-colors flex items-center gap-1"
-                                    >
-                                      <Clock className="h-2.5 w-2.5" />
-                                      Pendente
-                                    </Badge>
-                                  </button>
+                      return (
+                        <TableRow key={transaction.id} className="group hover:bg-muted/50 transition-colors">
+                          <TableCell className="py-2.5 px-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(transaction.date)}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 min-w-[200px] max-w-[340px]">
+                            <div className="flex items-start gap-2">
+                              <div
+                                className={cn(
+                                  'p-1.5 rounded-full shrink-0 mt-0.5',
+                                  transaction.type === 'income'
+                                    ? 'bg-income-muted text-income'
+                                    : 'bg-expense-muted text-expense'
+                                )}
+                              >
+                                {transaction.type === 'income' ? (
+                                  <ArrowUpRight className="h-3 w-3" />
                                 ) : (
-                                  <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-500/5 text-emerald-700 border-emerald-500/30 font-medium h-4 shrink-0">
-                                    {transaction.type === 'income' ? 'Recebido' : 'Pago'}
-                                  </Badge>
+                                  <ArrowDownRight className="h-3 w-3" />
                                 )}
                               </div>
-                              {transaction.customerId && (
-                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium mt-1">
-                                  Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
-                                </span>
-                              )}
-                              {transaction.supplierId && (
-                                <span className="text-[10px] text-muted-foreground bg-muted w-fit px-1.5 py-0.5 rounded font-medium">
-                                  Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
-                                </span>
-                              )}
-                              {transaction.orderId && (
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
-                                      if (order) setSelectedOrderForView(order);
-                                    }}
-                                    className="text-[10px] text-muted-foreground bg-muted hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer"
-                                    title="Clique para visualizar o recibo do pedido"
-                                  >
-                                    <ShoppingBag className="h-3 w-3 text-primary" />
-                                    <span>Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}</span>
-                                    <Eye className="h-2.5 w-2.5 ml-0.5 opacity-60" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
-                                      if (order) {
-                                        generateOrderPdf(order, currentClient?.name);
-                                        toast({
-                                          title: "PDF Gerado",
-                                          description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
-                                        });
-                                      }
-                                    }}
-                                    className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
-                                    title="Baixar PDF do Pedido"
-                                  >
-                                    <Download className="h-3 w-3" />
-                                  </button>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-medium text-xs sm:text-sm truncate max-w-[240px]" title={transaction.description}>
+                                    {transaction.description}
+                                  </span>
+                                  {transaction.status === 'pending' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSettlingTransaction(transaction)}
+                                      className="inline-flex items-center"
+                                      title="Clique para dar baixa (integral ou parcial)"
+                                    >
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] py-0 px-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium h-4 shrink-0 cursor-pointer transition-colors flex items-center gap-1"
+                                      >
+                                        <Clock className="h-2.5 w-2.5" />
+                                        Pendente
+                                      </Badge>
+                                    </button>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-medium h-4 shrink-0">
+                                      {transaction.type === 'income' ? 'Recebido' : 'Pago'}
+                                    </Badge>
+                                  )}
                                 </div>
-                              )}
-                              {transaction.attachmentUrl && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedAttachment(transaction.attachmentUrl!);
-                                  }}
-                                  className="text-[9px] text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer w-fit mt-0.5"
-                                  title="Visualizar Comprovante / Anexo"
-                                >
-                                  <Paperclip className="h-2.5 w-2.5" />
-                                  <span>Anexo</span>
-                                  <Eye className="h-2 w-2 ml-0.5 opacity-70" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {transaction.reference || '-'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {category?.name || '-'}
-                        </TableCell>
-                        {userSettings.enablePaymentMethods && (
-                          <TableCell>
-                            {transaction.paymentMethod ? (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                {getPaymentMethodIcon(transaction.paymentMethod)}
-                                <span className="text-sm">{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
+                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                  {transaction.customerId && (
+                                    <span className="text-[10px] text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded font-medium truncate max-w-[150px]" title={getCustomerById(transaction.customerId)?.name || ''}>
+                                      Cliente: {getCustomerById(transaction.customerId)?.name || '—'}
+                                    </span>
+                                  )}
+                                  {transaction.supplierId && (
+                                    <span className="text-[10px] text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded font-medium truncate max-w-[150px]" title={getSupplierById(transaction.supplierId)?.name || ''}>
+                                      Fornecedor: {getSupplierById(transaction.supplierId)?.name || '—'}
+                                    </span>
+                                  )}
+                                  {transaction.orderId && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                          if (order) setSelectedOrderForView(order);
+                                        }}
+                                        className="text-[10px] text-muted-foreground bg-muted/70 hover:bg-primary/10 hover:text-primary transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer"
+                                        title="Clique para visualizar o recibo do pedido"
+                                      >
+                                        <ShoppingBag className="h-2.5 w-2.5 text-primary" />
+                                        <span>Pedido: #{getOrderById ? getOrderById(transaction.orderId)?.orderNumber || transaction.orderId.slice(0, 8) : transaction.orderId.slice(0, 8)}</span>
+                                        <Eye className="h-2 w-2 ml-0.5 opacity-60" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const order = getOrderById ? getOrderById(transaction.orderId!) : orders.find((o: any) => o.id === transaction.orderId);
+                                          if (order) {
+                                            generateOrderPdf(order, currentClient?.name);
+                                            toast({
+                                              title: "PDF Gerado",
+                                              description: `O comprovante do pedido #${order.orderNumber} foi baixado com sucesso.`
+                                            });
+                                          }
+                                        }}
+                                        className="text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 p-0.5 rounded transition-colors"
+                                        title="Baixar PDF do Pedido"
+                                      >
+                                        <Download className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  {transaction.attachmentUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedAttachment(transaction.attachmentUrl!);
+                                      }}
+                                      className="text-[9px] text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-pointer"
+                                      title="Visualizar Comprovante / Anexo"
+                                    >
+                                      <Paperclip className="h-2.5 w-2.5" />
+                                      <span>Anexo</span>
+                                      <Eye className="h-2 w-2 ml-0.5 opacity-70" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
+                            </div>
                           </TableCell>
-                        )}
-                        {userSettings.enableCommission && (
-                          <>
-                            <TableCell className="text-muted-foreground truncate max-w-[150px]" title={collaboratorsNames}>
-                              {collaboratorsNames || '-'}
+                          <TableCell className="py-2.5 px-3 text-muted-foreground text-xs whitespace-nowrap max-w-[110px] truncate" title={transaction.reference || '-'}>
+                            {transaction.reference || '-'}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 text-muted-foreground text-xs whitespace-nowrap max-w-[130px] truncate" title={category?.name || '-'}>
+                            {category?.name || '-'}
+                          </TableCell>
+                          {userSettings.enablePaymentMethods && (
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap">
+                              {transaction.paymentMethod ? (
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  {getPaymentMethodIcon(transaction.paymentMethod)}
+                                  <span className="text-xs">{getPaymentMethodLabel(transaction.paymentMethod, t)}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
                             </TableCell>
-                            <TableCell className="text-muted-foreground" title={commissionTooltip}>
-                              {totalCommission > 0 ? formatCurrency(totalCommission) : '-'}
-                            </TableCell>
-                          </>
-                        )}
-                        <TableCell
-                          className={cn(
-                            'text-right font-semibold money-font',
-                            transaction.type === 'income' ? 'money-positive' : 'money-negative'
                           )}
-                        >
-                          {transaction.type === 'income' ? '+' : '-'}
-                          {formatCurrency(transaction.amount)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 justify-end">
-                            {transaction.status === 'pending' && (
+                          {userSettings.enableCommission && (
+                            <>
+                              <TableCell className="py-2.5 px-3 text-muted-foreground text-xs truncate max-w-[130px] whitespace-nowrap" title={collaboratorsNames}>
+                                {collaboratorsNames || '-'}
+                              </TableCell>
+                              <TableCell className="py-2.5 px-3 text-muted-foreground text-xs text-right whitespace-nowrap" title={commissionTooltip}>
+                                {totalCommission > 0 ? formatCurrency(totalCommission) : '-'}
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell
+                            className={cn(
+                              'py-2.5 px-4 text-right font-semibold money-font text-xs sm:text-sm whitespace-nowrap w-[130px]',
+                              transaction.type === 'income' ? 'money-positive' : 'money-negative'
+                            )}
+                          >
+                            {transaction.type === 'income' ? '+ ' : '- '}
+                            {formatCurrency(transaction.amount)}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 w-[120px] text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {transaction.status === 'pending' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSettlingTransaction(transaction)}
+                                  className="h-7 px-2 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 gap-1 text-[11px] font-semibold transition-colors"
+                                  title={transaction.type === 'income' ? 'Dar baixa / Receber' : 'Dar baixa / Pagar'}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  <span>Baixar</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setSettlingTransaction(transaction)}
-                                className="h-8 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 text-xs font-semibold"
-                                title={transaction.type === 'income' ? 'Dar baixa / Receber' : 'Dar baixa / Pagar'}
+                                onClick={() => handleOpenEdit(transaction)}
+                                className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                title="Editar"
                               >
-                                <CheckCircle2 className="h-4 w-4" />
-                                <span className="hidden xl:inline">Baixar</span>
+                                <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(transaction)}
-                              className="h-8 w-8 p-0"
-                              title="Editar"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setDeletingTransaction(transaction);
-                                setIsDeleteDialogOpenState(true);
-                              }}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setDeletingTransaction(transaction);
+                                  setIsDeleteDialogOpenState(true);
+                                }}
+                                className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {/* Mobile Cards View */}
@@ -1570,7 +1587,7 @@ export const Transactions: React.FC = () => {
             <AlertDialogDescription>
               {(() => {
                 const linkedOrder = orders.find(
-                  (o) => o.transactionId === deletingTransaction?.id || o.id === deletingTransaction?.orderId
+                  (o) => o.transactionId === deletingTransaction?.id || (deletingTransaction?.orderId && o.id === deletingTransaction?.orderId) || (deletingTransaction?.reference && o.orderNumber === deletingTransaction?.reference)
                 );
 
                 return (
