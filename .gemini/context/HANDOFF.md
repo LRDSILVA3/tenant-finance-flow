@@ -71,6 +71,17 @@ As informações de `size_or_variant` e `color` estão sincronizadas em:
 4. **Comprovante de Pedido** (`OrderReceiptDialog.tsx`): Exibição dos itens no modal, espelho fiscal de bobina térmica e texto pré-formatado para cópia no WhatsApp.
 5. **PDF Comercial de Pedidos** (`OrderPdf.ts`): Itens impressos no formato `Nome (Tam: M, Cor: Azul)`.
 
+### E. Importação CSV com Variações de Grade & Busca Tokenizada Multi-Atributos
+- **Importador CSV Seguro para Variações (`ProductImportDialog.tsx`)**:
+  - Extração inteligente de tamanho e cor via colunas dedicadas da planilha ou regex em nomes legados.
+  - Bloqueio de agrupamento espúrio: se o produto candidato tiver tamanho ou cor diferentes da linha importada, é criado como nova variação independente.
+  - Conjunto `claimedProductIds` para impedir que múltiplas linhas da mesma planilha colidam no mesmo ID.
+  - Filtro com busca tokenizada na tabela de pré-visualização.
+- **Busca Tokenizada Multi-Atributos no Estoque e PDV (`Inventory.tsx`, `StorePos.tsx`)**:
+  - Quebra do termo digitado em tokens independentes e normalização sem acentos (`NFD`).
+  - Busca cruzada em Código/SKU, Nome, Categoria, Tamanho, Cor, Localização, Fornecedor e Descrição.
+  - Suporta buscas multi-termo como `"2436 P Barolo"` e `"300 M verde"`.
+
 ---
 
 ## 🗄️ 3. Banco de Dados (Migrations Aplicadas no Supabase)
@@ -83,6 +94,11 @@ As migrations a seguir foram aplicadas com sucesso no banco remoto via `supabase
 2. `supabase/migrations/20261001170000_add_product_color.sql`:
    - `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS color TEXT;`
    - `ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS color TEXT;`
+3. `supabase/migrations/20261109220000_fix_ana_brentano_stock_csv_variants.sql`:
+   - Criação e restauração de 38 variações de produtos ausentes na conta da Ana Brentano.
+   - Normalização dos estoques inflados das variações prévias e inserção de movimentações rastreáveis (`stock_movements`).
+4. `supabase/migrations/20261109223000_audit_ana_brentano_stock.sql`:
+   - Auditoria de estoque em tempo real conferindo integridade de SKUs `138`, `2436` e `300` e totalizando 237 produtos e 189 peças.
 
 ---
 

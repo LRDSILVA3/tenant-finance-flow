@@ -550,6 +550,27 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const updateProfile = useCallback(async (updates: { whatsappNumber?: string }) => {
     if (!user) return;
+
+    if (updates.whatsappNumber) {
+      const clean = updates.whatsappNumber.replace(/\D/g, '');
+      if (clean) {
+        // Verificar se outro usuário já está usando este mesmo número de WhatsApp
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .neq('id', user.id)
+          .or(`whatsapp_number.ilike.%${clean}%,whatsapp_number.eq.${clean}`);
+
+        if (existingProfile && existingProfile.length > 0) {
+          toast({
+            title: "Telefone já em uso",
+            description: `Este número de WhatsApp já está vinculado à conta ${existingProfile[0].email || 'de outro usuário'}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
     
     const dbUpdates: any = {};
     if (updates.whatsappNumber !== undefined) dbUpdates.whatsapp_number = updates.whatsappNumber;

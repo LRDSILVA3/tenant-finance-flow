@@ -152,6 +152,39 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
 
     setSaving(true);
     try {
+      const cleanPhone = form.phone.replace(/\D/g, '');
+      if (cleanPhone) {
+        if (cleanPhone.length < 10) {
+          setErrors((prev) => ({ ...prev, phone: 'Telefone incompleto (mínimo 10 dígitos com DDD).' }));
+          setSaving(false);
+          setActiveTab('basic');
+          return;
+        }
+
+        // Validar duplicidade de telefone: não permitir que dois clientes tenham o mesmo telefone
+        let checkQuery = supabase
+          .from('customers')
+          .select('id, name')
+          .eq('client_id', currentClient.id)
+          .or(`phone.ilike.%${cleanPhone}%,phone.eq.${cleanPhone}`);
+
+        if (customer?.id) {
+          checkQuery = checkQuery.neq('id', customer.id);
+        }
+
+        const { data: existingCustomers } = await checkQuery;
+        if (existingCustomers && existingCustomers.length > 0) {
+          const otherName = existingCustomers[0].name;
+          setErrors((prev) => ({
+            ...prev,
+            phone: `Este telefone já está em uso pelo cliente "${otherName}".`,
+          }));
+          setSaving(false);
+          setActiveTab('basic');
+          return;
+        }
+      }
+
       const preferencesObj: CustomerPreferences = {
         favoriteProductIds: customer?.preferences?.favoriteProductIds || [],
         orderNotesDefault: form.orderNotesDefault.trim() || undefined,
@@ -351,14 +384,20 @@ export const CustomerDialog: React.FC<CustomerDialogProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="cust-phone" className="text-xs font-semibold">Telefone / WhatsApp</Label>
+                    <Label htmlFor="cust-phone" className={cn('text-xs font-semibold', errors.phone && 'text-destructive')}>
+                      Telefone / WhatsApp
+                    </Label>
                     <Input
                       id="cust-phone"
                       value={form.phone}
-                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, phone: e.target.value }));
+                        setErrors((er) => ({ ...er, phone: '' }));
+                      }}
                       placeholder="(11) 99999-9999"
-                      className="h-8 text-xs"
+                      className={cn('h-8 text-xs', errors.phone && 'border-destructive')}
                     />
+                    {errors.phone && <p className="text-[11px] text-destructive">{errors.phone}</p>}
                   </div>
                 </div>
 
