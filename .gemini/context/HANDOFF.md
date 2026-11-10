@@ -1,6 +1,6 @@
 # 🚀 Documento de Handoff Técnico - Tenant Finance Flow
 
-**Data de Atualização**: 01/10/2026  
+**Data de Atualização**: 09/11/2026  
 **Repositório**: `tenant-finance-flow`  
 **Stack**: React 18, Vite 5, TypeScript, Tailwind CSS, Shadcn UI, Supabase (PostgreSQL + Auth + Storage), Vitest.
 

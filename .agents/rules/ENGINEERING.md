@@ -1,0 +1,51 @@
+# Engineering Rules - Tenant Finance Flow
+
+## Tech Stack & Styling
+- **Framework**: React (Vite) with TypeScript.
+- **Styling**: Tailwind CSS for layout and utilities.
+- **UI Components**: Shadcn UI (Radix UI primitives).
+- **Icons**: Lucide React.
+- **Date Handling**: date-fns (always parse dates carefully to avoid timezone shifts: `new Date(`${t.date}T00:00:00`)`).
+
+## Code Standards
+- **Naming**: PascalCase for components and types, camelCase for functions and variables.
+- **Typing**: Strict TypeScript. Avoid `any` at all costs. Use `keyof` and generics for dynamic data.
+- **State Management**: 
+  - Server State: `@tanstack/react-query`.
+  - Global UI State: React Context API (`FinanceContext`).
+  - Local State: `useState` / `useMemo` / `useCallback`.
+
+## Component Reuse & UI Mandates (ZERO WHEEL REINVENTION)
+- **NUNCA crie componentes, modais, formulários ou lógicas duplicadas/simplificadas** quando já existirem equivalentes no sistema.
+- Antes de criar qualquer funcionalidade, pesquise na base de código e consulte [.gemini/rules/DESIGN_SYSTEM_AND_PATTERNS.md](file:///c:/Users/rmpes/Documents/tenant-finance-flow/.gemini/rules/DESIGN_SYSTEM_AND_PATTERNS.md).
+- Se um modal/componente estiver embutido diretamente em uma tela, **EXTRAIA-O para um componente reutilizável** compartilhado (em `src/components/...`) e utilize-o em ambos os locais, preservando 100% das funcionalidades consolidadas (busca EAN, margens, fornecedores, validades, etc.).
+- **Modal Design**: Modals with extensive forms/content MUST use `max-h-[90vh]`, `flex flex-col`, fixed Header/Footer, and internal scroll `overflow-y-auto` to prevent viewport clipping.
+- **Hardware & Multi-Input Support**: Always provide clear visual labels and badges for hardware scanners (USB/Bluetooth barcode guns) alongside camera scanning and manual fallback.
+- **SPA Routing**: Maintain SPA routing rewrite files (`vercel.json`, `public/_redirects`, `public/.htaccess`) to prevent 404 errors on direct URL accesses.
+
+## Form Validation
+- **Mandatory Fields**: Always show visual feedback (red borders/labels) and error messages.
+- **Resetting**: Clear field-specific errors immediately upon user interaction.
+- **Automation**: When adding new entities (like Collaborators), automatically select them in the calling form.
+
+## Feature Gating
+- **Plan-Based Access**: Functional components (like Payment Method selects or Commission tabs) must check the active plan's features before rendering.
+- **Grace Periods**: Implement logic to handle trial expirations and plan downgrades gracefully.
+
+## Administrative Access
+- **Super-Admin Role**: A global flag on the user profile to identify system administrators (`user_profiles.is_admin`).
+- **Admin Isolation**: Admin-only routes and actions must be strictly guarded via Supabase RLS and UI-level checks.
+- **Plan Management**: Only administrators can create or modify plan definitions and feature sets.
+
+## Backend & Persistence
+- **Service**: Supabase.
+- **Operations**: Centralize database logic in `FinanceContext`.
+- **Formatting**: Always use `formatDateForDB` (YYYY-MM-DD) when persisting dates to Supabase.
+
+## Git Workflow & Commits (STRICT MANDATE)
+- **Trigger**: **ONLY commit and push to git when EXPLICITLY requested by the user.** NEVER commit automatically on your own.
+- **Language**: Commit messages MUST ALWAYS be written in **English**.
+- **Format**: Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
+- **Author Identity**: Always commit as `Lucas Silva <rm.pessoal13@gmail.com>`.
+- **No Signatures**: NEVER include `Co-authored-by` lines or AI assistant signatures in commits.
+- **Message Style**: Concise, minimal necessary description.

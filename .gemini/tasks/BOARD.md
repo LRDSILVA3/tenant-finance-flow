@@ -94,8 +94,10 @@
 - [x] **Adaptação Responsiva Completa para Dispositivos Móveis (Smartphones)**: Reformulação e polimento da ergonomia mobile em todas as telas da plataforma (Menu inferior nativo fixo, Drawer/Sheet de módulos, cabeçalhos compactos com seletor flexível de clientes, grids responsivos em Dashboard, cartões touch-friendly em Contas a Pagar/Receber, tabelas com scroll horizontal e colunas protegidas em Pedidos, OS, Estoque, Fornecedores, Agenda e Relatórios, barras de navegação de abas com rolagem horizontal e Cupom Flutuante de checkout rápido no PDV Touch).
 - [x] **Leitor de Código de Barras com Câmera Nativa do Dispositivo (`DeviceCameraScanner`)**: Componente reutilizável com mira visual a laser, bipe sonoro via Web Audio API e vibração tátil. Suporte a leitura direta pela câmera do celular e webcam no PDV Touch (`StorePos`), Pedidos (`Orders`), Estoque (`Inventory`) e Ordens de Serviço (`ServiceOrderDialog`), com alternador dinâmico entre Câmera Deste Aparelho e Pareamento com Celular Remoto (QR Code).
 
+- [x] **Refine Gemini CLI Context and Rules**: Atualização e consolidação das regras de engenharia, arquitetura, handoff e skills em `.gemini/` e `.agents/`.
+
 ## 🟡 In Progress
-- [ ] Refine Gemini CLI Context and Rules.
+*(Nenhuma tarefa em andamento no momento)*
 
 
 ## 🔴 Backlog
