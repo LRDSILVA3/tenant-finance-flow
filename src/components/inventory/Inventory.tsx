@@ -637,14 +637,36 @@ export const Inventory: React.FC = () => {
 
     return products
       .filter((p) => {
-        // 1. Text search
+        // 1. Text search (tokenized across all attributes: name, sku, size, color, cat, loc, desc, supplier)
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchesName = p.name.toLowerCase().includes(q);
-          const matchesSku = p.sku && p.sku.toLowerCase().includes(q);
-          const matchesCat = p.category && p.category.toLowerCase().includes(q);
-          const matchesLoc = p.location && p.location.toLowerCase().includes(q);
-          if (!matchesName && !matchesSku && !matchesCat && !matchesLoc) return false;
+          const searchTokens = searchQuery
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .split(/\s+/)
+            .filter((t) => t.length > 0);
+
+          const supplierName = p.supplier_id
+            ? suppliers.find((s) => s.id === p.supplier_id)?.name || ''
+            : '';
+
+          const itemText = [
+            p.name,
+            p.sku || '',
+            p.category || '',
+            p.size_or_variant || '',
+            p.color || '',
+            p.location || '',
+            p.description || '',
+            supplierName,
+          ]
+            .join(' ')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+          const matchesAllTokens = searchTokens.every((token) => itemText.includes(token));
+          if (!matchesAllTokens) return false;
         }
 
         // 2. Legacy button filter

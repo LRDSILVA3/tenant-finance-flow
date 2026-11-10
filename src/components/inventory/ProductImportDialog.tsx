@@ -221,6 +221,7 @@ export const ProductImportDialog: React.FC<ProductImportDialogProps> = ({
     };
 
     const parsedRows: ParsedImportRow[] = [];
+    const claimedProductIds = new Set<string>();
 
     for (let i = 1; i < lines.length; i++) {
       const cols = parseLine(lines[i]);
@@ -294,6 +295,27 @@ export const ProductImportDialog: React.FC<ProductImportDialogProps> = ({
         return true;
       };
 
+      // Helper to extract candidate size and color (from columns or embedded in name/description)
+      const getCandidateVariant = (candidate: ProductImportDialogProduct) => {
+        let size = (candidate.size_or_variant || '').trim().toLowerCase();
+        let color = (candidate.color || '').trim().toLowerCase();
+
+        if (!size && candidate.name) {
+          const sizeMatch = candidate.name.match(/(?:tam|tamanho)[:\s]+([^-\)\|,;]+)/i);
+          if (sizeMatch) size = sizeMatch[1].trim().toLowerCase();
+        }
+
+        if (!color && candidate.name) {
+          const colorMatch = candidate.name.match(/(?:cor)[:\s]+([^-\)\|,;]+)/i);
+          if (colorMatch) color = colorMatch[1].trim().toLowerCase();
+        }
+
+        return { size, color };
+      };
+
+      const targetSize = rawSize.trim().toLowerCase();
+      const targetColor = rawColor.trim().toLowerCase();
+
       // 1. Check match by SKU if available, filtering out cross-brand / cross-category collisions
       if (rawSku) {
         const bySkuMatches = existingProducts.filter(
@@ -301,26 +323,45 @@ export const ProductImportDialog: React.FC<ProductImportDialogProps> = ({
         );
         const plausibleMatches = bySkuMatches.filter(isPlausibleMatch);
 
-        if (plausibleMatches.length === 1) {
-          matched = plausibleMatches[0];
-        } else if (plausibleMatches.length > 1) {
-          // If multiple variants have same SKU, differentiate by size and color
-          matched = plausibleMatches.find(
-            (p) =>
-              (!rawSize || (p.size_or_variant || '').trim().toLowerCase() === rawSize.trim().toLowerCase()) &&
-              (!rawColor || (p.color || '').trim().toLowerCase() === rawColor.trim().toLowerCase())
-          ) || plausibleMatches[0];
+        // Check variants: size and color must be compatible
+        const variantMatches = plausibleMatches.filter((p) => {
+          const cand = getCandidateVariant(p);
+
+          // If CSV specifies size and candidate has a known size, they MUST match
+          if (targetSize && cand.size && targetSize !== cand.size) return false;
+          // If CSV specifies color and candidate has a known color, they MUST match
+          if (targetColor && cand.color && targetColor !== cand.color) return false;
+
+          // If CSV specifies variant info (size/color), but candidate already has different variant details:
+          if ((targetSize || targetColor) && (cand.size || cand.color)) {
+            if (targetSize && cand.size && cand.size !== targetSize) return false;
+            if (targetColor && cand.color && cand.color !== targetColor) return false;
+          }
+
+          return true;
+        });
+
+        // Match one that hasn't already been claimed by a previous row in this CSV
+        matched = variantMatches.find((p) => !claimedProductIds.has(p.id));
+        if (matched) {
+          claimedProductIds.add(matched.id);
         }
       }
 
       // 2. Check match by Name + Size + Color if not found by SKU
       if (!matched && rawName) {
-        matched = existingProducts.find(
-          (p) =>
-            p.name.trim().toLowerCase() === rawName.trim().toLowerCase() &&
-            (!rawSize || (p.size_or_variant || '').trim().toLowerCase() === rawSize.trim().toLowerCase()) &&
-            (!rawColor || (p.color || '').trim().toLowerCase() === rawColor.trim().toLowerCase())
-        );
+        matched = existingProducts.find((p) => {
+          if (claimedProductIds.has(p.id)) return false;
+          if (p.name.trim().toLowerCase() !== rawName.trim().toLowerCase()) return false;
+          const cand = getCandidateVariant(p);
+          if (targetSize && cand.size && targetSize !== cand.size) return false;
+          if (targetColor && cand.color && targetColor !== cand.color) return false;
+          return true;
+        });
+
+        if (matched) {
+          claimedProductIds.add(matched.id);
+        }
       }
 
       parsedRows.push({
@@ -393,15 +434,28 @@ export const ProductImportDialog: React.FC<ProductImportDialogProps> = ({
 
   // Filtered rows for the preview table
   const displayedRows = importRows.filter((r) => {
-    if (!searchFilter) return true;
-    const term = searchFilter.toLowerCase();
-    return (
-      r.name.toLowerCase().includes(term) ||
-      r.sku.toLowerCase().includes(term) ||
-      r.brand.toLowerCase().includes(term) ||
-      r.size_or_variant.toLowerCase().includes(term) ||
-      r.color.toLowerCase().includes(term)
-    );
+    if (!searchFilter.trim()) return true;
+    const tokens = searchFilter
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+
+    const rowText = [
+      r.name,
+      r.sku,
+      r.brand,
+      r.size_or_variant,
+      r.color,
+      r.category,
+    ]
+      .join(' ')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    return tokens.every((token) => rowText.includes(token));
   });
 
   // Execute Import

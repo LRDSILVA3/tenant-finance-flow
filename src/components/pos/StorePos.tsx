@@ -610,17 +610,30 @@ export const StorePos: React.FC<{ onBackToOrders?: () => void }> = ({ onBackToOr
       items = items.filter((i) => i.category === selectedCategory);
     }
 
-    // Filtro por Busca
+    // Filtro por Busca (busca inteligente tokenizada em nome, sku, categoria, tamanho, cor, etc.)
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      items = items.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          (i.sku && i.sku.toLowerCase().includes(q)) ||
-          (i.category && i.category.toLowerCase().includes(q)) ||
-          (i.sizeOrVariant && i.sizeOrVariant.toLowerCase().includes(q)) ||
-          (i.color && i.color.toLowerCase().includes(q))
-      );
+      const tokens = searchQuery
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .split(/\s+/)
+        .filter((t) => t.length > 0);
+
+      items = items.filter((i) => {
+        const itemText = [
+          i.name,
+          i.sku || '',
+          i.category || '',
+          i.sizeOrVariant || '',
+          i.color || '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+
+        return tokens.every((token) => itemText.includes(token));
+      });
     }
 
     return items;
