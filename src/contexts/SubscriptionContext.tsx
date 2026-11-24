@@ -14,7 +14,7 @@ interface SubscriptionContextType {
   loadingPlans: boolean;
   loadingSubscription: boolean;
   loadSubscription: (clientId: string) => Promise<void>;
-  changePlan: (clientId: string, planId: string) => Promise<void>;
+  changePlan: (clientId: string, planId: string, customTrialDays?: number) => Promise<void>;
   subscribeWithPagarme: (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod?: 'credit_card' | 'pix') => Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }>;
   cancelSubscription: (subscriptionId: string) => Promise<boolean>;
   saveBillingMethod: (clientId: string, method: Omit<BillingMethod, 'id' | 'clientId' | 'createdAt'>) => Promise<void>;
@@ -102,7 +102,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     setLoadingSubscription(false);
   }, [user]);
 
-  const changePlan = useCallback(async (clientId: string, planId: string) => {
+  const changePlan = useCallback(async (clientId: string, planId: string, customTrialDays?: number) => {
     setLoadingSubscription(true);
     const targetPlan = plans.find(p => p.id === planId);
     if (!targetPlan) return;
@@ -115,8 +115,9 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     const now = new Date();
     const trialEndDate = new Date();
-    if (targetPlan.trialDays > 0) {
-      trialEndDate.setDate(now.getDate() + targetPlan.trialDays);
+    const effectiveTrialDays = customTrialDays !== undefined ? customTrialDays : targetPlan.trialDays;
+    if (effectiveTrialDays > 0) {
+      trialEndDate.setDate(now.getDate() + effectiveTrialDays);
     } else {
       trialEndDate.setTime(now.getTime());
     }

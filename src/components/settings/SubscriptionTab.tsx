@@ -5,10 +5,11 @@ import { Plan } from '@/types/finance';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Loader2, Sparkles, ShieldCheck, XCircle, CreditCard } from 'lucide-react';
+import { Check, Loader2, Sparkles, ShieldCheck, XCircle, CreditCard, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { PaymentModal } from './PaymentModal';
+import { ReferralProgramDialog } from '@/components/referrals/ReferralProgramDialog';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -29,6 +30,7 @@ export const SubscriptionTab: React.FC = () => {
 
   const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
+  const [isReferralOpen, setIsReferralOpen] = React.useState(false);
 
   if (!currentClient) return null;
 
@@ -202,6 +204,36 @@ export const SubscriptionTab: React.FC = () => {
         </Card>
       )}
 
+      {/* Card do Programa Indique e Ganhe */}
+      <Card className="border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-primary/10 shadow-sm overflow-hidden">
+        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+              <Gift className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                Indique e Ganhe Mensalidades Grátis
+                <Badge variant="secondary" className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                  Ganha-Ganha
+                </Badge>
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl leading-relaxed">
+                Indique amigos empresários: eles ganham <strong>22 dias de teste</strong> (+15 dias de bônus VIP) e você ganha <strong>1 mês 100% grátis</strong> na sua mensalidade a cada amigo que assinar.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setIsReferralOpen(true)}
+            className="w-full sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 font-semibold h-10 px-4"
+          >
+            <Gift className="h-4 w-4" />
+            Indicar Amigos & Ver Recompensas
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
         {plans.map((plan) => {
           const isCurrent = currentPlan?.id === plan.id;
@@ -278,6 +310,8 @@ export const SubscriptionTab: React.FC = () => {
       </div>
 
       <PaymentModal plan={selectedPlan} isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+      
+      <ReferralProgramDialog open={isReferralOpen} onOpenChange={setIsReferralOpen} />
     </div>
   );
 };

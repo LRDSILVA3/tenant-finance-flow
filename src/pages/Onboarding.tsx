@@ -10,11 +10,27 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { getStoredReferralCode, setStoredReferralCode, cleanReferralCode, EXTENDED_REFERRAL_TRIAL_DAYS } from '@/utils/referralUtils';
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const planParam = searchParams.get('plan');
+  const refParam = searchParams.get('ref');
+
+  const [referralCode, setReferralCode] = useState<string | null>(() => {
+    return cleanReferralCode(refParam) || getStoredReferralCode();
+  });
+
+  useEffect(() => {
+    if (refParam) {
+      const clean = cleanReferralCode(refParam);
+      if (clean) {
+        setStoredReferralCode(clean);
+        setReferralCode(clean);
+      }
+    }
+  }, [refParam]);
 
   const { 
     isAuthenticated,
@@ -174,7 +190,24 @@ export default function Onboarding() {
           }
 
           // Create client under new user session (address is created in step 3 or saved as blank for now)
-          await addClient({ name: companyName, taxId }, data.user.id);
+          const newClientId = await addClient({ name: companyName, taxId, referredByCode: referralCode || undefined }, data.user.id);
+          if (referralCode && newClientId) {
+            try {
+              const { data: refClient } = await supabase.from('clients').select('id').eq('referral_code', referralCode).maybeSingle();
+              if (refClient?.id) {
+                await (supabase.from('referrals') as any).insert({
+                  referrer_client_id: refClient.id,
+                  referred_client_id: newClientId,
+                  referral_code: referralCode,
+                  referred_email: email || undefined,
+                  referred_company_name: companyName,
+                  status: 'trialing'
+                });
+              }
+            } catch (refErr) {
+              console.warn('Silent fail recording referral tracking:', refErr);
+            }
+          }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Erro desconhecido';
           toast({ title: 'Erro ao criar conta', description: message, variant: 'destructive' });
@@ -187,7 +220,24 @@ export default function Onboarding() {
         if (clients.length === 0) {
           setLoading(true);
           try {
-            await addClient({ name: companyName, taxId });
+            const newClientId = await addClient({ name: companyName, taxId, referredByCode: referralCode || undefined });
+            if (referralCode && newClientId) {
+              try {
+                const { data: refClient } = await supabase.from('clients').select('id').eq('referral_code', referralCode).maybeSingle();
+                if (refClient?.id) {
+                  await (supabase.from('referrals') as any).insert({
+                    referrer_client_id: refClient.id,
+                    referred_client_id: newClientId,
+                    referral_code: referralCode,
+                    referred_email: userProfile?.email || undefined,
+                    referred_company_name: companyName,
+                    status: 'trialing'
+                  });
+                }
+              } catch (refErr) {
+                console.warn('Silent fail recording referral tracking:', refErr);
+              }
+            }
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Erro desconhecido';
             toast({ title: 'Erro ao criar empresa', description: message, variant: 'destructive' });
@@ -212,7 +262,7 @@ export default function Onboarding() {
         try {
           const clientId = clients.length > 0 ? clients[0].id : null;
           if (clientId) {
-            await changePlan(clientId, selectedPlanId);
+            await changePlan(clientId, selectedPlanId, referralCode ? EXTENDED_REFERRAL_TRIAL_DAYS : undefined);
             toast({ title: 'Sucesso!', description: 'Conta configurada com sucesso no plano grátis.' });
             navigate('/app', { replace: true });
           }
@@ -245,7 +295,7 @@ export default function Onboarding() {
     try {
       let clientId = clients.length > 0 ? clients[0].id : null;
       if (!clientId) {
-        clientId = await addClient({ name: companyName, taxId }) || null;
+        clientId = await addClient({ name: companyName, taxId, referredByCode: referralCode || undefined }) || null;
       }
       
       if (clientId && selectedPlanId) {
@@ -336,7 +386,7 @@ export default function Onboarding() {
           }
         } else {
           // Simple change for free plans (fallback safety)
-          await changePlan(clientId, selectedPlanId);
+          await changePlan(clientId, selectedPlanId, referralCode ? EXTENDED_REFERRAL_TRIAL_DAYS : undefined);
         }
 
         if (paymentMethod === 'credit_card') {
@@ -448,6 +498,23 @@ export default function Onboarding() {
             <div className={cn("flex items-center justify-center w-8 h-8 rounded-full font-bold", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>3</div>
           </div>
         </div>
+
+        {/* Banner de Indicação VIP */}
+        {referralCode && (
+          <div className="max-w-2xl mx-auto mb-6 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-start gap-3 shadow-sm animate-fade-in">
+            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-emerald-900 dark:text-emerald-200">
+                🎉 Convite VIP Ativado (Código: <span className="font-mono underline">{referralCode}</span>)
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Você foi indicado e ganhou <strong>{EXTENDED_REFERRAL_TRIAL_DAYS} dias de teste gratuito</strong> (15 dias extras de bônus) para experimentar todas as ferramentas sem nenhum custo!
+              </p>
+            </div>
+          </div>
+        )}
 
         {step === 1 && (
           <Card className="max-w-md mx-auto animate-fade-in shadow-lg border-primary/20">
@@ -605,7 +672,7 @@ export default function Onboarding() {
                     {plan.trialDays > 0 ? (
                       <p className="text-sm font-medium text-emerald-600 flex items-center gap-1">
                         <Sparkles className="h-4 w-4" />
-                        {plan.trialDays} dias grátis (período de testes)
+                        {referralCode ? `${EXTENDED_REFERRAL_TRIAL_DAYS} dias grátis (+15 dias de bônus VIP)` : `${plan.trialDays} dias grátis (período de testes)`}
                       </p>
                     ) : (
                       <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">

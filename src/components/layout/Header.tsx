@@ -47,12 +47,14 @@ import {
   Sun,
   Moon,
   Smartphone,
-  BookOpen
+  BookOpen,
+  Gift
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { ReferralProgramDialog } from '@/components/referrals/ReferralProgramDialog';
 
 const languageLabels: Record<Language, string> = {
   pt: 'Português',
@@ -98,6 +100,7 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour, onOpe
   const currentTheme = theme === 'system' ? resolvedTheme : theme;
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isReferralOpen, setIsReferralOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientTaxId, setNewClientTaxId] = useState('');
@@ -498,6 +501,11 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour, onOpe
                 Meu Perfil
               </DropdownMenuItem>
 
+              <DropdownMenuItem onClick={() => setIsReferralOpen(true)} className="font-medium text-emerald-600 dark:text-emerald-400">
+                <Gift className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Indique e Ganhe 🎁
+              </DropdownMenuItem>
+
               {/* Mobile-only menu items */}
               <div className="sm:hidden border-t my-1 pt-1">
                 <DropdownMenuItem onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}>
@@ -683,6 +691,11 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour, onOpe
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReferralProgramDialog 
+        open={isReferralOpen} 
+        onOpenChange={setIsReferralOpen} 
+      />
     </header>
   );
 };

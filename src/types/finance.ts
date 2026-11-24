@@ -43,6 +43,24 @@ export interface Client {
   userId: string;
   createdAt: Date;
   businessSegment?: BusinessSegment;
+  referralCode?: string;
+  referredByCode?: string;
+}
+
+export type ReferralStatus = 'trialing' | 'active' | 'rewarded' | 'churned';
+
+export interface Referral {
+  id: string;
+  referrerClientId: string;
+  referredClientId?: string;
+  referralCode: string;
+  referredEmail?: string;
+  referredCompanyName?: string;
+  status: ReferralStatus;
+  rewardMonthsAwarded: number;
+  createdAt: Date;
+  convertedAt?: Date;
+  rewardedAt?: Date;
 }
 
 export interface Address {

@@ -8,6 +8,7 @@ import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { generateReferralCode, cleanReferralCode } from '@/utils/referralUtils';
 
 import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier, Order } from '@/types/finance';
 
@@ -37,7 +38,7 @@ interface FinanceContextType {
   clients: Client[];
   currentClient: Client | null;
   setCurrentClient: (client: Client | null) => void;
-  addClient: (client: { name: string; taxId?: string }, userId?: string) => Promise<string | undefined>;
+  addClient: (client: { name: string; taxId?: string; referralCode?: string; referredByCode?: string }, userId?: string) => Promise<string | undefined>;
   loadingClients: boolean;
 
   // Addresses
@@ -60,7 +61,7 @@ interface FinanceContextType {
   loadingSubscription: boolean;
   subscribeWithPagarme: (clientId: string, planId: string, cardToken?: string, document?: string, customerName?: string, phone?: string, address?: Omit<Address, 'id' | 'clientId' | 'isMain' | 'type'>, paymentMethod?: 'credit_card' | 'pix') => Promise<{ success: boolean; qrCode?: string; qrCodeUrl?: string; error?: string }>;
   cancelSubscription: (subscriptionId: string) => Promise<boolean>;
-  changePlan: (clientId: string, planId: string) => Promise<void>;
+  changePlan: (clientId: string, planId: string, customTrialDays?: number) => Promise<void>;
   updatePlan: (planId: string, updates: Partial<Plan>) => Promise<void>;
 
   // Proxy to TransactionContext
@@ -625,12 +626,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       const mapped = filtered.map((c: any) => {
         const storedSegment = localStorage.getItem(`tf_business_segment_${c.id}`);
+        const pureRefCode = cleanReferralCode(c.referral_code);
         return {
           id: c.id,
           name: c.name,
           taxId: c.tax_id,
+          userId: c.user_id,
           createdAt: new Date(c.created_at),
-          businessSegment: (storedSegment as BusinessSegment) || (c.business_segment as BusinessSegment) || 'full'
+          businessSegment: (storedSegment as BusinessSegment) || (c.business_segment as BusinessSegment) || 'full',
+          referralCode: pureRefCode || c.referral_code,
+          referredByCode: cleanReferralCode(c.referred_by_code) || c.referred_by_code
         };
       });
 
@@ -667,12 +672,37 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, [currentPlan, isSubscriptionActive, userProfile?.isAdmin]);
 
-  const addClient = useCallback(async (client: { name: string; taxId?: string }, userId?: string) => {
+  const addClient = useCallback(async (client: { name: string; taxId?: string; referralCode?: string; referredByCode?: string }, userId?: string) => {
     const targetUserId = userId || user?.id;
     if (!targetUserId) return;
-    const { data } = await supabase.from('clients').insert({ user_id: targetUserId, name: client.name, tax_id: client.taxId }).select().single();
+    const refCode = cleanReferralCode(client.referralCode) || generateReferralCode();
+    const insertPayload: any = {
+      user_id: targetUserId,
+      name: client.name,
+      tax_id: client.taxId,
+      referral_code: refCode,
+    };
+    if (client.referredByCode) {
+      insertPayload.referred_by_code = cleanReferralCode(client.referredByCode) || client.referredByCode;
+    }
+
+    let insertRes = await supabase.from('clients').insert(insertPayload).select().single();
+    // Fallback defensivo para caso a migration ainda não esteja aplicada em banco legado
+    if (insertRes.error && (insertRes.error.message.includes('referral_code') || insertRes.error.message.includes('column'))) {
+      insertRes = await supabase.from('clients').insert({ user_id: targetUserId, name: client.name, tax_id: client.taxId }).select().single();
+    }
+
+    const data = insertRes.data;
     if (data) {
-      const newC = { id: data.id, name: data.name, taxId: data.tax_id, createdAt: new Date(data.created_at) };
+      const newC = {
+        id: data.id,
+        name: data.name,
+        taxId: data.tax_id,
+        userId: data.user_id || targetUserId,
+        createdAt: new Date(data.created_at),
+        referralCode: data.referral_code || refCode,
+        referredByCode: data.referred_by_code || client.referredByCode
+      };
       setClients(prev => [...prev, newC]);
       setCurrentClient(newC);
       return data.id;

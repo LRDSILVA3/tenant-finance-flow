@@ -1,8 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
+import { setStoredReferralCode, getStoredReferralCode } from '@/utils/referralUtils';
 import { 
   AreaChart, 
   Area, 
@@ -94,13 +95,28 @@ const previewChartData = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { plans: dbPlans } = useSubscription();
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
-  }, []);
+    const refParam = searchParams.get('ref');
+    if (refParam) {
+      setStoredReferralCode(refParam);
+    }
+  }, [searchParams]);
+
+  const activeReferral = searchParams.get('ref') || getStoredReferralCode();
+
+  const handleGoToOnboarding = (planName?: string) => {
+    const params = new URLSearchParams();
+    if (planName) params.set('plan', planName.toLowerCase());
+    if (activeReferral) params.set('ref', activeReferral);
+    const queryString = params.toString();
+    navigate(queryString ? `/onboarding?${queryString}` : '/onboarding');
+  };
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -226,7 +242,7 @@ export default function Landing() {
               }}>
                 Acessar
               </Button>
-              <Button onClick={() => navigate('/onboarding')} className="hidden sm:flex bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Button onClick={() => handleGoToOnboarding()} className="hidden sm:flex bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
                 Começar Grátis
               </Button>
             </div>
@@ -256,8 +272,8 @@ export default function Landing() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="h-14 px-8 text-base font-semibold bg-primary hover:bg-primary/95 text-primary-foreground shadow-xl shadow-primary/25 group transition-all" onClick={() => navigate('/onboarding')}>
-                Experimentar 7 dias grátis
+              <Button size="lg" className="h-14 px-8 text-base font-semibold bg-primary hover:bg-primary/95 text-primary-foreground shadow-xl shadow-primary/25 group transition-all" onClick={() => handleGoToOnboarding()}>
+                {activeReferral ? 'Experimentar 22 dias grátis' : 'Experimentar 7 dias grátis'}
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
               <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={() => {
@@ -548,7 +564,7 @@ export default function Landing() {
                       ))}
                     </ul>
                     <Button 
-                      onClick={() => navigate(`/onboarding?plan=${plan.name.toLowerCase()}`)} 
+                      onClick={() => handleGoToOnboarding(plan.name)} 
                       className={`w-full h-12 text-sm font-semibold rounded-xl ${plan.popular ? 'bg-primary hover:bg-primary/95 text-primary-foreground shadow-lg shadow-primary/20' : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'}`}
                     >
                       {plan.cta}
@@ -656,8 +672,8 @@ export default function Landing() {
             <p className="text-primary-foreground/90 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
               Junte-se a centenas de empresas que escolheram a automação e o controle inteligente para crescer de forma sustentável.
             </p>
-            <Button size="lg" variant="secondary" className="h-14 px-8 text-base font-bold shadow-2xl hover:scale-105 transition-transform" onClick={() => navigate('/onboarding')}>
-              Começar Teste de 7 Dias Grátis
+            <Button size="lg" variant="secondary" className="h-14 px-8 text-base font-bold shadow-2xl hover:scale-105 transition-transform" onClick={() => handleGoToOnboarding()}>
+              {activeReferral ? 'Começar Teste de 22 Dias Grátis' : 'Começar Teste de 7 Dias Grátis'}
             </Button>
           </div>
         </section>
