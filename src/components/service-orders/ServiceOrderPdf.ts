@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { ServiceOrder } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getPdfSettings, hexToRgb } from '@/lib/pdfCustomization';
+import { formatVehiclePlate } from '@/utils/vehicleUtils';
 
 export const generateServiceOrderPdf = (
   os: ServiceOrder,
@@ -108,7 +109,22 @@ export const generateServiceOrderPdf = (
     doc.text(`Técnico Responsável: ${os.collaborator.name}`, 115, 64);
   }
 
-  // 3. Informações do Equipamento & Defeito Reclamado
+  // 3. Informações do Equipamento ou Veículo & Defeito Reclamado
+  const isVehicle = Boolean(os.vehiclePlate || os.vehicleModel || os.vehicleKm);
+  const objectTitle = isVehicle ? 'DADOS DO VEÍCULO (MECÂNICA):' : 'OBJETO / EQUIPAMENTO / VEÍCULO:';
+  
+  let objectDescription = os.equipmentInfo || 'Não especificado';
+  if (isVehicle) {
+    const parts = [
+      os.vehiclePlate ? `Placa: ${formatVehiclePlate(os.vehiclePlate)}` : null,
+      os.vehicleModel ? `Modelo: ${os.vehicleModel}` : null,
+      os.vehicleYear ? `Ano: ${os.vehicleYear}` : null,
+      os.vehicleKm ? `KM: ${Number(os.vehicleKm).toLocaleString('pt-BR')} km` : null,
+      os.equipmentInfo ? `(${os.equipmentInfo})` : null
+    ].filter(Boolean);
+    objectDescription = parts.join('  |  ');
+  }
+
   doc.setFillColor(248, 250, 252);
   doc.rect(14, 76, 182, 32, 'F');
   doc.setDrawColor(226, 232, 240);
@@ -117,10 +133,10 @@ export const generateServiceOrderPdf = (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(30, 41, 59);
-  doc.text('OBJETO / EQUIPAMENTO / VEÍCULO:', 18, 82);
+  doc.text(objectTitle, 18, 82);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text(os.equipmentInfo || 'Não especificado', 18, 88, { maxWidth: 174 });
+  doc.text(objectDescription, 18, 88, { maxWidth: 174 });
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59);

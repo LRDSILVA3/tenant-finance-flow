@@ -46,6 +46,27 @@ if (typeof window !== 'undefined' && window.HTMLCanvasElement) {
   }) as any;
 }
 
+// Mock Web Audio API
+class MockAudioContext {
+  currentTime = 0;
+  destination = {};
+  createOscillator = vi.fn().mockReturnValue({
+    type: 'sine',
+    frequency: { setValueAtTime: vi.fn() },
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  });
+  createGain = vi.fn().mockReturnValue({
+    gain: { setValueAtTime: vi.fn() },
+    connect: vi.fn(),
+  });
+}
+if (typeof window !== 'undefined') {
+  window.AudioContext = (window.AudioContext || MockAudioContext) as any;
+  (window as any).webkitAudioContext = ((window as any).webkitAudioContext || MockAudioContext) as any;
+}
+
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';

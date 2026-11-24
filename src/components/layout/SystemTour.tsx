@@ -1,8 +1,9 @@
 // System Tour Component for Interactive Onboarding Guided Tour
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, X, Sparkles, LayoutDashboard, ArrowRightLeft, Users, BarChart3, Building2, Bell } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Sparkles, LayoutDashboard, ArrowRightLeft, Users, BarChart3, Building2, Bell, Wrench, ShoppingBag, Utensils, Calendar, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Step {
@@ -15,61 +16,117 @@ interface Step {
 interface SystemTourProps {
   open: boolean;
   onClose: () => void;
+  onOpenTutorials?: () => void;
 }
 
-export const SystemTour: React.FC<SystemTourProps> = ({ open, onClose }) => {
+export const SystemTour: React.FC<SystemTourProps> = ({ open, onClose, onOpenTutorials }) => {
+  const { businessSegment = 'full' } = useFinance();
   const [currentStep, setCurrentStep] = useState(0);
   const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties | null>(null);
 
-  const steps: Step[] = [
-    {
-      title: "Bem-vindo ao Previna! 🚀",
-      description: "Este é o seu novo painel de controle financeiro. Vamos fazer um tour rápido de 1 minuto para te mostrar onde tudo fica e como começar com o pé direito!",
-      icon: <Sparkles className="h-8 w-8 text-primary animate-bounce" />
-    },
-    {
-      title: "1. Painel Geral (Dashboard) 📊",
-      description: "O Dashboard exibe um resumo financeiro consolidado de suas receitas, despesas, faturamento mensal e saldo total, com gráficos dinâmicos de fluxo de caixa e atalhos rápidos.",
-      selector: '[data-tour="nav-dashboard"]',
-      icon: <LayoutDashboard className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "2. Gestão Financeira 💸",
-      description: "No menu Financeiro, você gerencia seu livro-caixa de transações, contas a receber (receitas pendentes) e contas a pagar (despesas pendentes) de forma simples e rápida.",
-      selector: '[data-tour="nav-financeiro"]',
-      icon: <ArrowRightLeft className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "3. Incluir: Pedidos & Ordens de Serviço 🛒🛠️",
-      description: "Agilidade comercial máxima! Crie pedidos de venda com carrinho dinâmico do estoque e emita Ordens de Serviço completas com mão de obra, peças consumidas e termo de garantia.",
+  const steps: Step[] = useMemo(() => {
+    const isRetail = businessSegment === 'retail';
+    const isRepair = businessSegment === 'repair';
+    const isServices = businessSegment === 'services';
+    const isFood = businessSegment === 'food';
+    const isB2B = businessSegment === 'b2b';
+
+    // Passo 3 Dinâmico conforme segmento
+    let step3: Step = {
+      title: "3. Incluir: Vendas & Ordens de Serviço 🛒🛠️",
+      description: "Agilidade comercial máxima! Crie pedidos de venda com catálogo de estoque ou emita Ordens de Serviço completas para clientes.",
       selector: '[data-tour="nav-incluir"]',
       icon: <Sparkles className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "4. Clientes, Agenda e Estoque 👥",
-      description: "Gerencie toda a sua operação! Cadastre clientes e fornecedores, agende serviços diários com faturamento automático e controle o estoque por lotes e validades.",
+    };
+
+    if (isRepair) {
+      step3 = {
+        title: "3. Ordens de Serviço (Mecânica) 🔧🚗",
+        description: "Recepção ágil de veículos! Abra Ordens de Serviço estruturadas informando Placa, Modelo, Ano e Odômetro (KM). Lance peças com baixa de estoque, mão de obra e imprima o termo de garantia.",
+        selector: '[data-tour="nav-incluir"]',
+        icon: <Wrench className="h-8 w-8 text-primary" />
+      };
+    } else if (isRetail) {
+      step3 = {
+        title: "3. Modo Loja & Pedidos de Venda 👗🛒",
+        description: "Frente de caixa rápida e catálogo visual! Realize vendas no PDV Touch com leitor de código de barras, fotos de peças, tamanhos P/M/G e controle de recebíveis.",
+        selector: '[data-tour="nav-incluir"]',
+        icon: <ShoppingBag className="h-8 w-8 text-primary" />
+      };
+    } else if (isB2B) {
+      step3 = {
+        title: "3. Propostas Comerciais & Orçamentos 💼📄",
+        description: "Gere propostas comerciais em PDF com escopo de prestação de serviços e condições de pagamento. Ao aprovar, converta diretamente em faturamento.",
+        selector: '[data-tour="nav-incluir"]',
+        icon: <Briefcase className="h-8 w-8 text-primary" />
+      };
+    } else if (isFood) {
+      step3 = {
+        title: "3. Modo Loja & Comandas de Consumo 🍽️🧾",
+        description: "Atendimento expresso! Abra comandas por mesa ou cliente, adicione porções e bebidas e feche a conta emitindo cupom conferencial em segundos.",
+        selector: '[data-tour="nav-incluir"]',
+        icon: <Utensils className="h-8 w-8 text-primary" />
+      };
+    }
+
+    // Passo 4 Dinâmico
+    let step4: Step = {
+      title: "4. Cadastros & Operação 👥",
+      description: "Gerencie toda a sua base: clientes com ficha financeira, fornecedores e controle de estoque completo com códigos e categorias.",
       selector: '[data-tour="nav-cadastros"]',
       icon: <Users className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "5. Relatórios Completos 📈",
-      description: "Acompanhe a saúde do seu negócio através do DRE Simplificado, demonstrativos de repasses/comissões, projeções de caixa e análise de margens por categoria.",
-      selector: '[data-tour="nav-relatorios"]',
-      icon: <BarChart3 className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "6. Troca de Empresa 🏢",
-      description: "Caso você gerencie mais de uma empresa ou unidade, utilize este seletor de clientes no cabeçalho para alternar instantaneamente entre elas.",
-      selector: '[data-tour="client-select"]',
-      icon: <Building2 className="h-8 w-8 text-primary" />
-    },
-    {
-      title: "7. Central de Alertas e Notificações 🔔",
-      description: "O sino no cabeçalho avisa em tempo real sobre alertas importantes do sistema, como vencimentos de produtos do estoque ou níveis críticos de armazenamento.",
-      selector: '[data-tour="notifications-bell"]',
-      icon: <Bell className="h-8 w-8 text-primary" />
+    };
+
+    if (isServices) {
+      step4 = {
+        title: "4. Grade Horária, Clientes & Profissionais ✂️📅",
+        description: "Cadastre clientes e colaboradores, configure turnos e jornadas com pausas de almoço, e agende atendimentos na grade diária ou semanal com cálculo de comissões.",
+        selector: '[data-tour="nav-cadastros"]',
+        icon: <Calendar className="h-8 w-8 text-primary" />
+      };
+    } else if (isRepair) {
+      step4 = {
+        title: "4. Clientes, Peças & Fornecedores 👥⚙️",
+        description: "Histórico de manutenções por cliente e veículo, controle de estoque de peças automotivas por medida/aplicação e gestão de distribuidoras de autopeças.",
+        selector: '[data-tour="nav-cadastros"]',
+        icon: <Users className="h-8 w-8 text-primary" />
+      };
     }
-  ];
+
+    return [
+      {
+        title: "Bem-vindo ao Previna! 🚀",
+        description: `Este painel está personalizado para o seu perfil (${isRepair ? 'Oficina Mecânica' : isRetail ? 'Loja & Varejo' : isServices ? 'Serviços & Estética' : isFood ? 'Alimentos & Gastronomia' : isB2B ? 'Prestador B2B' : 'Modo Completo'}). Vamos fazer um tour rápido de 1 minuto pelos recursos essenciais!`,
+        icon: <Sparkles className="h-8 w-8 text-primary animate-bounce" />
+      },
+      {
+        title: "1. Painel Geral (Dashboard) 📊",
+        description: "O Dashboard exibe seu fluxo de caixa consolidado, entradas, saídas e um Hub de Ações Rápidas adaptado exatamente para a rotina do seu negócio.",
+        selector: '[data-tour="nav-dashboard"]',
+        icon: <LayoutDashboard className="h-8 w-8 text-primary" />
+      },
+      {
+        title: "2. Gestão Financeira 💸",
+        description: "No menu Financeiro, você gerencia seu livro-caixa, contas a receber (receitas pendentes e fiado) e contas a pagar (boletos e despesas fixas) com baixa parcial e total.",
+        selector: '[data-tour="nav-financeiro"]',
+        icon: <ArrowRightLeft className="h-8 w-8 text-primary" />
+      },
+      step3,
+      step4,
+      {
+        title: "5. Relatórios & Demonstração de Lucro 📈",
+        description: "Acompanhe a lucratividade através do DRE Simplificado, relatórios de movimentação por período e demonstrativos de comissão.",
+        selector: '[data-tour="nav-relatorios"]',
+        icon: <BarChart3 className="h-8 w-8 text-primary" />
+      },
+      {
+        title: "6. Central de Alertas e Notificações 🔔",
+        description: "O sino no cabeçalho avisa em tempo real sobre alertas importantes, como vencimentos de contas e estoque mínimo.",
+        selector: '[data-tour="notifications-bell"]',
+        icon: <Bell className="h-8 w-8 text-primary" />
+      }
+    ];
+  }, [businessSegment]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -212,7 +269,21 @@ export const SystemTour: React.FC<SystemTourProps> = ({ open, onClose }) => {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {onOpenTutorials && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  handleClose();
+                  onOpenTutorials();
+                }}
+                className="h-8 text-xs text-primary hover:text-primary/90 hover:bg-primary/10 mr-auto"
+                title="Abrir Central de Tutoriais e Passo a Passo"
+              >
+                Ver Tutoriais
+              </Button>
+            )}
             {currentStep > 0 ? (
               <Button variant="outline" size="sm" onClick={handlePrev} className="h-8 gap-1 text-xs">
                 <ChevronLeft className="h-3.5 w-3.5" /> Voltar

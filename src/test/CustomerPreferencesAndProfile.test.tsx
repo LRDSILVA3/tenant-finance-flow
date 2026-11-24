@@ -172,7 +172,7 @@ vi.mock('@/integrations/supabase/client', () => ({
           }),
         } as any;
       }
-      if (table === 'service_orders' || table === 'appointments') {
+      if (table === 'service_orders' || table === 'appointments' || table === 'customer_vehicles') {
         const queryHandler = {
           order: vi.fn().mockResolvedValue({ data: [], error: null }),
         };

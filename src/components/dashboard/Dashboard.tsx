@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Banknote, CreditCard, Smartphone, Clock, Lock, FileText, Wallet, Store, Package, ShoppingBag, Truck, Users, ArrowUpRight, ArrowDownLeft, ChevronRight, ShoppingCart, HandCoins } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, Clock, Lock, FileText, Wallet, Store, Package, ShoppingBag, Truck, Users, ArrowUpRight, ArrowDownLeft, ChevronRight, ShoppingCart, HandCoins, Wrench, Calendar, FileCheck2, Utensils } from 'lucide-react';
 import { CategoryBreakdown } from './CategoryBreakdown';
 import { TodayScheduleWidget } from './TodayScheduleWidget';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -324,30 +324,90 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-foreground">Ações Rápidas do Negócio</h3>
-              <p className="text-xs text-muted-foreground">Atalhos diretos para vendas, estoque, contas a pagar, receber, clientes e fornecedores</p>
+              <p className="text-xs text-muted-foreground">Atalhos diretos adaptados para a rotina operacional do seu segmento</p>
             </div>
           </div>
           {businessSegment === 'retail' && (
             <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1">
-              👗 Modo Loja Ativo
+              👗 Loja & Varejo
+            </Badge>
+          )}
+          {businessSegment === 'repair' && (
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-[11px] font-semibold flex items-center gap-1">
+              🔧 Oficina Mecânica
+            </Badge>
+          )}
+          {businessSegment === 'services' && (
+            <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 border-indigo-500/30 text-[11px] font-semibold flex items-center gap-1">
+              ✂️ Serviços & Estética
+            </Badge>
+          )}
+          {businessSegment === 'food' && (
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[11px] font-semibold flex items-center gap-1">
+              🍽️ Alimentos & Gastronomia
+            </Badge>
+          )}
+          {businessSegment === 'b2b' && (
+            <Badge variant="outline" className="bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30 text-[11px] font-semibold flex items-center gap-1">
+              💼 B2B & Consultoria
+            </Badge>
+          )}
+          {businessSegment === 'full' && (
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[11px] font-semibold flex items-center gap-1">
+              ⭐ Modo Completo
             </Badge>
           )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-          {/* 1. Pedido de Venda */}
-          <button
-            onClick={() => onNavigateToView ? onNavigateToView('orders') : onNavigateToTransactions()}
-            className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border-2 border-emerald-500/30 bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent hover:border-emerald-500 hover:shadow-md transition-all text-center group cursor-pointer"
-          >
-            <div className="p-3 rounded-full bg-emerald-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
-              <ShoppingCart className="h-5 sm:h-6 w-5 sm:w-6" />
-            </div>
-            <span className="font-bold text-xs sm:text-sm text-foreground">Vender Agora</span>
-            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Pedido de Venda</span>
-          </button>
+          {/* Ação 1: Principal de Venda / Operação */}
+          {businessSegment === 'repair' ? (
+            <button
+              onClick={() => onNavigateToView ? onNavigateToView('service_orders') : null}
+              className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border-2 border-blue-500/30 bg-gradient-to-b from-blue-500/15 via-blue-500/5 to-transparent hover:border-blue-500 hover:shadow-md transition-all text-center group cursor-pointer"
+            >
+              <div className="p-3 rounded-full bg-blue-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
+                <Wrench className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <span className="font-bold text-xs sm:text-sm text-foreground">Nova OS</span>
+              <span className="text-[10px] text-blue-700 dark:text-blue-400 font-medium">Veículo & Placa</span>
+            </button>
+          ) : businessSegment === 'services' ? (
+            <button
+              onClick={() => onNavigateToSchedule ? onNavigateToSchedule() : null}
+              className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border-2 border-indigo-500/30 bg-gradient-to-b from-indigo-500/15 via-indigo-500/5 to-transparent hover:border-indigo-500 hover:shadow-md transition-all text-center group cursor-pointer"
+            >
+              <div className="p-3 rounded-full bg-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
+                <Calendar className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <span className="font-bold text-xs sm:text-sm text-foreground">Agendar</span>
+              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-medium">Grade de Horários</span>
+            </button>
+          ) : businessSegment === 'b2b' ? (
+            <button
+              onClick={() => onNavigateToView ? onNavigateToView('orders') : null}
+              className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border-2 border-slate-500/30 bg-gradient-to-b from-slate-500/15 via-slate-500/5 to-transparent hover:border-slate-600 hover:shadow-md transition-all text-center group cursor-pointer"
+            >
+              <div className="p-3 rounded-full bg-slate-700 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
+                <FileCheck2 className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <span className="font-bold text-xs sm:text-sm text-foreground">Proposta</span>
+              <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Orçamento B2B</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigateToView ? onNavigateToView('orders') : onNavigateToTransactions()}
+              className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border-2 border-emerald-500/30 bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent hover:border-emerald-500 hover:shadow-md transition-all text-center group cursor-pointer"
+            >
+              <div className="p-3 rounded-full bg-emerald-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
+                <ShoppingCart className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <span className="font-bold text-xs sm:text-sm text-foreground">Vender Agora</span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Pedido de Venda</span>
+            </button>
+          )}
 
-          {/* 2. Estoque & Grade P/M/G */}
+          {/* Ação 2: Estoque / Peças / Catálogo */}
           <button
             onClick={() => onNavigateToView ? onNavigateToView('inventory') : null}
             className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-xl border border-purple-500/20 bg-gradient-to-b from-purple-500/10 via-purple-500/5 to-transparent hover:border-purple-500 hover:shadow-md transition-all text-center group cursor-pointer"
@@ -355,8 +415,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
             <div className="p-3 rounded-full bg-purple-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
               <Package className="h-5 sm:h-6 w-5 sm:w-6" />
             </div>
-            <span className="font-bold text-xs sm:text-sm text-foreground">Estoque de Peças</span>
-            <span className="text-[10px] text-purple-700 dark:text-purple-400 font-medium">Grade P/M/G & Cores</span>
+            <span className="font-bold text-xs sm:text-sm text-foreground">
+              {businessSegment === 'repair' ? 'Peças & Reposição' : businessSegment === 'retail' ? 'Estoque & Grade' : 'Estoque'}
+            </span>
+            <span className="text-[10px] text-purple-700 dark:text-purple-400 font-medium">
+              {businessSegment === 'repair' ? 'Peças Automotivas' : businessSegment === 'retail' ? 'P/M/G & Cores' : 'Produtos & Itens'}
+            </span>
           </button>
 
           {/* 3. Contas a Pagar */}
@@ -415,8 +479,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
             <div className="p-3 rounded-full bg-cyan-600 text-white shadow-md group-hover:scale-110 transition-transform mb-2">
               <Users className="h-5 sm:h-6 w-5 sm:w-6" />
             </div>
-            <span className="font-bold text-xs sm:text-sm text-foreground">Clientes & Fiado</span>
-            <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-medium">CRM & Crediário</span>
+            <span className="font-bold text-xs sm:text-sm text-foreground">
+              {businessSegment === 'repair' ? 'Clientes & Veículos' : 'Clientes & Fiado'}
+            </span>
+            <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-medium">CRM & Histórico</span>
           </button>
 
           {/* 8. Fornecedores */}
@@ -428,7 +494,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
               <Truck className="h-5 sm:h-6 w-5 sm:w-6" />
             </div>
             <span className="font-bold text-xs sm:text-sm text-foreground">Fornecedores</span>
-            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">Contatos & Compras</span>
+            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+              {businessSegment === 'repair' ? 'Distribuidoras Peças' : 'Contatos & Compras'}
+            </span>
           </button>
         </div>
       </div>
@@ -754,13 +822,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTransactions, 
         </div>
       )}
 
-      {/* Recent Transactions + Agenda do Dia (se não for varejo) */}
-      <div className={cn("grid gap-6", businessSegment === 'retail' ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2")}>
+      {/* Recent Transactions + Agenda do Dia (apenas para segmentos com agendamento ativo) */}
+      <div className={cn("grid gap-6", (businessSegment === 'retail' || businessSegment === 'repair' || businessSegment === 'food') ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2")}>
         <RecentTransactions
           transactions={transactions}
           onViewAll={onNavigateToTransactions}
         />
-        {businessSegment !== 'retail' && (
+        {businessSegment !== 'retail' && businessSegment !== 'repair' && businessSegment !== 'food' && (
           <TodayScheduleWidget
             onNavigateToSchedule={onNavigateToSchedule ?? (() => {})}
           />

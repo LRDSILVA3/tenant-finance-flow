@@ -106,9 +106,14 @@ Sempre que precisar de uma das funcionalidades abaixo, **REUTILIZE O COMPONENTE 
 | Primitivo | Caminho | Quando usar |
 | :--- | :--- | :--- |
 | **`MoneyInput`** | `src/components/ui/money-input.tsx` | **OBRIGATÓRIO para qualquer input monetário em Real (R$)**. Aplica máscara de moeda, alinhamento correto e emite `onChange(value: number)`. |
-| **`SearchableSelect`** | `src/components/ui/searchable-select.tsx` | **OBRIGATÓRIO para listas longas** (categorias, clientes, planos, fornecedores). Permite busca textual rápida integrada. |
+| **`SearchableSelect`** | `src/components/ui/searchable-select.tsx` | **OBRIGATÓRIO para seletores com busca, autocompletes e listas extensas** (categorias, marcas, clientes, fornecedores, cores, etc.). Suporta `allowAdd={true}` para inclusão livre sem quebrar o layout. |
 | **`DeviceCameraScanner`** | `src/components/common/DeviceCameraScanner.tsx` | **Leitor de código de barras pela câmera do smartphone ou webcam**. Possui mira a laser visual, som de bipe e vibração háptica. |
 | **`UpgradeBadge`** | `src/components/ui/upgrade-badge.tsx` | Badge indicando recursos bloqueados por plano superior. |
+
+### 2.8. Mandato Estrito contra Elementos Nativos (Sem reinventar a roda)
+- **PROIBIDO O USO DE `<datalist>` OU `<select>` NATIVO DO HTML**: NUNCA utilize `<datalist>` nativo ou `<select>` cru do navegador. O elemento `<datalist>` renderiza caixas cinzas nativas do sistema operacional, ignora o Dark Mode, quebra o visual do sistema e não tem responsividade.
+- **DROPDOWNS FECHADOS / ENUMS**: Utilize exclusivamente o `<Select>` do Shadcn UI (`@/components/ui/select`).
+- **AUTOCOMPLETES & LISTAS PESQUISÁVEIS**: Utilize exclusivamente `SearchableSelect` (`@/components/ui/searchable-select`) com `allowAdd={true}` caso seja permitida digitação livre (ex: marcas de veículos, cores, novas tags).
 
 ---
 

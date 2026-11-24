@@ -113,7 +113,9 @@ const formatCurrency = (value: number) => {
 // Web Audio API Beep helper
 const playPcBeep = (freq = 880, duration = 0.12) => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'sine';

@@ -38,17 +38,8 @@
       if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then((reg) => {
-            reg.onupdatefound = () => {
-              const installingWorker = reg.installing;
-              if (installingWorker) {
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // Novo service worker ativo, recarrega para pegar a versão atualizada
-                    window.location.reload();
-                  }
-                };
-              }
-            };
+            // Força verificação de nova versão imediatamente
+            reg.update().catch(() => {});
           }).catch(() => {});
         });
       }

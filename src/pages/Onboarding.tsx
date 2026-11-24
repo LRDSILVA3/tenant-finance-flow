@@ -618,6 +618,10 @@ export default function Onboarding() {
                         <Check className="h-4 w-4 text-emerald-500" /> 
                         Fluxo de caixa básico
                       </li>
+                      <li className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500" /> 
+                        Relatórios & DRE Simplificado
+                      </li>
                       <li className={cn("flex items-center gap-2 text-sm", !plan.features.payment_methods && "text-muted-foreground opacity-60")}>
                         <Check className={cn("h-4 w-4", plan.features.payment_methods ? "text-emerald-500" : "opacity-0")} /> 
                         Formas de Recebimento

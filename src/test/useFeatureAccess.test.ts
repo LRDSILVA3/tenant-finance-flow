@@ -126,25 +126,28 @@ describe('useFeatureAccess Hook', () => {
     expect(result.current.isSubscriptionActive).toBe(false);
   });
 
-  it('deve conceder acesso à assinatura cancelada se ainda estiver dentro do período pago', () => {
-    const futureDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+  it('deve conceder acesso a relatórios financeiros (advanced_reports) para assinaturas ativas mesmo no plano Básico', () => {
+    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
 
     vi.mocked(useFinance).mockReturnValue({
       userProfile: { isAdmin: false },
       currentSubscription: {
-        status: 'canceled',
+        status: 'active',
         currentPeriodEnd: futureDate,
-        trialEnd: null,
       },
       currentPlan: {
-        name: 'Pro',
-        features: { commissions: true },
+        name: 'Básico',
+        features: {
+          advanced_reports: false,
+          commissions: false,
+        },
       },
     } as any);
 
     const { result } = renderHook(() => useFeatureAccess());
 
     expect(result.current.isSubscriptionActive).toBe(true);
-    expect(result.current.hasFeature('commissions' as any)).toBe(true);
+    expect(result.current.hasFeature('advanced_reports' as any)).toBe(true);
+    expect(result.current.hasFeature('commissions' as any)).toBe(false);
   });
 });

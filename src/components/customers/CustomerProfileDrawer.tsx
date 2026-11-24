@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Customer, Order, ServiceOrder, Appointment, Transaction } from '@/types/finance';
+import { Customer, Order, ServiceOrder, Appointment, Transaction, CustomerVehicle } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useFinance } from '@/contexts/FinanceContext';
 import {
@@ -21,13 +21,17 @@ import {
   CreditCard, Tag, Sparkles, Receipt, Download, TrendingUp, Clock,
   MapPin, ShieldAlert, ArrowUpRight, CheckCircle2, AlertCircle, Loader2,
   ExternalLink, MessageSquare, ChevronRight, Package, Percent, FileDown,
-  Printer, XCircle, Trash2, AlertTriangle, Banknote
+  Printer, XCircle, Trash2, AlertTriangle, Banknote, Car, Plus, Pencil
 } from 'lucide-react';
 import { PaymentSettlementDialog } from '@/components/transactions/PaymentSettlementDialog';
 import { OrderReceiptDialog } from '@/components/orders/OrderReceiptDialog';
 import { generateOrderPdf } from '@/components/orders/OrderPdf';
 import { generateCustomerStatementPdf } from '@/components/customers/CustomerStatementPdf';
 import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
+import { VehicleDialog } from '@/components/vehicles/VehicleDialog';
+import { formatVehiclePlate } from '@/utils/vehicleUtils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -55,7 +59,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   onNavigateToSchedule,
 }) => {
   const { currentClient, addTransaction, loadTransactions, loadOrders } = useFinance();
-  const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'top_items' | 'preferences' | 'vehicles'>('history');
   const [loading, setLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
@@ -63,7 +67,10 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
   const [pendingDebt, setPendingDebt] = useState<number>(0);
+  const [isVehicleDialogOpen, setIsVehicleDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<CustomerVehicle | null>(null);
 
   // Ref para rastrear o ID do cliente atualmente ativo e descartar respostas assíncronas obsoletas
   const activeCustomerIdRef = useRef<string | null>(null);
@@ -234,6 +241,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         scheduledAt: s.scheduled_at ? new Date(s.scheduled_at) : undefined,
         completedAt: s.completed_at ? new Date(s.completed_at) : undefined,
         warrantyTerms: s.warranty_terms,
+        vehicleId: s.vehicle_id,
+        vehiclePlate: s.vehicle_plate,
+        vehicleModel: s.vehicle_model,
+        vehicleYear: s.vehicle_year,
+        vehicleKm: s.vehicle_km ? Number(s.vehicle_km) : undefined,
         servicesTotal: Number(s.services_total) || 0,
         productsTotal: Number(s.products_total) || 0,
         discountAmount: Number(s.discount_amount) || 0,
@@ -284,7 +296,41 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
         }
       }
 
-      // 4. Carregar Lançamentos Financeiros (todas as receitas e pagamentos do cliente)
+      // 4. Carregar Veículos do Cliente (Módulo Oficina / Garagem)
+      try {
+        const vehicleQuery = supabase.from('customer_vehicles');
+        if (vehicleQuery && typeof vehicleQuery.select === 'function') {
+          const { data: vData } = await vehicleQuery
+            .select('*')
+            .eq('customer_id', targetCustomerId)
+            .order('created_at', { ascending: false });
+
+          if (activeCustomerIdRef.current === targetCustomerId && vData) {
+            setVehicles(
+              vData.map((v: any) => ({
+                id: v.id,
+                clientId: v.client_id,
+                customerId: v.customer_id,
+                plate: v.plate,
+                brand: v.brand,
+                model: v.model,
+                modelYear: v.model_year,
+                color: v.color,
+                fuelType: v.fuel_type,
+                chassis: v.chassis,
+                renavam: v.renavam,
+                notes: v.notes,
+                createdAt: new Date(v.created_at),
+                updatedAt: new Date(v.updated_at),
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar veículos do cliente:', err);
+      }
+
+      // 5. Carregar Lançamentos Financeiros (todas as receitas e pagamentos do cliente)
       let transQuery = supabase
         .from('transactions')
         .select('*');
@@ -407,6 +453,40 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     }
   }, []);
 
+  const handleVehicleSuccess = (saved: CustomerVehicle) => {
+    setVehicles((prev) => {
+      const exists = prev.some((v) => v.id === saved.id);
+      if (exists) {
+        return prev.map((v) => (v.id === saved.id ? saved : v));
+      }
+      return [saved, ...prev];
+    });
+  };
+
+  const handleDeleteVehicle = async (vehicleId: string) => {
+    try {
+      const { error } = await supabase
+        .from('customer_vehicles')
+        .delete()
+        .eq('id', vehicleId);
+
+      if (error) throw error;
+
+      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
+      toast({
+        title: 'Veículo removido',
+        description: 'O veículo foi desvinculado da garagem do cliente.',
+      });
+    } catch (err: any) {
+      console.error('Erro ao remover veículo:', err);
+      toast({
+        title: 'Erro ao remover veículo',
+        description: err.message || 'Não foi possível remover o veículo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Limpa o estado imediatamente e busca os novos dados ao abrir ou alternar cliente
   useEffect(() => {
     activeCustomerIdRef.current = customer?.id || null;
@@ -418,6 +498,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setServiceOrders([]);
       setAppointments([]);
       setTransactions([]);
+      setVehicles([]);
       setPendingDebt(0);
       setActiveTab('history');
       loadCustomerData(customer.id, customer.name);
@@ -426,10 +507,13 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       setServiceOrders([]);
       setAppointments([]);
       setTransactions([]);
+      setVehicles([]);
       setPendingDebt(0);
       setLoading(false);
     }
   }, [open, customer?.id, customer?.name, loadCustomerData]);
+
+  const isRepairSegment = currentClient?.businessSegment === 'repair' || vehicles.length > 0;
 
   // ─── Métricas RFM & Comerciais ──────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -1205,22 +1289,28 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             onValueChange={(v: any) => setActiveTab(v)}
             className="flex-1 flex flex-col min-h-0 overflow-hidden"
           >
-            <div className="px-4 pt-2 border-b shrink-0 bg-background">
-              <TabsList className="grid grid-cols-3 h-9 w-full">
-                <TabsTrigger value="history" className="text-xs gap-1.5">
-                  <Receipt className="h-3.5 w-3.5" />
-                  Últimas Compras {loading ? '' : `(${unifiedTimeline.filter((e) => e.type !== 'appointment').length})`}
-                </TabsTrigger>
-                <TabsTrigger value="top_items" className="text-xs gap-1.5">
-                  <Package className="h-3.5 w-3.5 text-primary" />
-                  Mais Comprados {loading ? '' : `(${topProducts.length})`}
-                </TabsTrigger>
-                <TabsTrigger value="preferences" className="text-xs gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  Preferências CRM
-                </TabsTrigger>
-              </TabsList>
-            </div>
+                <div className="px-4 pt-2 border-b shrink-0 bg-background">
+                  <TabsList className={cn("grid h-9 w-full", isRepairSegment ? "grid-cols-4" : "grid-cols-3")}>
+                    <TabsTrigger value="history" className="text-xs gap-1.5">
+                      <Receipt className="h-3.5 w-3.5" />
+                      Últimas Compras {loading ? '' : `(${unifiedTimeline.filter((e) => e.type !== 'appointment').length})`}
+                    </TabsTrigger>
+                    <TabsTrigger value="top_items" className="text-xs gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-primary" />
+                      Mais Comprados {loading ? '' : `(${topProducts.length})`}
+                    </TabsTrigger>
+                    {isRepairSegment && (
+                      <TabsTrigger value="vehicles" className="text-xs gap-1.5">
+                        <Car className="h-3.5 w-3.5 text-blue-500" />
+                        Garagem {loading ? '' : `(${vehicles.length})`}
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="preferences" className="text-xs gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                      Preferências CRM
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
             {/* CONTEÚDO DAS ABAS */}
             <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
@@ -1490,6 +1580,11 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                       <span className="text-xs font-bold text-foreground">
                                         OS #{s.osNumber} — {s.title}
                                       </span>
+                                      {s.vehiclePlate && (
+                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono font-bold bg-blue-50 text-blue-700 border-blue-300">
+                                          🚗 {s.vehiclePlate}
+                                        </Badge>
+                                      )}
                                       {s.status === 'cancelled' ? (
                                         <Badge
                                           variant="destructive"
@@ -1665,6 +1760,157 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                     )}
                   </TabsContent>
 
+                  {/* ABA: GARAGEM / VEÍCULOS (Oficinas & Centro Automotivo) */}
+                  <TabsContent value="vehicles" className="mt-0 space-y-3.5">
+                    {/* Cabeçalho da Garagem com botão de Adicionar */}
+                    <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl border bg-card">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider">
+                          <Car className="h-4 w-4 text-blue-600" /> Garagem do Cliente
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {vehicles.length === 0
+                            ? 'Nenhum veículo vinculado a este cliente no momento.'
+                            : `${vehicles.length} veículo(s) cadastrado(s) com histórico de manutenção.`}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs gap-1.5 shrink-0"
+                        onClick={() => {
+                          setEditingVehicle(null);
+                          setIsVehicleDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Adicionar Veículo
+                      </Button>
+                    </div>
+
+                    {/* Lista de Veículos Cadastrados */}
+                    {vehicles.length === 0 ? (
+                      <div className="p-8 text-center rounded-xl border border-dashed border-border/80 bg-muted/10 space-y-2">
+                        <div className="h-10 w-10 mx-auto rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-blue-600">
+                          <Car className="h-5 w-5" />
+                        </div>
+                        <p className="text-xs font-semibold text-foreground">
+                          Nenhum veículo cadastrado na garagem
+                        </p>
+                        <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                          Veículos cadastrados manualmente ou preenchidos ao abrir uma Ordem de Serviço serão sincronizados aqui automaticamente com o histórico do cliente.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {vehicles.map((v) => {
+                          const vSOs = serviceOrders.filter(
+                            (s) =>
+                              s.vehicleId === v.id ||
+                              (v.plate && s.vehiclePlate && s.vehiclePlate.toUpperCase() === v.plate.toUpperCase())
+                          );
+                          const totalInvested = vSOs.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+                          const latestKmSO = vSOs.find((s) => s.vehicleKm);
+                          const latestKm = latestKmSO?.vehicleKm;
+
+                          return (
+                            <div
+                              key={v.id}
+                              className="p-3.5 rounded-xl border bg-card hover:border-primary/40 transition-colors space-y-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                  {v.plate ? (
+                                    <div className="border-2 border-blue-600/60 dark:border-blue-400/60 bg-muted/40 rounded-md px-2 py-0.5 text-center shrink-0 shadow-xs">
+                                      <p className="text-[8px] font-bold text-blue-600 dark:text-blue-400 tracking-wider">BRASIL</p>
+                                      <p className="font-mono font-black text-xs text-foreground tracking-widest">
+                                        {formatVehiclePlate(v.plate)}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 flex items-center justify-center shrink-0">
+                                      <Car className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <h5 className="text-xs font-bold text-foreground truncate">
+                                      {v.brand ? `${v.brand} ` : ''}
+                                      {v.model}
+                                    </h5>
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                      {v.modelYear && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium">
+                                          Ano: {v.modelYear}
+                                        </Badge>
+                                      )}
+                                      {v.color && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium">
+                                          Cor: {v.color}
+                                        </Badge>
+                                      )}
+                                      {v.fuelType && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium">
+                                          {v.fuelType}
+                                        </Badge>
+                                      )}
+                                      {latestKm !== undefined && (
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono font-bold text-blue-600">
+                                          Última KM: {latestKm.toLocaleString('pt-BR')} km
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                    title="Editar veículo"
+                                    onClick={() => {
+                                      setEditingVehicle(v);
+                                      setIsVehicleDialogOpen(true);
+                                    }}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    title="Remover veículo da garagem"
+                                    onClick={() => handleDeleteVehicle(v.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {v.notes && (
+                                <p className="text-[11px] text-muted-foreground bg-muted/30 p-2 rounded-md border border-border/50">
+                                  📝 {v.notes}
+                                </p>
+                              )}
+
+                              {/* Resumo de Manutenções do Veículo */}
+                              <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1 text-[11px]">
+                                  <Wrench className="h-3 w-3 text-primary" />
+                                  <strong className="text-foreground">{vSOs.length}</strong> OS realizada(s)
+                                </span>
+                                <span className="text-[11px]">
+                                  Total em serviços:{' '}
+                                  <strong className="text-blue-600 dark:text-blue-400 font-semibold">
+                                    {formatCurrency(totalInvested)}
+                                  </strong>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
                   {/* ABA 3: PREFERÊNCIAS & CRM */}
                   <TabsContent value="preferences" className="mt-0 space-y-3.5">
                     {/* Preferências de Pagamento & Comercial */}
@@ -1812,6 +2058,15 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             loadOrders(currentClient.id);
           }
         }}
+      />
+
+      {/* MODAL OFICIAL DE CRIAÇÃO & EDIÇÃO DE VEÍCULOS */}
+      <VehicleDialog
+        open={isVehicleDialogOpen}
+        onOpenChange={setIsVehicleDialogOpen}
+        vehicle={editingVehicle}
+        defaultCustomerId={customer?.id}
+        onSuccess={handleVehicleSuccess}
       />
     </>
   );

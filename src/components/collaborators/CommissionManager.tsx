@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { formatCurrency as defaultFormatCurrency } from '@/lib/utils';
 import { CommissionSettlement, commissionSettlementService } from '@/services/commissionSettlementService';
 import { CommissionSettlementDialog } from '@/components/collaborators/CommissionSettlementDialog';
 import { CommissionReceiptDialog } from '@/components/collaborators/CommissionReceiptDialog';
@@ -46,7 +47,8 @@ export const CommissionManager: React.FC<CommissionManagerProps> = ({
   startDate: propStartDate,
   endDate: propEndDate,
 }) => {
-  const { currentClient, transactions, collaborators, customers, formatCurrency } = useFinance();
+  const { currentClient, transactions, collaborators, customers, formatCurrency: contextFormatCurrency } = useFinance();
+  const formatCurrency = contextFormatCurrency || defaultFormatCurrency;
 
   // Internal state
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string>('all');

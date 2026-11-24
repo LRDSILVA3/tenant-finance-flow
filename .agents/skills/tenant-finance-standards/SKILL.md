@@ -51,7 +51,8 @@ Antes de criar qualquer interface, verifique a tabela de componentes oficiais ab
 
 7. **Primitivos Essenciais**:
    - `MoneyInput` (`src/components/ui/money-input.tsx`): Input com máscara monetária BRL obrigatório.
-   - `SearchableSelect` (`src/components/ui/searchable-select.tsx`): Seletor pesquisável obrigatório para listas longas.
+   - `SearchableSelect` (`src/components/ui/searchable-select.tsx`): Seletor pesquisável obrigatório para listas longas, autocompletes e opções dinâmicas. Proibido o uso de `<datalist>` ou `<select>` nativo do HTML.
+   - `Select` (`src/components/ui/select.tsx`): Seletor oficial Shadcn para enums e listas fixas.
    - `DeviceCameraScanner` (`src/components/common/DeviceCameraScanner.tsx`): Scanner de código de barras por câmera.
 
 ---

@@ -22,6 +22,7 @@ import { ServiceOrders } from '@/components/service-orders/ServiceOrders';
 import { StorePos } from '@/components/pos/StorePos';
 import { Loader2 } from 'lucide-react';
 import { SystemTour } from '@/components/layout/SystemTour';
+import { BusinessTutorialDialog } from '@/components/tutorials/BusinessTutorialDialog';
 import { cn } from '@/lib/utils';
 
 type View = 'dashboard' | 'transactions' | 'receivables' | 'payables' | 'orders' | 'service_orders' | 'store_pos' | 'customers' | 'suppliers' | 'schedule' | 'inventory' | 'reports' | 'settings' | 'notifications';
@@ -42,6 +43,7 @@ const Index: React.FC = () => {
   const [scheduleCustomerId, setScheduleCustomerId] = useState<string | undefined>(undefined);
   const [activeReportTab, setActiveReportTab] = useState<string>('dre');
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isTutorialsOpen, setIsTutorialsOpen] = useState(false);
 
   useEffect(() => {
     (window as any).__setView = (view: View, reportTab?: string) => {
@@ -155,7 +157,11 @@ const Index: React.FC = () => {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-background">
-      <Header onViewChange={setCurrentView} onStartTour={() => setIsTourOpen(true)} />
+      <Header 
+        onViewChange={setCurrentView} 
+        onStartTour={() => setIsTourOpen(true)}
+        onOpenTutorials={() => setIsTutorialsOpen(true)}
+      />
       <Navigation 
         currentView={currentView} 
         onViewChange={setCurrentView} 
@@ -170,7 +176,16 @@ const Index: React.FC = () => {
       )}>
         {renderView()}
       </main>
-      <SystemTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
+      <SystemTour 
+        open={isTourOpen} 
+        onClose={() => setIsTourOpen(false)}
+        onOpenTutorials={() => setIsTutorialsOpen(true)}
+      />
+      <BusinessTutorialDialog
+        open={isTutorialsOpen}
+        onOpenChange={setIsTutorialsOpen}
+        onNavigateToView={(view) => setCurrentView(view as View)}
+      />
     </div>
   );
 };

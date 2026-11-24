@@ -17,11 +17,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette, MessageSquare, Store, CalendarDays, Wrench, LayoutGrid, ShoppingBag, Check } from 'lucide-react';
+import { List, Settings as SettingsIcon, Wallet, Users, CreditCard, Sparkles, UserPlus, Loader2, Plus, Trash2, Palette, MessageSquare, Store, CalendarDays, Wrench, LayoutGrid, ShoppingBag, Check, Utensils, Briefcase, BookOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BusinessSegment } from '@/types/finance';
+import { BusinessTutorialDialog } from '@/components/tutorials/BusinessTutorialDialog';
 
 export const Settings: React.FC = () => {
   const { 
@@ -37,6 +38,7 @@ export const Settings: React.FC = () => {
     businessSegment = 'full',
     updateBusinessSegment
   } = useFinance();
+  const [isTutorialOpen, setIsTutorialOpen] = React.useState(false);
   const isOwner = userRole === 'owner' || userProfile?.isAdmin;
 
   const handleSelectSegment = async (segment: BusinessSegment) => {
@@ -44,8 +46,10 @@ export const Settings: React.FC = () => {
     await updateBusinessSegment(segment);
     const names: Record<BusinessSegment, string> = {
       retail: 'Loja de Roupas & Varejo (Modo Simplificado)',
-      services: 'Prestador de Serviços & Agendamentos',
-      repair: 'Oficina & Assistência Técnica',
+      repair: 'Oficina Mecânica & Assistência Técnica',
+      services: 'Serviços, Estética & Barbearia',
+      food: 'Alimentos, Gastronomia & Mercados',
+      b2b: 'Prestador de Serviços B2B & Consultoria',
       full: 'Modo Completo (Avançado)'
     };
     toast({
@@ -194,16 +198,30 @@ export const Settings: React.FC = () => {
                     Personalize os menus e a complexidade do sistema conforme a rotina diária da sua empresa.
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="self-start sm:self-auto bg-background/80 text-primary border-primary/30 text-xs px-2.5 py-0.5 font-semibold">
-                  {businessSegment === 'retail' && '👗 Varejo & Loja de Roupas'}
-                  {businessSegment === 'services' && '✂️ Serviços & Agenda'}
-                  {businessSegment === 'repair' && '🔧 Oficina & Reparos'}
-                  {businessSegment === 'full' && '🏢 Modo Completo'}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsTutorialOpen(true)}
+                    className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Ver Guia & Tutoriais
+                  </Button>
+                  <Badge variant="outline" className="bg-background/80 text-primary border-primary/30 text-xs px-2.5 py-0.5 font-semibold">
+                    {businessSegment === 'retail' && '👗 Varejo & Loja de Roupas'}
+                    {businessSegment === 'repair' && '🚗 Oficina Mecânica & Auto Center'}
+                    {businessSegment === 'services' && '✂️ Serviços, Estética & Barbearia'}
+                    {businessSegment === 'food' && '🍔 Alimentos, Gastronomia & Mercados'}
+                    {businessSegment === 'b2b' && '💼 Prestador B2B & Consultoria'}
+                    {businessSegment === 'full' && '🏢 Modo Completo (Avançado)'}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* 1. Loja de Roupas & Varejo */}
                 <div
                   onClick={() => handleSelectSegment('retail')}
@@ -230,18 +248,53 @@ export const Settings: React.FC = () => {
                     </div>
                     <h4 className="font-bold text-sm text-foreground">Loja de Roupas & Varejo</h4>
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Modo simplificado. Foco em frente de caixa (PDV), estoque com grade P/M/G e cores, compras e contas a pagar por fornecedor.
+                      Foco em frente de caixa (PDV Touch), grade P/M/G e cores, compras por fornecedor e crediário.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">PDV Touch</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Estoque P/M/G</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Por Fornecedor</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Grade P/M/G</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium">Oculta OS e Agenda</span>
                   </div>
                 </div>
 
-                {/* 2. Serviços & Agenda */}
+                {/* 2. Oficina Mecânica & Auto Center */}
+                <div
+                  onClick={() => handleSelectSegment('repair')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'repair'
+                      ? "border-amber-600 bg-amber-50/30 dark:bg-amber-950/20 ring-2 ring-amber-600/20 shadow-sm"
+                      : "border-border hover:border-amber-300 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'repair' ? "bg-amber-600 text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <Wrench className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'repair' ? (
+                        <Badge className="bg-amber-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">Oficinas / Auto</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Oficina Mecânica & Auto Center</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Foco em Ordens de Serviço por Placa do Veículo, KM, Mão de Obra separada de Peças e baixa no estoque.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-bold">Placa & KM</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Mão de Obra + Peças</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Oculta Agenda</span>
+                  </div>
+                </div>
+
+                {/* 3. Serviços, Estética & Barbearia */}
                 <div
                   onClick={() => handleSelectSegment('services')}
                   className={cn(
@@ -263,54 +316,87 @@ export const Settings: React.FC = () => {
                         <Badge className="bg-blue-600 text-white text-[10px] font-bold">Ativo</Badge>
                       )}
                     </div>
-                    <h4 className="font-bold text-sm text-foreground">Serviços & Agenda</h4>
+                    <h4 className="font-bold text-sm text-foreground">Serviços, Estética & Barbearia</h4>
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Foco em grade horária de atendimentos, escalas de colaboradores, comissões e clientes.
+                      Foco em grade horária de agendamentos diários, escalas de profissionais, comissões e lembretes WhatsApp.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Grade Horária</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Escalas</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Comissões</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">Oculta OS</span>
                   </div>
                 </div>
 
-                {/* 3. Oficina & Reparos */}
+                {/* 4. Alimentos, Gastronomia & Mercados */}
                 <div
-                  onClick={() => handleSelectSegment('repair')}
+                  onClick={() => handleSelectSegment('food')}
                   className={cn(
                     "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
-                    businessSegment === 'repair'
-                      ? "border-amber-600 bg-amber-50/30 dark:bg-amber-950/20 ring-2 ring-amber-600/20 shadow-sm"
-                      : "border-border hover:border-amber-300 bg-card"
+                    businessSegment === 'food'
+                      ? "border-rose-600 bg-rose-50/30 dark:bg-rose-950/20 ring-2 ring-rose-600/20 shadow-sm"
+                      : "border-border hover:border-rose-300 bg-card"
                   )}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className={cn(
                         "p-2.5 rounded-lg",
-                        businessSegment === 'repair' ? "bg-amber-600 text-white" : "bg-muted text-muted-foreground"
+                        businessSegment === 'food' ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground"
                       )}>
-                        <Wrench className="h-5 w-5" />
+                        <Utensils className="h-5 w-5" />
                       </div>
-                      {businessSegment === 'repair' && (
-                        <Badge className="bg-amber-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      {businessSegment === 'food' && (
+                        <Badge className="bg-rose-600 text-white text-[10px] font-bold">Ativo</Badge>
                       )}
                     </div>
-                    <h4 className="font-bold text-sm text-foreground">Oficina & Assistência</h4>
+                    <h4 className="font-bold text-sm text-foreground">Alimentos & Gastronomia</h4>
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Foco em ordens de serviço (peças e mão de obra), estoque de peças e finanças de reparos.
+                      Foco em Frente de Caixa Touch rápido, controle de validade de perecíveis, Kardex de perdas e fornecedores.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Ordens de Serviço</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Peças & Estoque</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-medium">Oculta Agenda</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">PDV Touch</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 font-medium">Validade & Perecíveis</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Oculta OS e Agenda</span>
                   </div>
                 </div>
 
-                {/* 4. Modo Completo */}
+                {/* 5. Prestador B2B & Consultoria */}
+                <div
+                  onClick={() => handleSelectSegment('b2b')}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between hover:shadow-md",
+                    businessSegment === 'b2b'
+                      ? "border-indigo-600 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-600/20 shadow-sm"
+                      : "border-border hover:border-indigo-300 bg-card"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={cn(
+                        "p-2.5 rounded-lg",
+                        businessSegment === 'b2b' ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <Briefcase className="h-5 w-5" />
+                      </div>
+                      {businessSegment === 'b2b' && (
+                        <Badge className="bg-indigo-600 text-white text-[10px] font-bold">Ativo</Badge>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-sm text-foreground">Prestador B2B & Consultoria</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      Foco em Contas a Receber, faturamento de contratos, propostas comerciais em PDF e extrato DRE.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Contas a Receber</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">DRE Gerencial</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 font-medium">Oculta PDV e OS</span>
+                  </div>
+                </div>
+
+                {/* 6. Modo Completo */}
                 <div
                   onClick={() => handleSelectSegment('full')}
                   className={cn(
@@ -334,12 +420,11 @@ export const Settings: React.FC = () => {
                     </div>
                     <h4 className="font-bold text-sm text-foreground">Modo Completo (Avançado)</h4>
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Acesso irrestrito a todos os módulos, relatórios contábeis, agendas e ordens de serviço.
+                      Acesso irrestrito a todos os módulos, relatórios contábeis, agendas, ordens de serviço e estoque.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-1">
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Todos os Módulos</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">DRE Contábil</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Sem Ocultações</span>
                   </div>
                 </div>
@@ -644,6 +729,11 @@ export const Settings: React.FC = () => {
           </TabsContent>
         )}
       </Tabs>
+
+      <BusinessTutorialDialog
+        open={isTutorialOpen}
+        onOpenChange={setIsTutorialOpen}
+      />
     </div>
   );
 };

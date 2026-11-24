@@ -234,6 +234,10 @@ export const SubscriptionTab: React.FC = () => {
                       <Check className="h-4 w-4 text-emerald-500 shrink-0" />
                       <span>{t.chartOfAccounts} & Lançamentos</span>
                     </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>Relatórios Financeiros & DRE</span>
+                    </li>
                     <li className={cn("flex items-center gap-2 text-sm", !plan.features.payment_methods && "text-muted-foreground opacity-50")}>
                       <Check className={cn("h-4 w-4 text-emerald-500 shrink-0", !plan.features.payment_methods && "text-muted-foreground/30")} />
                       <span>Formas de Pagamento Avançadas</span>

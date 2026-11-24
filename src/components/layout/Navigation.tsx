@@ -67,8 +67,17 @@ export const Navigation: React.FC<NavigationProps> = ({
   const location = useLocation();
 
   const isRetail = businessSegment === 'retail';
-  const showServiceOrders = businessSegment === 'full' || businessSegment === 'repair';
-  const showSchedule = businessSegment === 'full' || businessSegment === 'services';
+  const isRepair = businessSegment === 'repair';
+  const isServices = businessSegment === 'services';
+  const isFood = businessSegment === 'food';
+  const isB2B = businessSegment === 'b2b';
+  const isFull = businessSegment === 'full';
+
+  // Regras de visibilidade granular por segmento
+  const showServiceOrders = isFull || isRepair;
+  const showSchedule = isFull || isServices;
+  const showStorePos = isFull || isRetail || isFood || isRepair;
+  const showOrders = isFull || isRetail || isFood || isB2B;
 
   const isAdminView = location.pathname === '/admin';
   const activeId = isAdminView ? 'admin' : currentView;
@@ -242,35 +251,39 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 bg-card border border-border shadow-lg">
-                <DropdownMenuItem
-                  onClick={() => handleNavClick('store_pos')}
-                  className={cn(
-                    "flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
-                    activeId === 'store_pos' && "bg-accent text-accent-foreground font-semibold"
-                  )}
-                >
-                  <Store className="h-4 w-4 text-emerald-600" />
-                  <div>
-                    <div className="font-medium text-xs leading-none flex items-center gap-1">
-                      Modo Loja (PDV Touch)
-                      <Badge className="bg-emerald-600 text-white text-[8px] h-3.5 px-1 py-0 uppercase">Novo</Badge>
+                {showStorePos && (
+                  <DropdownMenuItem
+                    onClick={() => handleNavClick('store_pos')}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                      activeId === 'store_pos' && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    <Store className="h-4 w-4 text-emerald-600" />
+                    <div>
+                      <div className="font-medium text-xs leading-none flex items-center gap-1">
+                        Modo Loja (PDV Touch)
+                        <Badge className="bg-emerald-600 text-white text-[8px] h-3.5 px-1 py-0 uppercase">Novo</Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Frente de caixa rápida com botões</p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Frente de caixa rápida com botões</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleNavClick('orders')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
-                    activeId === 'orders' && "bg-accent text-accent-foreground font-semibold"
-                  )}
-                >
-                  <ShoppingCart className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="font-medium text-xs leading-none">Pedido de Venda</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Catálogo e histórico de pedidos</p>
-                  </div>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                )}
+                {showOrders && (
+                  <DropdownMenuItem
+                    onClick={() => handleNavClick('orders')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                      activeId === 'orders' && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    <ShoppingCart className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="font-medium text-xs leading-none">{isB2B ? 'Propostas & Pedidos' : 'Pedido de Venda'}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{isB2B ? 'Orçamentos e propostas comerciais' : 'Catálogo e histórico de pedidos'}</p>
+                    </div>
+                  </DropdownMenuItem>
+                )}
                 {showServiceOrders && (
                   <DropdownMenuItem
                     onClick={() => handleNavClick('service_orders')}
@@ -281,8 +294,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                   >
                     <ClipboardList className="h-4 w-4 text-primary" />
                     <div>
-                      <p className="font-medium text-xs leading-none">Ordem de Serviço</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Mão de obra e peças</p>
+                      <p className="font-medium text-xs leading-none">{isRepair ? 'Ordem de Serviço (Mecânica)' : 'Ordem de Serviço'}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{isRepair ? 'Veículo, placa, peças e mão de obra' : 'Mão de obra e peças'}</p>
                     </div>
                   </DropdownMenuItem>
                 )}
@@ -645,26 +658,30 @@ export const Navigation: React.FC<NavigationProps> = ({
                   Vendas & Atendimento
                 </p>
                 <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => { handleNavClick('store_pos'); setIsMobileMenuOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
-                      activeId === 'store_pos' && "border-primary bg-primary/5 text-primary font-bold"
-                    )}
-                  >
-                    <Store className="h-5 w-5 text-emerald-600" />
-                    <span className="text-xs">Modo Loja</span>
-                  </button>
-                  <button
-                    onClick={() => { handleNavClick('orders'); setIsMobileMenuOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
-                      activeId === 'orders' && "border-primary bg-primary/5 text-primary font-bold"
-                    )}
-                  >
-                    <ShoppingCart className="h-5 w-5 text-primary" />
-                    <span className="text-xs">Pedidos</span>
-                  </button>
+                  {showStorePos && (
+                    <button
+                      onClick={() => { handleNavClick('store_pos'); setIsMobileMenuOpen(false); }}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                        activeId === 'store_pos' && "border-primary bg-primary/5 text-primary font-bold"
+                      )}
+                    >
+                      <Store className="h-5 w-5 text-emerald-600" />
+                      <span className="text-xs">Modo Loja</span>
+                    </button>
+                  )}
+                  {showOrders && (
+                    <button
+                      onClick={() => { handleNavClick('orders'); setIsMobileMenuOpen(false); }}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border bg-card text-center gap-1.5 transition-colors",
+                        activeId === 'orders' && "border-primary bg-primary/5 text-primary font-bold"
+                      )}
+                    >
+                      <ShoppingCart className="h-5 w-5 text-primary" />
+                      <span className="text-xs">{isB2B ? 'Propostas' : 'Pedidos'}</span>
+                    </button>
+                  )}
                   {showServiceOrders && (
                     <button
                       onClick={() => { handleNavClick('service_orders'); setIsMobileMenuOpen(false); }}
@@ -674,7 +691,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                       )}
                     >
                       <ClipboardList className="h-5 w-5 text-indigo-600" />
-                      <span className="text-xs">Ordens Serv.</span>
+                      <span className="text-xs">{isRepair ? 'Ordens (OS)' : 'Ordens Serv.'}</span>
                     </button>
                   )}
                 </div>

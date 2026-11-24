@@ -37,15 +37,15 @@ const planDisplayMetadata: Record<string, { description: string, features: { tex
     description: "Ideal para autônomos e microempresas começando a organizar suas finanças.",
     features: [
       { text: "1 Usuário (Dono)", included: true },
-      { text: "Fluxo de caixa básico", included: true },
+      { text: "Fluxo de caixa completo", included: true },
       { text: "Importação de extratos (OFX/CSV)", included: true },
-      { text: "Relatórios de receitas e despesas", included: true },
+      { text: "Relatórios & DRE Simplificado", included: true },
+      { text: "Exportação de relatórios em CSV", included: true },
       { text: "Sem colaboradores", included: true },
       { text: "Suporte por e-mail", included: true },
       { text: "Controle de Múltiplas Empresas", included: false },
       { text: "Gestão avançada de comissões", included: false },
-      { text: "Exportação de relatórios em CSV", included: false },
-      { text: "Dashboards e projeções avançadas", included: false },
+      { text: "Projeções e automações com IA", included: false },
     ],
     cta: "Começar Teste Grátis",
     popular: false,
@@ -96,6 +96,11 @@ export default function Landing() {
   const navigate = useNavigate();
   const { plans: dbPlans } = useSubscription();
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -274,7 +279,7 @@ export default function Landing() {
                 <span className="text-xs font-mono text-muted-foreground ml-auto bg-muted px-2 py-0.5 rounded">previna.app/dashboard</span>
               </div>
               <div className="p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-6 bg-gradient-to-br from-background to-muted/20">
-                <div className="col-span-1 md:col-span-2 space-y-4 text-left">
+                <div className="col-span-1 md:col-span-2 space-y-4 text-left min-w-0 w-full">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="font-bold text-lg">Visão Geral da Empresa</h3>
@@ -284,9 +289,10 @@ export default function Landing() {
                       <TrendingUp className="h-3.5 w-3.5" /> +42% este mês
                     </div>
                   </div>
-                  <div className="h-[240px] bg-primary/5 border border-primary/10 rounded-xl relative overflow-hidden p-4">
+                  <div className="h-[240px] w-full min-w-0 bg-primary/5 border border-primary/10 rounded-xl relative overflow-hidden p-4">
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
-                    <ResponsiveContainer width="100%" height={200}>
+                    {isMounted ? (
+                      <ResponsiveContainer width="100%" height={200} minWidth={100}>
                       <AreaChart data={previewChartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
@@ -342,7 +348,12 @@ export default function Landing() {
                           fill="url(#colorExpense)"
                         />
                       </AreaChart>
-                    </ResponsiveContainer>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground animate-pulse">
+                        Carregando prévia do painel...
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-card border rounded-xl p-4 text-sm flex flex-col gap-1">

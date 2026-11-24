@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { formatCurrency as defaultFormatCurrency } from '@/lib/utils';
 import { CommissionSettlement, commissionSettlementService } from '@/services/commissionSettlementService';
 import {
   Dialog,
@@ -55,7 +56,8 @@ export const CommissionSettlementDialog: React.FC<CommissionSettlementDialogProp
   endDate,
   onSettlementSuccess,
 }) => {
-  const { currentClient, categories, addTransaction, formatCurrency } = useFinance();
+  const { currentClient, categories, addTransaction, formatCurrency: contextFormatCurrency } = useFinance();
+  const formatCurrency = contextFormatCurrency || defaultFormatCurrency;
 
   const totalSales = candidateItems.reduce((acc, item) => acc + item.amount, 0);
   const totalCommission = candidateItems.reduce((acc, item) => acc + item.commissionAmount, 0);

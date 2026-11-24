@@ -90,7 +90,9 @@ export const Scan: React.FC = () => {
   // Audio Beep generator using Web Audio API
   const playBeep = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+      if (!AudioContextClass) return;
+      const audioCtx = new AudioContextClass();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sine';

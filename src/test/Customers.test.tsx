@@ -76,6 +76,10 @@ describe('Customers CRM Component', () => {
             }
           ],
           error: null
+        }),
+        or: vi.fn().mockResolvedValue({
+          data: [],
+          error: null
         })
       })
     });

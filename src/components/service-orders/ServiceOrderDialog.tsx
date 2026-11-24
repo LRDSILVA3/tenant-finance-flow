@@ -57,11 +57,15 @@ import {
   WifiOff,
   RefreshCw,
   Camera,
-  MessageSquare
+  MessageSquare,
+  Car,
+  Loader2,
 } from 'lucide-react';
 import { WhatsAppSendModal } from '@/components/whatsapp/WhatsAppSendModal';
 import { DeviceCameraScanner } from '@/components/common/DeviceCameraScanner';
 import { generateServiceOrderPdf } from './ServiceOrderPdf';
+import { VehicleDialog } from '@/components/vehicles/VehicleDialog';
+import { formatVehiclePlate } from '@/utils/vehicleUtils';
 
 // Web Audio API Beep helper
 const playPcBeep = (freq = 880, duration = 0.12) => {
@@ -104,7 +108,8 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
   serviceOrder,
   onSaved,
 }) => {
-  const { currentClient, collaborators, categories, customPaymentMethods = [] } = useFinance();
+  const { currentClient, collaborators, categories, customPaymentMethods = [], businessSegment: ctxSegment } = useFinance();
+  const businessSegment = ctxSegment || currentClient?.businessSegment || 'full';
   const { addTransaction } = useTransactions();
 
   const [activeTab, setActiveTab] = useState<'general' | 'services' | 'products' | 'totals'>('general');
@@ -122,6 +127,14 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
   const [collaboratorId, setCollaboratorId] = useState<string>('none');
   const [status, setStatus] = useState<ServiceOrderStatus>('budget');
   const [equipmentInfo, setEquipmentInfo] = useState('');
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
+  const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [isVehicleDialogOpen, setIsVehicleDialogOpen] = useState(false);
+  const [vehiclePlate, setVehiclePlate] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear, setVehicleYear] = useState('');
+  const [vehicleKm, setVehicleKm] = useState<string>('');
   const [reportedDefect, setReportedDefect] = useState('');
   const [technicalDiagnosis, setTechnicalDiagnosis] = useState('');
   const [scheduledAt, setScheduledAt] = useState<string>('');
@@ -248,7 +261,107 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
     loadAuxData();
   }, [currentClient, open]);
 
-  // Inicializa ou limpa formulário
+  // Carrega veículos do cliente selecionado
+  useEffect(() => {
+    if (!currentClient || !open || customerId === 'none') {
+      setCustomerVehicles([]);
+      setLoadingVehicles(false);
+      return;
+    }
+
+    const fetchVehicles = async () => {
+      setLoadingVehicles(true);
+      try {
+        const { data, error } = await supabase
+          .from('customer_vehicles')
+          .select('*')
+          .eq('client_id', currentClient.id)
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          const mapped: CustomerVehicle[] = data.map((v: any) => ({
+            id: v.id,
+            clientId: v.client_id,
+            customerId: v.customer_id,
+            plate: v.plate,
+            brand: v.brand,
+            model: v.model,
+            modelYear: v.model_year,
+            color: v.color,
+            fuelType: v.fuel_type,
+            chassis: v.chassis,
+            renavam: v.renavam,
+            notes: v.notes,
+            createdAt: new Date(v.created_at),
+            updatedAt: new Date(v.updated_at),
+          }));
+          setCustomerVehicles(mapped);
+
+          // Se estiver criando uma nova OS:
+          // Se tiver exatamente 1 veículo e ainda não selecionou nenhum, seleciona automaticamente!
+          if (!serviceOrder && mapped.length === 1 && !selectedVehicleId) {
+            const first = mapped[0];
+            setSelectedVehicleId(first.id);
+            setVehiclePlate(formatVehiclePlate(first.plate));
+            setVehicleModel(first.model);
+            setVehicleYear(first.modelYear || '');
+            if (first.color || first.fuelType) {
+              setEquipmentInfo([first.color, first.fuelType].filter(Boolean).join(', '));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao buscar veículos do cliente:', err);
+      } finally {
+        setLoadingVehicles(false);
+      }
+    };
+
+    fetchVehicles();
+  }, [customerId, currentClient, open, serviceOrder]);
+
+  const handleCustomerChange = (newCustId: string) => {
+    setCustomerId(newCustId);
+    setSelectedVehicleId('');
+    setVehiclePlate('');
+    setVehicleModel('');
+    setVehicleYear('');
+    setEquipmentInfo('');
+    setVehicleKm('');
+  };
+
+  // Handler de seleção de veículo pré-cadastrado
+  const handleSelectVehicle = (vId: string) => {
+    setSelectedVehicleId(vId);
+    if (vId === 'manual' || vId === 'new') {
+      return;
+    }
+    const found = customerVehicles.find((v) => v.id === vId);
+    if (found) {
+      setVehiclePlate(formatVehiclePlate(found.plate));
+      setVehicleModel(found.model);
+      setVehicleYear(found.modelYear || '');
+      const details = [found.color, found.fuelType].filter(Boolean).join(', ');
+      if (details) setEquipmentInfo(details);
+    }
+  };
+
+  const handleVehicleCreated = (created: CustomerVehicle) => {
+    setCustomerVehicles((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
+    setSelectedVehicleId(created.id);
+    setVehiclePlate(formatVehiclePlate(created.plate));
+    setVehicleModel(created.model);
+    setVehicleYear(created.modelYear || '');
+    const details = [created.color, created.fuelType].filter(Boolean).join(', ');
+    if (details) setEquipmentInfo(details);
+    setIsVehicleDialogOpen(false);
+    toast({
+      title: '🚗 Veículo vinculado à OS!',
+      description: `${created.model} (${formatVehiclePlate(created.plate)}) selecionado.`,
+    });
+  };
+
   useEffect(() => {
     if (serviceOrder) {
       setTitle(serviceOrder.title);
@@ -256,6 +369,11 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
       setCollaboratorId(serviceOrder.collaboratorId || 'none');
       setStatus(serviceOrder.status);
       setEquipmentInfo(serviceOrder.equipmentInfo || '');
+      setSelectedVehicleId(serviceOrder.vehicleId || (serviceOrder.vehiclePlate ? 'manual' : ''));
+      setVehiclePlate(serviceOrder.vehiclePlate || '');
+      setVehicleModel(serviceOrder.vehicleModel || '');
+      setVehicleYear(serviceOrder.vehicleYear || '');
+      setVehicleKm(serviceOrder.vehicleKm !== undefined && serviceOrder.vehicleKm !== null ? String(serviceOrder.vehicleKm) : '');
       setReportedDefect(serviceOrder.reportedDefect || '');
       setTechnicalDiagnosis(serviceOrder.technicalDiagnosis || '');
       setScheduledAt(
@@ -300,6 +418,12 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
       setCollaboratorId('none');
       setStatus('budget');
       setEquipmentInfo('');
+      setSelectedVehicleId('');
+      setCustomerVehicles([]);
+      setVehiclePlate('');
+      setVehicleModel('');
+      setVehicleYear('');
+      setVehicleKm('');
       setReportedDefect('');
       setTechnicalDiagnosis('');
       setScheduledAt('');
@@ -619,6 +743,55 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
         }
       }
 
+      // Se for oficina e informou cliente + placa, salvar/atualizar automaticamente o veículo na garagem do cliente
+      let vehicleIdToLink = selectedVehicleId !== 'manual' && selectedVehicleId !== 'new' ? selectedVehicleId : null;
+      if (businessSegment === 'repair' && customerId !== 'none' && vehiclePlate.trim()) {
+        try {
+          const cleanPlate = vehiclePlate.trim().toUpperCase();
+          const vehiclePayload = {
+            client_id: currentClient.id,
+            customer_id: customerId,
+            plate: cleanPlate,
+            model: vehicleModel.trim() || 'Veículo não especificado',
+            model_year: vehicleYear.trim() || null,
+            notes: equipmentInfo.trim() || null,
+          };
+
+          if (vehicleIdToLink) {
+            await supabase
+              .from('customer_vehicles')
+              .update(vehiclePayload)
+              .eq('id', vehicleIdToLink);
+          } else {
+            // Verifica se já existe pela placa para esse cliente
+            const { data: existingV } = await supabase
+              .from('customer_vehicles')
+              .select('id')
+              .eq('client_id', currentClient.id)
+              .eq('customer_id', customerId)
+              .eq('plate', cleanPlate)
+              .maybeSingle();
+
+            if (existingV) {
+              vehicleIdToLink = existingV.id;
+              await supabase
+                .from('customer_vehicles')
+                .update(vehiclePayload)
+                .eq('id', existingV.id);
+            } else {
+              const { data: newV } = await supabase
+                .from('customer_vehicles')
+                .insert(vehiclePayload)
+                .select('id')
+                .single();
+              if (newV) vehicleIdToLink = newV.id;
+            }
+          }
+        } catch (vErr) {
+          console.warn('Falha ao auto-salvar veículo na garagem:', vErr);
+        }
+      }
+
       // 1. Salva ou atualiza a OS
       const osPayload = {
         client_id: currentClient.id,
@@ -628,6 +801,11 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
         collaborator_id: collaboratorId !== 'none' ? collaboratorId : null,
         status,
         equipment_info: equipmentInfo.trim() || null,
+        vehicle_id: vehicleIdToLink,
+        vehicle_plate: vehiclePlate.trim().toUpperCase() || null,
+        vehicle_model: vehicleModel.trim() || null,
+        vehicle_year: vehicleYear.trim() || null,
+        vehicle_km: vehicleKm ? Number(vehicleKm.replace(/\D/g, '')) || null : null,
         reported_defect: reportedDefect.trim() || null,
         technical_diagnosis: technicalDiagnosis.trim() || null,
         scheduled_at: scheduledAt ? new Date(`${scheduledAt}T00:00:00`).toISOString() : null,
@@ -748,6 +926,10 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
       status,
       title,
       equipmentInfo,
+      vehiclePlate: vehiclePlate.trim().toUpperCase() || undefined,
+      vehicleModel: vehicleModel.trim() || undefined,
+      vehicleYear: vehicleYear.trim() || undefined,
+      vehicleKm: vehicleKm ? Number(vehicleKm.replace(/\D/g, '')) || undefined : undefined,
       reportedDefect,
       technicalDiagnosis,
       scheduledAt: scheduledAt ? new Date(`${scheduledAt}T00:00:00`) : undefined,
@@ -856,7 +1038,7 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs font-semibold">Cliente</Label>
-                  <Select value={customerId} onValueChange={setCustomerId}>
+                  <Select value={customerId} onValueChange={handleCustomerChange}>
                     <SelectTrigger className="mt-1 h-8 text-xs">
                       <SelectValue placeholder="Selecione o cliente" />
                     </SelectTrigger>
@@ -907,29 +1089,342 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs font-semibold">
-                    Objeto / Equipamento / Veículo
-                  </Label>
-                  <Input
-                    placeholder="Ex: Notebook Dell Inspiron i5 / Placa: ABC-1234 / Nº Série: 99482"
-                    value={equipmentInfo}
-                    onChange={(e) => setEquipmentInfo(e.target.value)}
-                    className="mt-1 text-xs"
-                  />
-                </div>
+              {/* Bloco Automotivo (Oficina Mecânica) ou Equipamento Genérico */}
+              {businessSegment === 'repair' ? (
+                <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        🚗
+                      </div>
+                      <span className="text-xs font-bold text-foreground">Dados do Veículo (Oficina Mecânica)</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-700 dark:text-blue-300">
+                        Garagem
+                      </Badge>
+                    </div>
 
-                <div>
-                  <Label className="text-xs font-semibold">Previsão de Conclusão</Label>
-                  <Input
-                    type="date"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                    className="mt-1 h-8 text-xs"
-                  />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1.5 px-2.5 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                      onClick={() => setIsVehicleDialogOpen(true)}
+                    >
+                      <Plus className="h-3 w-3" /> Novo Veículo
+                    </Button>
+                  </div>
+
+                  {/* Estado A: Carregando veículos da garagem */}
+                  {customerId !== 'none' && loadingVehicles ? (
+                    <div className="p-4 rounded-xl border border-dashed border-blue-200 dark:border-blue-900 bg-background/50 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      <span>Buscando veículos na garagem do cliente...</span>
+                    </div>
+                  ) : customerId !== 'none' && customerVehicles.length > 0 ? (
+                    /* Cenário 1: Cliente selecionado e POSSUI veículos na garagem -> Select de Veículo */
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-foreground">Veículo do Cliente *</Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 text-[11px] text-blue-600 dark:text-blue-400 p-0 hover:underline flex items-center gap-1"
+                              onClick={() => setIsVehicleDialogOpen(true)}
+                            >
+                              <Plus className="h-3 w-3" /> Cadastrar Outro
+                            </Button>
+                          </div>
+                          <Select value={selectedVehicleId} onValueChange={handleSelectVehicle}>
+                            <SelectTrigger className="h-9 text-xs bg-background">
+                              <SelectValue placeholder="Selecione o veículo da garagem..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {customerVehicles.map((v) => (
+                                <SelectItem key={v.id} value={v.id} className="text-xs font-medium">
+                                  🚗 {formatVehiclePlate(v.plate)} — {v.brand ? `${v.brand} ` : ''}{v.model} {v.modelYear ? `(${v.modelYear})` : ''}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="manual" className="text-xs text-muted-foreground">
+                                ✏️ Informar outro veículo avulso
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-semibold text-foreground">KM Atual (Odômetro na Chegada) *</Label>
+                          <Input
+                            placeholder="Ex: 85.000"
+                            value={vehicleKm}
+                            onChange={(e) => setVehicleKm(e.target.value)}
+                            className="h-9 text-xs font-mono mt-1 bg-background"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Card com Detalhes do Veículo Selecionado */}
+                      {selectedVehicleId && selectedVehicleId !== 'manual' && (
+                        <div className="p-3 rounded-lg border bg-background/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {vehiclePlate && (
+                              <div className="border-2 border-blue-600/60 dark:border-blue-400/60 bg-muted/30 rounded-md px-2 py-0.5 text-center shrink-0">
+                                <p className="text-[7.5px] font-bold text-blue-600 dark:text-blue-400 tracking-wider">BRASIL</p>
+                                <p className="font-mono font-black text-xs text-foreground tracking-widest">
+                                  {formatVehiclePlate(vehiclePlate)}
+                                </p>
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-foreground truncate">
+                                {vehicleModel || 'Modelo do veículo'}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {[
+                                  vehicleYear ? `Ano: ${vehicleYear}` : null,
+                                  equipmentInfo || null
+                                ].filter(Boolean).join(' • ')}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 self-start sm:self-auto"
+                            onClick={() => setSelectedVehicleId('manual')}
+                          >
+                            ✏️ Editar dados nesta OS
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Digitação manual alternativa */}
+                      {selectedVehicleId === 'manual' && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                          <div>
+                            <Label className="text-xs font-semibold">Placa *</Label>
+                            <Input
+                              placeholder="Ex: ABC1D23"
+                              value={vehiclePlate}
+                              onChange={(e) => setVehiclePlate(formatVehiclePlate(e.target.value))}
+                              maxLength={8}
+                              className="mt-1 h-8 text-xs font-mono font-bold uppercase tracking-wider bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Modelo</Label>
+                            <Input
+                              placeholder="Ex: Gol 1.6, Civic"
+                              value={vehicleModel}
+                              onChange={(e) => setVehicleModel(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Ano</Label>
+                            <Input
+                              placeholder="Ex: 2020"
+                              value={vehicleYear}
+                              onChange={(e) => setVehicleYear(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Cor / Combustível</Label>
+                            <Input
+                              placeholder="Ex: Prata, Flex"
+                              value={equipmentInfo}
+                              onChange={(e) => setEquipmentInfo(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : customerId !== 'none' && !loadingVehicles ? (
+                    /* Cenário 2: Cliente selecionado mas NÃO possui veículo cadastrado -> Botão para Cadastrar */
+                    <div className="p-4 text-center rounded-xl border border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 space-y-2.5">
+                      <div className="flex items-center justify-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>Este cliente ainda não possui nenhum veículo cadastrado na garagem.</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
+                        Cadastre o veículo para registrar a placa, modelo e acompanhar o histórico de manutenções.
+                      </p>
+                      <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 text-xs gap-1.5 font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                          onClick={() => setIsVehicleDialogOpen(true)}
+                        >
+                          <Car className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5" />
+                          Cadastrar Veículo na Garagem
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-muted-foreground"
+                          onClick={() => setSelectedVehicleId('manual')}
+                        >
+                          ou informar apenas nesta OS
+                        </Button>
+                      </div>
+
+                      {selectedVehicleId === 'manual' && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-left border-t border-amber-200 dark:border-amber-900/50">
+                          <div>
+                            <Label className="text-xs font-semibold">Placa *</Label>
+                            <Input
+                              placeholder="Ex: ABC1D23"
+                              value={vehiclePlate}
+                              onChange={(e) => setVehiclePlate(formatVehiclePlate(e.target.value))}
+                              maxLength={8}
+                              className="mt-1 h-8 text-xs font-mono font-bold uppercase tracking-wider bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Modelo</Label>
+                            <Input
+                              placeholder="Ex: Gol 1.6, Civic"
+                              value={vehicleModel}
+                              onChange={(e) => setVehicleModel(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Ano</Label>
+                            <Input
+                              placeholder="Ex: 2020"
+                              value={vehicleYear}
+                              onChange={(e) => setVehicleYear(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">KM Atual</Label>
+                            <Input
+                              placeholder="Ex: 85.000"
+                              value={vehicleKm}
+                              onChange={(e) => setVehicleKm(e.target.value)}
+                              className="mt-1 h-8 text-xs font-mono bg-background"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Cenário 3: Cliente Balcão / Não selecionado */
+                    <div className="p-4 text-center rounded-xl border border-dashed border-border bg-background/50 space-y-2">
+                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                        <Car className="h-4 w-4 text-blue-500 shrink-0" />
+                        <span>Selecione um cliente acima para carregar os veículos da garagem.</span>
+                      </div>
+                      {selectedVehicleId !== 'manual' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => setSelectedVehicleId('manual')}
+                        >
+                          ✏️ Informar placa/veículo avulso (Cliente Balcão)
+                        </Button>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-left">
+                          <div>
+                            <Label className="text-xs font-semibold">Placa do Veículo *</Label>
+                            <Input
+                              placeholder="Ex: ABC1D23"
+                              value={vehiclePlate}
+                              onChange={(e) => setVehiclePlate(formatVehiclePlate(e.target.value))}
+                              maxLength={8}
+                              className="mt-1 h-8 text-xs font-mono font-bold uppercase tracking-wider bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Veículo / Modelo</Label>
+                            <Input
+                              placeholder="Ex: Gol 1.6, Civic EXL"
+                              value={vehicleModel}
+                              onChange={(e) => setVehicleModel(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Ano / Fab.</Label>
+                            <Input
+                              placeholder="Ex: 2018/2019"
+                              value={vehicleYear}
+                              onChange={(e) => setVehicleYear(e.target.value)}
+                              className="mt-1 h-8 text-xs bg-background"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">KM Atual (Odômetro)</Label>
+                            <Input
+                              placeholder="Ex: 85.000"
+                              value={vehicleKm}
+                              onChange={(e) => setVehicleKm(e.target.value)}
+                              className="mt-1 h-8 text-xs font-mono bg-background"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">
+                      Objeto / Equipamento / Veículo
+                    </Label>
+                    <Input
+                      placeholder="Ex: Notebook Dell Inspiron i5 / Placa: ABC-1234 / Nº Série: 99482"
+                      value={equipmentInfo}
+                      onChange={(e) => setEquipmentInfo(e.target.value)}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold">Previsão de Conclusão</Label>
+                    <Input
+                      type="date"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {businessSegment === 'repair' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Previsão de Conclusão</Label>
+                    <Input
+                      type="date"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground">Prazo Estimado de Liberação</Label>
+                    <div className="text-xs text-muted-foreground mt-2 italic">
+                      {scheduledAt ? `Programado para entrega em ${new Date(`${scheduledAt}T00:00:00`).toLocaleDateString('pt-BR')}` : 'Sem data definida (aviso por WhatsApp)'}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label className="text-xs font-semibold">Problema Reclamado pelo Cliente</Label>
@@ -1647,6 +2142,14 @@ export const ServiceOrderDialog: React.FC<ServiceOrderDialogProps> = ({
         />
       );
     })()}
+
+    {/* MODAL DE CRIAÇÃO RÁPIDA DE VEÍCULO */}
+    <VehicleDialog
+      open={isVehicleDialogOpen}
+      onOpenChange={setIsVehicleDialogOpen}
+      defaultCustomerId={customerId !== 'none' ? customerId : undefined}
+      onSuccess={handleVehicleCreated}
+    />
     </>
   );
 };

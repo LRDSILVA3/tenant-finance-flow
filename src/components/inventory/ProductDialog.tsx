@@ -99,7 +99,7 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
   product,
   onSuccess,
 }) => {
-  const { currentClient, suppliers = [] } = useFinance();
+  const { currentClient, suppliers = [], businessSegment = 'full' } = useFinance();
   const [saving, setSaving] = useState(false);
   const [fetchingEan, setFetchingEan] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -486,8 +486,8 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
               </div>
             </div>
 
-            {/* Variações & Medidas: Unidade, Tamanho e Cor */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Variações & Medidas: Unidade, Tamanho e Cor (ou Aplicação/Medida para mecânica) */}
+            <div className={cn("grid gap-4", businessSegment === 'repair' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-3")}>
               <div className="space-y-1.5">
                 <Label htmlFor="prod-unit" className="text-xs font-semibold">Unidade</Label>
                 <Select
@@ -508,13 +508,16 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                     <SelectItem value="M">Metro (M)</SelectItem>
                     <SelectItem value="M2">Metro² (M²)</SelectItem>
                     <SelectItem value="PAR">Par (PAR)</SelectItem>
+                    <SelectItem value="JG">Jogo / Kit (JG)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between h-5">
-                  <Label htmlFor="prod-size" className="text-xs font-semibold">Tamanho</Label>
+                  <Label htmlFor="prod-size" className="text-xs font-semibold">
+                    {businessSegment === 'repair' ? 'Aplicação / Medida' : 'Tamanho'}
+                  </Label>
                   {form.sizeOrVariant && (
                     <button
                       type="button"
@@ -529,78 +532,80 @@ export const ProductDialog: React.FC<ProductDialogProps> = ({
                   id="prod-size"
                   value={form.sizeOrVariant}
                   onChange={(e) => setForm((p) => ({ ...p, sizeOrVariant: e.target.value }))}
-                  placeholder="Ex: P, M, 42, 50ml..."
+                  placeholder={businessSegment === 'repair' ? 'Ex: Gol G5 1.0, Aro 15, Dianteiro...' : 'Ex: P, M, 42, 50ml...'}
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between h-5">
-                  <div className="flex items-center gap-1.5 min-w-0">
+              {businessSegment !== 'repair' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between h-5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {form.color && (
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-2xs shrink-0"
+                          style={{ backgroundColor: getColorHex(form.color) }}
+                        />
+                      )}
+                      <Label htmlFor="prod-color" className="text-xs font-semibold truncate">Cor</Label>
+                    </div>
                     {form.color && (
-                      <span
-                        className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-2xs shrink-0"
-                        style={{ backgroundColor: getColorHex(form.color) }}
-                      />
-                    )}
-                    <Label htmlFor="prod-color" className="text-xs font-semibold truncate">Cor</Label>
-                  </div>
-                  {form.color && (
-                    <button
-                      type="button"
-                      onClick={() => setForm((p) => ({ ...p, color: '' }))}
-                      className="text-[10px] text-muted-foreground hover:text-destructive font-medium shrink-0"
-                    >
-                      Limpar
-                    </button>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <Input
-                    id="prod-color"
-                    value={form.color}
-                    onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-                    placeholder="Ex: Preto, Azul..."
-                    className="pr-9"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
                       <button
                         type="button"
-                        aria-label="Selecionar cor na paleta"
-                        className="absolute right-2 p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-muted/80 transition-colors"
-                        title="Escolher cor da paleta"
+                        onClick={() => setForm((p) => ({ ...p, color: '' }))}
+                        className="text-[10px] text-muted-foreground hover:text-destructive font-medium shrink-0"
                       >
-                        <Palette className="h-4 w-4" />
+                        Limpar
                       </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-3 z-50" align="end">
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                          <span>Cores Rápidas</span>
-                          <span className="text-[10px] text-muted-foreground font-normal">Paleta Varejo</span>
+                    )}
+                  </div>
+                  <div className="relative flex items-center">
+                    <Input
+                      id="prod-color"
+                      value={form.color}
+                      onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+                      placeholder="Ex: Preto, Azul..."
+                      className="pr-9"
+                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Selecionar cor na paleta"
+                          className="absolute right-2 p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-muted/80 transition-colors"
+                          title="Escolher cor da paleta"
+                        >
+                          <Palette className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3 z-50" align="end">
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
+                            <span>Cores Rápidas</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">Paleta Varejo</span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {RETAIL_COLORS.map((c) => (
+                              <button
+                                key={c.name}
+                                type="button"
+                                onClick={() => setForm((p) => ({ ...p, color: c.name }))}
+                                className={cn(
+                                  "group relative w-7 h-7 rounded-md border flex items-center justify-center transition-all hover:scale-110",
+                                  form.color.toLowerCase() === c.name.toLowerCase() ? "ring-2 ring-primary ring-offset-1" : "border-border/60"
+                                )}
+                                style={{ backgroundColor: c.hex }}
+                                title={c.name}
+                              >
+                                <span className="sr-only">{c.name}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-6 gap-1.5">
-                          {RETAIL_COLORS.map((c) => (
-                            <button
-                              key={c.name}
-                              type="button"
-                              onClick={() => setForm((p) => ({ ...p, color: c.name }))}
-                              className={cn(
-                                "group relative w-7 h-7 rounded-md border flex items-center justify-center transition-all hover:scale-110",
-                                form.color.toLowerCase() === c.name.toLowerCase() ? "ring-2 ring-primary ring-offset-1" : "border-border/60"
-                              )}
-                              style={{ backgroundColor: c.hex }}
-                              title={c.name}
-                            >
-                              <span className="sr-only">{c.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Código de Barras & Localização Física no Estoque */}

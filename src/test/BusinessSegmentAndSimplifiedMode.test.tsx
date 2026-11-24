@@ -139,7 +139,7 @@ describe('Business Segment & Simplified Profile Mode', () => {
   });
 
   describe('Settings.tsx: Perfil do Negócio & Modo de Operação', () => {
-    it('deve exibir a seção de seleção de perfil com os 4 segmentos', () => {
+    it('deve exibir a seção de seleção de perfil com os segmentos configurados', () => {
       render(
         <MemoryRouter>
           <Settings />
@@ -148,8 +148,10 @@ describe('Business Segment & Simplified Profile Mode', () => {
 
       expect(screen.getByText('Perfil do Negócio & Modo de Operação')).toBeInTheDocument();
       expect(screen.getByText('Loja de Roupas & Varejo')).toBeInTheDocument();
-      expect(screen.getByText('Serviços & Agenda')).toBeInTheDocument();
-      expect(screen.getByText('Oficina & Assistência')).toBeInTheDocument();
+      expect(screen.getByText('Oficina Mecânica & Auto Center')).toBeInTheDocument();
+      expect(screen.getByText('Serviços, Estética & Barbearia')).toBeInTheDocument();
+      expect(screen.getByText('Alimentos & Gastronomia')).toBeInTheDocument();
+      expect(screen.getByText('Prestador B2B & Consultoria')).toBeInTheDocument();
       expect(screen.getByText('Modo Completo (Avançado)')).toBeInTheDocument();
     });
 
@@ -227,9 +229,9 @@ describe('Business Segment & Simplified Profile Mode', () => {
       );
 
       expect(screen.getByText('Ações Rápidas do Negócio')).toBeInTheDocument();
-      expect(screen.getByText('👗 Modo Loja Ativo')).toBeInTheDocument();
+      expect(screen.getByText('👗 Loja & Varejo')).toBeInTheDocument();
       expect(screen.getByText('Vender Agora')).toBeInTheDocument();
-      expect(screen.getByText('Estoque de Peças')).toBeInTheDocument();
+      expect(screen.getByText('Estoque & Grade')).toBeInTheDocument();
       expect(screen.getByText('Contas a Pagar')).toBeInTheDocument();
       expect(screen.getByText('Contas a Receber')).toBeInTheDocument();
       expect(screen.getByText('Nova Saída')).toBeInTheDocument();
@@ -241,8 +243,8 @@ describe('Business Segment & Simplified Profile Mode', () => {
       fireEvent.click(screen.getByText('Vender Agora'));
       expect(mockNavigateToView).toHaveBeenCalledWith('orders');
 
-      // Clicar em Estoque de Peças deve navegar para inventory
-      fireEvent.click(screen.getByText('Estoque de Peças'));
+      // Clicar em Estoque & Grade deve navegar para inventory
+      fireEvent.click(screen.getByText('Estoque & Grade'));
       expect(mockNavigateToView).toHaveBeenCalledWith('inventory');
 
       // Clicar em Contas a Pagar deve navegar para payables
@@ -279,6 +281,30 @@ describe('Business Segment & Simplified Profile Mode', () => {
       // Verificação dos totais agregados (Pendente: R$ 1.500,00 | Pago: R$ 2.800,00)
       expect(screen.getByText('Total Pendente a Pagar')).toBeInTheDocument();
       expect(screen.getByText('Total Já Pago (Quitado)')).toBeInTheDocument();
+    });
+
+    it('deve adaptar ações do Dashboard para Oficina Mecânica (repair)', () => {
+      mockBusinessSegment = 'repair';
+      const mockNavigateToView = vi.fn();
+
+      render(
+        <MemoryRouter>
+          <Dashboard
+            onNavigateToTransactions={vi.fn()}
+            onNavigateToView={mockNavigateToView}
+          />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('🔧 Oficina Mecânica')).toBeInTheDocument();
+      expect(screen.getByText('Nova OS')).toBeInTheDocument();
+      expect(screen.getByText('Veículo & Placa')).toBeInTheDocument();
+      expect(screen.getByText('Peças & Reposição')).toBeInTheDocument();
+      expect(screen.getByText('Clientes & Veículos')).toBeInTheDocument();
+      expect(screen.getByText('Distribuidoras Peças')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Nova OS'));
+      expect(mockNavigateToView).toHaveBeenCalledWith('service_orders');
     });
   });
 });

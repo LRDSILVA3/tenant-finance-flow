@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
+import { formatVehiclePlate } from '@/utils/vehicleUtils';
 import {
   Wrench,
   Plus,
@@ -139,6 +140,11 @@ export const ServiceOrders: React.FC = () => {
         collaboratorId: o.collaborator_id,
         status: o.status as ServiceOrderStatus,
         equipmentInfo: o.equipment_info,
+        vehicleId: o.vehicle_id,
+        vehiclePlate: o.vehicle_plate,
+        vehicleModel: o.vehicle_model,
+        vehicleYear: o.vehicle_year,
+        vehicleKm: o.vehicle_km ? Number(o.vehicle_km) : undefined,
         reportedDefect: o.reported_defect,
         technicalDiagnosis: o.technical_diagnosis,
         scheduledAt: o.scheduled_at ? new Date(o.scheduled_at) : undefined,
@@ -251,6 +257,8 @@ export const ServiceOrders: React.FC = () => {
         os.osNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         os.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (os.equipmentInfo && os.equipmentInfo.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (os.vehiclePlate && os.vehiclePlate.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (os.vehicleModel && os.vehicleModel.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (os.customer?.name && os.customer.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesStatus = statusFilter === 'all' || os.status === statusFilter;
@@ -343,7 +351,7 @@ export const ServiceOrders: React.FC = () => {
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por número, título, objeto ou cliente..."
+              placeholder="Buscar por número, título, placa, modelo ou cliente..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 text-xs sm:text-sm"
@@ -415,10 +423,27 @@ export const ServiceOrders: React.FC = () => {
                   <TableRow key={os.id} className="hover:bg-muted/30">
                     <TableCell className="font-bold text-xs text-primary">#{os.osNumber}</TableCell>
                     <TableCell className="text-xs">
-                      <div className="font-semibold text-foreground">{os.title}</div>
-                      {os.equipmentInfo && (
-                        <span className="text-[11px] text-muted-foreground block truncate max-w-xs">
-                          {os.equipmentInfo}
+                      <div className="font-semibold text-foreground flex items-center gap-1.5">
+                        {os.title}
+                        {os.vehiclePlate && (
+                          <Badge
+                            variant="outline"
+                            className="font-mono uppercase text-[10px] px-1.5 py-0 bg-muted/60 border-primary/30 text-primary cursor-pointer hover:bg-primary/10 transition-colors"
+                            onClick={() => setSearchQuery(formatVehiclePlate(os.vehiclePlate || ''))}
+                            title="Clique para filtrar OS deste veículo"
+                          >
+                            🚗 {formatVehiclePlate(os.vehiclePlate)}
+                          </Badge>
+                        )}
+                      </div>
+                      {(os.vehicleModel || os.vehicleKm || os.equipmentInfo) && (
+                        <span className="text-[11px] text-muted-foreground block truncate max-w-xs mt-0.5">
+                          {[
+                            os.vehicleModel,
+                            os.vehicleYear,
+                            os.vehicleKm ? `${Number(os.vehicleKm).toLocaleString('pt-BR')} km` : null,
+                            !os.vehicleModel && os.equipmentInfo ? os.equipmentInfo : null
+                          ].filter(Boolean).join(' • ')}
                         </span>
                       )}
                     </TableCell>

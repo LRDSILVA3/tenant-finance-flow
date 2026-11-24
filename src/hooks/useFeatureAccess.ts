@@ -41,6 +41,11 @@ export const useFeatureAccess = () => {
     if (!isSubscriptionActive()) return false;
     if (!currentPlan) return false;
 
+    // Relatórios liberados para o plano Básico e superiores
+    if (feature === 'advanced_reports') {
+      return true;
+    }
+
     return !!currentPlan.features[feature];
   };
 

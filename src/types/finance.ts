@@ -34,7 +34,7 @@ export interface ClientMember {
   createdAt: Date;
 }
 
-export type BusinessSegment = 'retail' | 'services' | 'repair' | 'full';
+export type BusinessSegment = 'retail' | 'repair' | 'services' | 'food' | 'b2b' | 'full';
 
 export interface Client {
   id: string;
@@ -416,6 +416,11 @@ export interface ServiceOrder {
   status: ServiceOrderStatus;
   title: string;
   equipmentInfo?: string;
+  vehicleId?: string;
+  vehiclePlate?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  vehicleKm?: number;
   reportedDefect?: string;
   technicalDiagnosis?: string;
   scheduledAt?: Date;
@@ -433,6 +438,23 @@ export interface ServiceOrder {
   products?: ServiceOrderProduct[];
   customer?: Customer;
   collaborator?: Collaborator;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CustomerVehicle {
+  id: string;
+  clientId: string;
+  customerId: string;
+  plate: string;
+  brand?: string;
+  model: string;
+  modelYear?: string;
+  color?: string;
+  fuelType?: string;
+  chassis?: string;
+  renavam?: string;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

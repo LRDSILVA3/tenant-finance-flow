@@ -46,7 +46,8 @@ import {
   X,
   Sun,
   Moon,
-  Smartphone
+  Smartphone,
+  BookOpen
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -68,9 +69,10 @@ const languageFlags: Record<Language, string> = {
 interface HeaderProps {
   onViewChange?: (view: any) => void;
   onStartTour?: () => void;
+  onOpenTutorials?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => {
+export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour, onOpenTutorials }) => {
   const { 
     language, 
     setLanguage, 
@@ -415,17 +417,31 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
             <span className="hidden md:inline">Instalar App</span>
           </Button>
 
+          {/* Central de Tutoriais (Desktop) */}
+          {onOpenTutorials && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenTutorials}
+              className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-primary h-9 px-2.5 rounded-md hover:bg-primary/10 transition-colors"
+              title="Abrir Central de Tutoriais e Guia por Tipo de Negócio"
+            >
+              <BookOpen className="h-4 w-4 text-primary" />
+              <span>Tutoriais</span>
+            </Button>
+          )}
+
           {/* Tour do Sistema (Desktop) */}
           {onStartTour && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onStartTour}
-              className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted animate-fade-in"
-              title="Iniciar tutorial do sistema"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground h-9 px-2 rounded-md hover:bg-muted"
+              title="Iniciar tour guiado do sistema"
             >
-              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-              <span>Tutorial</span>
+              <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+              <span>Tour</span>
             </Button>
           )}
 
@@ -497,10 +513,16 @@ export const Header: React.FC<HeaderProps> = ({ onViewChange, onStartTour }) => 
                     </>
                   )}
                 </DropdownMenuItem>
+                {onOpenTutorials && (
+                  <DropdownMenuItem onClick={onOpenTutorials} className="font-medium text-primary">
+                    <BookOpen className="mr-2 h-4 w-4 text-primary" />
+                    Central de Tutoriais
+                  </DropdownMenuItem>
+                )}
                 {onStartTour && (
                   <DropdownMenuItem onClick={onStartTour}>
-                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
-                    Tutorial do Sistema
+                    <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                    Tour do Sistema
                   </DropdownMenuItem>
                 )}
               </div>

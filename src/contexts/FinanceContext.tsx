@@ -7,6 +7,7 @@ import { translations, Translations } from '@/i18n/translations';
 import { useSubscription } from './SubscriptionContext';
 import { useTransactions } from './TransactionContext';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 import { Plan, Subscription, Category, Transaction, Collaborator, TransactionType, Customer, SystemNotification, Supplier, Order } from '@/types/finance';
 
@@ -98,6 +99,9 @@ interface FinanceContextType {
   markAllNotificationsAsRead: () => void;
   clearNotification: (id: string) => void;
   refreshNotifications: () => Promise<void>;
+
+  // Formatters
+  formatCurrency: (value?: number | null) => string;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -768,6 +772,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     markAllNotificationsAsRead,
     clearNotification,
     refreshNotifications,
+
+    // Formatters
+    formatCurrency,
   }), [
     isAuthenticated, authLoading, signOut, userProfile, userRole, updateProfile, language, setLanguage, t,
     clients, currentClient, setCurrentClient, addClient, loadingClients,

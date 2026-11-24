@@ -114,6 +114,13 @@ export const PlanManagement: React.FC = () => {
                           <span className="text-xs">Comissões</span>
                         </div>
                         <div className="flex items-center gap-2 mb-2">
+                          <Switch
+                            checked={editingPlan.features.advanced_reports ?? true}
+                            onCheckedChange={v => updateFeature('advanced_reports', v)}
+                          />
+                          <span className="text-xs">Relatórios</span>
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
                           <span className="text-xs w-24">Max Colabs:</span>
                           <Input
                             type="number"
@@ -143,6 +150,7 @@ export const PlanManagement: React.FC = () => {
                         <div className="flex gap-2">
                           {plan.features.payment_methods && <Sparkles className="h-4 w-4 text-blue-500" title="Recebimentos" />}
                           {plan.features.commissions && <Sparkles className="h-4 w-4 text-amber-500" title="Comissões" />}
+                          {(plan.features.advanced_reports ?? true) && <Sparkles className="h-4 w-4 text-emerald-500" title="Relatórios" />}
                         </div>
                         <div className="text-[10px] text-muted-foreground">
                           Colabs: {plan.features.max_collaborators ?? 0} | Rec: {plan.features.max_recurring_transactions ?? 1}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { CommissionSettlement } from '@/services/commissionSettlementService';
 import { useFinance } from '@/contexts/FinanceContext';
+import { formatCurrency as defaultFormatCurrency } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,8 @@ export const CommissionReceiptDialog: React.FC<CommissionReceiptDialogProps> = (
   onOpenChange,
   settlement,
 }) => {
-  const { currentClient, formatCurrency } = useFinance();
+  const { currentClient, formatCurrency: contextFormatCurrency } = useFinance();
+  const formatCurrency = contextFormatCurrency || defaultFormatCurrency;
 
   if (!settlement) return null;
 
