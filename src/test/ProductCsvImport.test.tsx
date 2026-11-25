@@ -338,4 +338,208 @@ describe('ProductImportDialog', () => {
       window.FileReader = originalFileReader;
     }
   });
+
+  it('exibe o card do Catálogo Farmasi Brasil e permite carregar em 1 clique', async () => {
+    const mockFarmasiCsv =
+      'Codigo;Nome;Marca;Tamanho_Medida;Cor;Unidade;Categoria;Quantidade;Preco_Venda;Preco_Custo;Foto_URL\r\n' +
+      '1002855;Sabonete de Massagem de Páprica Dr. C. Tuna;Farmasi;;;UN;Cuidados Corporais;0;50,00;32,50;https://content.farmasi.com.br/Product/1002855_400_1.webp\r\n' +
+      '1002775;Sunkiss Drops;Farmasi;;;UN;Maquiagem;0;130,00;84,50;https://content.farmasi.com.br/Product/1002775_400_1.webp\r\n';
+
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(mockFarmasiCsv),
+    } as any);
+
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={[]}
+      />
+    );
+
+    expect(screen.getByText('Catálogo Oficial Farmasi Brasil')).toBeInTheDocument();
+    expect(screen.getByText('247 Produtos')).toBeInTheDocument();
+
+    const loadBtn = screen.getByText('Carregar Catálogo');
+    fireEvent.click(loadBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Sabonete de Massagem de Páprica Dr. C. Tuna')).toBeInTheDocument();
+      expect(screen.getByText('Sunkiss Drops')).toBeInTheDocument();
+      expect(screen.getByText(/2 Novos/i)).toBeInTheDocument();
+    });
+
+    globalFetchSpy.mockRestore();
+  });
+
+  it('permite alternar entre as 5 marcas multimarcas (Natura, Avon, Eudora, WePink) e carregar seus catálogos', async () => {
+    const mockWePinkCsv =
+      'Codigo;Nome;Marca;Tamanho_Medida;Cor;Unidade;Categoria;Quantidade;Preco_Venda;Preco_Custo;Preco_Sugerido;Foto_URL\r\n' +
+      '211;Óleo Essencial Lavanda Serene Oil;WePink;;;UN;Perfumaria;0;;69,30;99,00;https://example.com/wepink.webp\r\n';
+
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(mockWePinkCsv),
+    } as any);
+
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={[]}
+      />
+    );
+
+    expect(screen.getByText('5 Marcas Disponíveis')).toBeInTheDocument();
+    expect(screen.getByText('WePink')).toBeInTheDocument();
+    expect(screen.getByText('Natura')).toBeInTheDocument();
+    expect(screen.getByText('Avon')).toBeInTheDocument();
+    expect(screen.getByText('Eudora')).toBeInTheDocument();
+
+    // Clicar na aba WePink
+    fireEvent.click(screen.getByText('WePink'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Catálogo Oficial WePink Brasil')).toBeInTheDocument();
+      expect(screen.getByText('200 Produtos')).toBeInTheDocument();
+    });
+
+    // Clicar em Carregar Catálogo da WePink
+    fireEvent.click(screen.getByText('Carregar Catálogo'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Óleo Essencial Lavanda Serene Oil')).toBeInTheDocument();
+      expect(screen.getByText(/1 Novos/i)).toBeInTheDocument();
+    });
+
+    globalFetchSpy.mockRestore();
+  });
+
+  it('exibe o card de sincronização diária e permite alternar o switch', async () => {
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={[]}
+      />
+    );
+
+    expect(screen.getByText('Sincronização Diária Automática (1x ao dia)')).toBeInTheDocument();
+    const syncSwitch = screen.getByRole('switch');
+    expect(syncSwitch).toBeInTheDocument();
+
+    fireEvent.click(syncSwitch);
+
+    await waitFor(() => {
+      expect(screen.getByText('Ativa')).toBeInTheDocument();
+      expect(screen.getByText(/Também atualizar preço de venda para o sugerido/i)).toBeInTheDocument();
+      expect(screen.getByText('Sincronizar Agora')).toBeInTheDocument();
+    });
+  });
+
+  it('permite alternar opção de aplicar preço sugerido e de atualizar existentes no passo 2', async () => {
+    const mockFarmasiCsv =
+      'Codigo;Nome;Marca;Tamanho_Medida;Cor;Unidade;Categoria;Quantidade;Preco_Venda;Preco_Custo;Preco_Sugerido;Foto_URL\r\n' +
+      '1002775;Sunkiss Drops;Farmasi;;;UN;Maquiagem;0;;84,50;130,00;https://content.farmasi.com.br/Product/1002775_400_1.webp\r\n';
+
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(mockFarmasiCsv),
+    } as any);
+
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={[
+          {
+            id: 'prod-existing-1',
+            name: 'Sunkiss Drops',
+            sku: '1002775',
+            current_stock: 1,
+            sale_price: 120,
+            cost_price: 70,
+            supplier_id: null,
+            category: 'Maquiagem',
+            unit: 'UN',
+          },
+        ]}
+      />
+    );
+
+    const loadBtn = screen.getByText('Carregar Catálogo');
+    fireEvent.click(loadBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Atualizar produtos já cadastrados encontrados pelo código/i)).toBeInTheDocument();
+      expect(screen.getByText(/Aplicar preço de venda sugerido pela revista\/marca/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 Atualizações/i)).toBeInTheDocument();
+    });
+
+    // Desmarcar atualizar produtos existentes
+    const updateExistingCheckbox = screen.getByLabelText(/Atualizar produtos já cadastrados encontrados pelo código/i);
+    fireEvent.click(updateExistingCheckbox);
+
+    await waitFor(() => {
+      expect(screen.getByText('Ignorado')).toBeInTheDocument();
+      expect(screen.getByText(/Confirmar Importação \(0\)/i)).toBeInTheDocument();
+    });
+
+    // Testa o seletor de desconto da consultora
+    const zeroDiscountBtn = screen.getByRole('button', { name: 'Sem Desconto (0%)' });
+    expect(zeroDiscountBtn).toBeInTheDocument();
+    fireEvent.click(zeroDiscountBtn);
+
+    await waitFor(() => {
+      // Quando 0% de desconto é escolhido, o preço de custo passa a ser o valor de catálogo (R$ 130,00)
+      // Ambos Preço Custo e Preço Sugerido exibem 130,00
+      expect(screen.getAllByText(/130,00/).length).toBeGreaterThanOrEqual(2);
+    });
+
+    globalFetchSpy.mockRestore();
+  });
+
+  it('permite alternar o percentual de desconto da consultora (0% sem desconto até 40%) recalculando o preço de custo', async () => {
+    const mockFarmasiCsv =
+      'Codigo;Nome;Marca;Tamanho_Medida;Cor;Unidade;Categoria;Quantidade;Preco_Venda;Preco_Custo;Preco_Sugerido;Foto_URL\r\n' +
+      '1002775;Sunkiss Drops;Farmasi;;;UN;Maquiagem;0;;84,50;100,00;https://content.farmasi.com.br/Product/1002775_400_1.webp\r\n';
+
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(mockFarmasiCsv),
+    } as any);
+
+    render(
+      <ProductImportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        existingProducts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Carregar Catálogo'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Desconto de Consultora na Compra/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sem Desconto (0%)' })).toBeInTheDocument();
+      // Inicialmente com 35%: 100 - 35% = R$ 65,00
+      expect(screen.getByText(/65,00/)).toBeInTheDocument();
+    });
+
+    // Clicar em Sem Desconto (0%): Preço de Custo vira R$ 100,00
+    fireEvent.click(screen.getByRole('button', { name: 'Sem Desconto (0%)' }));
+
+    await waitFor(() => {
+      // Ambos Preço Custo e Preço Sugerido exibem R$ 100,00 quando sem desconto
+      expect(screen.getAllByText(/100,00/).length).toBeGreaterThanOrEqual(2);
+    });
+
+    globalFetchSpy.mockRestore();
+  });
 });

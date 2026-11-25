@@ -22,6 +22,7 @@ import { ProductDialog, ProductDialogProduct } from './ProductDialog';
 import { BarcodePrintDialog } from './BarcodePrintDialog';
 import { ProductImportDialog } from './ProductImportDialog';
 import { getColorHex } from '@/utils/colorUtils';
+import { checkAndRunDailyCatalogSync } from '@/utils/catalogSyncUtils';
 import { 
   Package, 
   Plus, 
@@ -295,6 +296,24 @@ export const Inventory: React.FC = () => {
       loadSuppliers?.(currentClient.id);
     }
   }, [currentClient, loadProducts, loadSuppliers]);
+
+  // Sincronização Diária Automática de Catálogo (Farmasi, etc.)
+  useEffect(() => {
+    if (!currentClient?.id) return;
+    checkAndRunDailyCatalogSync(currentClient.id)
+      .then((res) => {
+        if (res.synced && res.updatedCount > 0) {
+          toast({
+            title: 'Catálogo Oficial Atualizado',
+            description: `${res.updatedCount} produto(s) tiveram preços de custo e fotos sincronizados automaticamente.`,
+          });
+          loadProducts();
+        }
+      })
+      .catch((err) => {
+        console.warn('Erro na sincronização automática de catálogo:', err);
+      });
+  }, [currentClient?.id, loadProducts]);
 
   // Stable Refs to prevent Realtime WebSocket teardowns on state updates
   const productsRef = React.useRef(products);

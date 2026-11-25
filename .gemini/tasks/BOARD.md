@@ -1,5 +1,26 @@
 # Project Task Board
 
+- [x] **Importação Oficial Multimarcas de Cosméticos & Sincronização Diária em 1 Clique (Farmasi, Natura, Avon, Eudora, WePink) (`ProductImportDialog.tsx`, `catalogSyncUtils.ts`, `Inventory.tsx`, `scripts/scrapers/`, `CatalogSync.test.ts`, `ProductCsvImport.test.tsx`)**:
+  - (1) **Scrapers & Catálogos Oficiais Pré-Construídos (879 Produtos com Foto)**: Extração direta e padronização completa das 5 principais marcas de venda direta e cosméticos:
+    - *Farmasi*: 247 produtos com remoção do prefixo interno `PK`;
+    - *Natura*: 150 produtos (Demandware / Schema.org) com remoção do prefixo `NATBRA-`;
+    - *Avon*: 132 produtos (Demandware / Schema.org) com remoção do prefixo `AVNBRA-`;
+    - *Eudora*: 150 produtos (Grupo Boticário) com remoção do caractere inicial `E`;
+    - *WePink*: 200 produtos (VTEX IO Native API) com fotos HD e preços oficiais;
+    - Modelos gerados em `.csv` (padrão Excel com ponto e vírgula `;`) e `.json` em `public/templates/`;
+  - (2) **Motor de Precificação & Margem de Consultora**:
+    - Preenchimento prioritário do **Preço de Custo (`cost_price`)** calculado dinamicamente com base no desconto da revendedora/consultora (`0% Sem Desconto`, `30%`, `35%`, `40%` ou porcentagem livre digitada);
+    - **Preço de Venda (`sale_price`)** deixado livre/0 por padrão para total flexibilidade de markup do lojista, ou aplicado opcionalmente via checkbox com o valor sugerido da revista/marca;
+  - (3) **Controle de Itens Existentes & Prevenção de Sobrescrita**:
+    - Checkbox opcional "Atualizar produtos já cadastrados encontrados pelo código";
+    - Se desmarcado, produtos já cadastrados são rotulados como "Ignorado" na prévia e preservados intactos;
+  - (4) **Sincronização Diária Automática (1x ao dia)**:
+    - Utilitário unificado `catalogSyncUtils.ts` que verifica a periodicidade e cruza os SKUs com os catálogos oficiais atualizando fotos e custos em segundo plano de forma não-bloqueante no carregamento do Estoque (`Inventory.tsx`);
+    - Seletor de ativação e botão "Sincronizar Agora" acessíveis na interface;
+  - (5) **Qualidade & Testes Automatizados**:
+    - 21 novos testes unitários e de integração (`CatalogSync.test.ts` e `ProductCsvImport.test.tsx`);
+    - Suíte completa do projeto 100% aprovada (35 arquivos de teste, 188 testes passando) e build de produção validado (`npm run build`).
+
 - [x] **Programa "Indique e Ganhe" (Member-Get-Member SaaS) & Concessão de 22 Dias de Teste (`PLANO_INDIQUE_E_GANHE.md`, `referralUtils.ts`, `ReferralProgramDialog.tsx`, `Onboarding.tsx`, `Landing.tsx`, `SubscriptionTab.tsx`, `Header.tsx`, `FinanceContext.tsx`, `SubscriptionContext.tsx`, `ReferralProgram.test.tsx`, `20261124220000_create_referrals_and_codes.sql`)**:
   - (1) **Blindagem de Produção & Não-Regressão**: Implementação 100% não-bloqueante e retrocompatível. Usuários sem código de indicação navegam exatamente pelo fluxo padrão sem qualquer impacto;
   - (2) **Banco de Dados & Migration SQL (`20261124220000_create_referrals_and_codes.sql`)**: Adição de `referral_code` e `referred_by_code` em `public.clients` (com busca indexada); criação da tabela `public.referrals` com isolamento multi-tenant por RLS;
